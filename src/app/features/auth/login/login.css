@@ -1,0 +1,213 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--ink);
+  font-family: var(--font-ui);
+  color: var(--slate-900);
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  max-width: 1600px;
+  margin-inline: auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* On wide-enough viewports (two-column layout) lock the shell to the
+   viewport height so the page itself never scrolls; if content is still
+   too tall for a very short viewport, only the form panel scrolls. */
+@media (min-width: 901px) {
+  .shell {
+    height: 100vh;
+    height: 100dvh;
+  }
+  .hero,
+  .panel {
+    min-height: 0;
+  }
+}
+
+/* ---------- Hero panel ---------- */
+.hero {
+  position: relative;
+  background: linear-gradient(160deg, var(--navy) 0%, #123a5e 45%, var(--ink) 100%);
+  color: var(--white);
+  padding: clamp(20px, 4vh, 40px) 44px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+}
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 80% 20%, rgba(30, 95, 165, 0.35), transparent 55%);
+  pointer-events: none;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
+}
+.brand__crest {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  background: #f7f3ed;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  color: var(--action);
+}
+.brand__crest svg {
+  width: 26px;
+  height: 26px;
+}
+.brand__name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0.2px;
+}
+.brand__sub {
+  font-size: 12px;
+  color: #9fb6cc;
+  margin-top: 1px;
+}
+
+.hero__body {
+  position: relative;
+  z-index: 1;
+  max-width: 400px;
+}
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(217, 74, 69, 0.16);
+  border: 1px solid rgba(217, 74, 69, 0.35);
+  color: #f1a9a6;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 13px;
+  border-radius: 100px;
+  margin-bottom: 22px;
+}
+.tag svg {
+  width: 13px;
+  height: 13px;
+}
+.hero h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(28px, 3.4vw, 40px);
+  line-height: 1.08;
+  letter-spacing: -0.5px;
+  margin-bottom: 16px;
+}
+.hero__lead {
+  font-size: 15px;
+  line-height: 1.65;
+  color: #c6d6e6;
+  max-width: 340px;
+  margin: 0;
+}
+
+.trust {
+  display: flex;
+  gap: 26px;
+  position: relative;
+  z-index: 1;
+}
+.trust span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #a9c0d6;
+}
+.trust svg {
+  width: 17px;
+  height: 17px;
+  color: #6fa0cc;
+}
+
+/* ---------- Form panel ---------- */
+.panel {
+  background: var(--white);
+  display: flex;
+  align-items: center;
+  align-items: safe center;
+  justify-content: center;
+  padding: clamp(20px, 4vh, 40px) 40px;
+  overflow-y: auto;
+}
+.form {
+  width: 100%;
+  max-width: 380px;
+}
+
+.form__head h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 24px;
+  letter-spacing: -0.3px;
+  margin-bottom: 4px;
+}
+.form__head p {
+  font-size: 14px;
+  color: var(--slate-500);
+  margin: 0 0 20px;
+}
+
+.link--forgot {
+  display: block;
+  margin-top: 8px;
+  text-align: right;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+  .panel {
+    order: 1;
+    padding: 32px 24px;
+  }
+  .hero {
+    order: 2;
+    min-height: 0;
+    padding: 24px 26px;
+    gap: 18px;
+  }
+  .hero h1 {
+    font-size: 28px;
+  }
+  .hero__lead {
+    display: none;
+  }
+  .trust {
+    display: none;
+  }
+}
+@media (max-width: 420px) {
+  .hero {
+    padding: 20px 20px;
+  }
+  .hero h1 {
+    font-size: 24px;
+  }
+  .tag {
+    margin-bottom: 10px;
+  }
+}

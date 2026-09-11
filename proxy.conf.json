@@ -1,0 +1,7 @@
+{
+  "/cgi": {
+    "target": "http://edmontonfire.itestv2.uniformworks.ca",
+    "secure": false,
+    "changeOrigin": true
+  }
+}

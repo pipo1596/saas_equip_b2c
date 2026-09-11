@@ -1,1 +1,24 @@
 /* You can add global styles to this file, and also import other style files */
+
+/* Shared design tokens for the auth screens (login, MFA, forgot/reset
+   password) — defined globally so every auth component can reference them
+   without redeclaring the palette. Component-scoped `:root` rules don't
+   work under Angular's emulated encapsulation, so these live here instead. */
+:root {
+  --ink: #0a1622;
+  --navy: #0c1c2e;
+  --action: #1e5fa5;
+  --action-hover: #17507f;
+  --accent: #d94a45;
+  --slate-900: #0f172a;
+  --slate-600: #475569;
+  --slate-500: #64748b;
+  --slate-400: #94a3b8;
+  --slate-300: #cbd5e1;
+  --slate-200: #e2e8f0;
+  --field-bg: #f8fafc;
+  --white: #ffffff;
+  --radius: 10px;
+  --font-display: 'Archivo', system-ui, sans-serif;
+  --font-ui: 'Inter', system-ui, sans-serif;
+}
