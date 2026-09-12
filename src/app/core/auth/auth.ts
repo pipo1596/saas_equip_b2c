@@ -16,7 +16,9 @@ const ACTION = {
   resetPassword: 'RESET1',
 } as const;
 
-const SESSION_STORAGE_KEY = 'auth.session';
+// localStorage (not sessionStorage) — a session started in one tab should
+// already be logged in when the same origin is opened in a new tab.
+const AUTH_STORAGE_KEY = 'auth.session';
 
 export interface LoginResponse {
   success: boolean;
@@ -97,7 +99,7 @@ export class AuthService {
     this.session.set(null);
     this.pendingMfa.set(null);
     if (this.isBrowser) {
-      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      localStorage.removeItem(AUTH_STORAGE_KEY);
     }
   }
 
@@ -129,7 +131,7 @@ export class AuthService {
     if (!this.isBrowser) {
       return;
     }
-    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
   }
 
   private restoreSession(): Session | null {
@@ -137,7 +139,7 @@ export class AuthService {
       return null;
     }
     try {
-      const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+      const raw = localStorage.getItem(AUTH_STORAGE_KEY);
       return raw ? (JSON.parse(raw) as Session) : null;
     } catch {
       return null;

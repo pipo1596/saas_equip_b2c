@@ -25,15 +25,22 @@
 }
 
 .form-logo {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   width: 52px;
   height: 52px;
   border-radius: 14px;
   background: var(--field-bg);
   color: var(--action);
   margin: 0 0 14px;
+  overflow: hidden;
+}
+.form-logo img {
+  object-fit: contain;
+  padding: 8px;
 }
 .form-logo svg {
   width: 28px;

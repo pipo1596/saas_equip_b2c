@@ -1,0 +1,238 @@
+<app-header />
+
+<div class="announce">
+  <div class="announce__in wrap">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M3 11l18-5v12L3 14v-3z" />
+      <path d="M11.6 16.8A3 3 0 0 1 6 15" />
+    </svg>
+    {{
+      tenantSettings()?.alert_copy ??
+        'Latest news from Metro EMS: the 2026 station-boot policy is now in effect.'
+    }}
+    <a href="#">Read the update</a>
+  </div>
+</div>
+
+<section class="hero wrap">
+  <div class="hero__card">
+    <div class="hero__content">
+      <p class="hero__eyebrow">Field paramedic · Metro EMS</p>
+      <h1>Welcome back, Aaron.</h1>
+      <p class="hero__sub">
+        Here's where your account stands today. Shop your allotment, track orders, and stay
+        current with your department.
+      </p>
+      <div class="stats">
+        <div class="stat">
+          <div class="stat__label">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 1v22" />
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
+            Allotment balance
+          </div>
+          <div class="stat__value">$545.53<small> / $600</small></div>
+          <div class="track"><i [style.width.%]="91"></i></div>
+        </div>
+        <div class="stat">
+          <div class="stat__label">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 7h13v10H3z" />
+              <path d="M16 10h4l3 3v4h-7z" />
+              <circle cx="7.5" cy="18.5" r="1.5" />
+              <circle cx="18.5" cy="18.5" r="1.5" />
+            </svg>
+            Open orders
+          </div>
+          <div class="stat__value">2</div>
+          <div class="stat__meta">1 in transit · 1 processing</div>
+        </div>
+        <div class="stat">
+          <div class="stat__label">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 12l2 2 4-4" />
+              <circle cx="12" cy="12" r="9" />
+            </svg>
+            Approvals
+          </div>
+          <div class="stat__value">1</div>
+          <div class="stat__meta warn">Waiting on your review</div>
+        </div>
+      </div>
+      <div class="hero__cta">
+        <a class="btn btn--primary" href="#">Shop your allotment</a>
+        <a class="btn btn--ghost-light" href="#">View order history</a>
+      </div>
+    </div>
+    <div
+      class="hero__media"
+      aria-hidden="true"
+      [style.background-image]="
+        tenantSettings()?.hero_img ? 'url(' + tenantSettings()!.hero_img + ')' : null
+      "
+    ></div>
+  </div>
+</section>
+
+<!-- category carousel -->
+<section class="block">
+  <div class="block__head">
+    <div>
+      <h2>Shop by category</h2>
+      <p>Approved for the Firefighter allotment.</p>
+    </div>
+    <div class="headline-row">
+      <a class="seeall" href="#">View full catalog</a>
+      <button class="car-nav" type="button" aria-label="Previous" (click)="scrollCategories(-1)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 6l-6 6 6 6" />
+        </svg>
+      </button>
+      <button class="car-nav" type="button" aria-label="Next" (click)="scrollCategories(1)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 6l6 6-6 6" />
+        </svg>
+      </button>
+    </div>
+  </div>
+  <div class="carousel">
+    <div class="car-track" #categoryTrack>
+      <a class="ccard" href="#">
+        <div class="ccard__img">
+          <span class="ccard__count">14 styles</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M8 4l4 2 4-2 4 3-3 3v9H7V10L4 7z" /><path d="M9.5 6a2.5 2.5 0 0 0 5 0" /></svg>
+        </div>
+        <div class="ccard__body">
+          <div class="ccard__name">Polo shirts</div>
+          <div class="ccard__desc">Duty and casual polos</div>
+          <span class="ccard__shop">Shop <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span>
+        </div>
+      </a>
+      <a class="ccard" href="#">
+        <div class="ccard__img">
+          <span class="ccard__count">32 styles</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M8 3l4 3 4-3 5 4-3 3v11H6V10L3 7z" /></svg>
+        </div>
+        <div class="ccard__body">
+          <div class="ccard__name">Uniforms</div>
+          <div class="ccard__desc">Shirts and trousers</div>
+          <span class="ccard__shop">Shop <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span>
+        </div>
+      </a>
+      <a class="ccard" href="#">
+        <div class="ccard__img">
+          <span class="ccard__count">21 styles</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M7 4l5 2 5-2 3 3-2.5 2.5V20H6.5V9.5L4 7z" /></svg>
+        </div>
+        <div class="ccard__body">
+          <div class="ccard__name">T-shirts &amp; PT wear</div>
+          <div class="ccard__desc">Training and off-duty</div>
+          <span class="ccard__shop">Shop <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span>
+        </div>
+      </a>
+      <a class="ccard" href="#">
+        <div class="ccard__img">
+          <span class="ccard__count">18 styles</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M6 4h4v9c0 1 3 2 5 4l3 2v2H6z" /><path d="M6 17h13" /></svg>
+        </div>
+        <div class="ccard__body">
+          <div class="ccard__name">Footwear</div>
+          <div class="ccard__desc">Boots and duty shoes</div>
+          <span class="ccard__shop">Shop <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span>
+        </div>
+      </a>
+      <a class="ccard" href="#">
+        <div class="ccard__img">
+          <span class="ccard__badge">New</span>
+          <span class="ccard__count">14 styles</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M8 3l4 4 4-4 4 3-2 4v11H6V10L4 6z" /><path d="M12 7v14" /></svg>
+        </div>
+        <div class="ccard__body">
+          <div class="ccard__name">Outerwear</div>
+          <div class="ccard__desc">Jackets and shells</div>
+          <span class="ccard__shop">Shop <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span>
+        </div>
+      </a>
+      <a class="ccard" href="#">
+        <div class="ccard__img">
+          <span class="ccard__count">27 styles</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4" y="7" width="16" height="12" rx="2" /><path d="M9 7V5a3 3 0 0 1 6 0v2" /></svg>
+        </div>
+        <div class="ccard__body">
+          <div class="ccard__name">Gear</div>
+          <div class="ccard__desc">Duty and tactical gear</div>
+          <span class="ccard__shop">Shop <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span>
+        </div>
+      </a>
+      <a class="ccard" href="#">
+        <div class="ccard__img">
+          <span class="ccard__count">11 styles</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M4 13a8 8 0 0 1 16 0" /><path d="M2 13h20v3H2z" /></svg>
+        </div>
+        <div class="ccard__body">
+          <div class="ccard__name">Headwear</div>
+          <div class="ccard__desc">Caps and knit beanies</div>
+          <span class="ccard__shop">Shop <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span>
+        </div>
+      </a>
+      <a class="ccard" href="#">
+        <div class="ccard__img">
+          <span class="ccard__count">40+ styles</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v10M7 12h10" /></svg>
+        </div>
+        <div class="ccard__body">
+          <div class="ccard__name">Accessories</div>
+          <div class="ccard__desc">Belts, gloves, and more</div>
+          <span class="ccard__shop">Shop <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- quick actions -->
+<section class="block block--flush-top">
+  <div class="block__head">
+    <div>
+      <h2>Your portal</h2>
+      <p>Everything you need to manage your account and orders.</p>
+    </div>
+  </div>
+  <div class="actions">
+    <a class="action" href="#">
+      <span class="action__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5" /><path d="M5 20c0-3.6 3.1-5.5 7-5.5s7 1.9 7 5.5" /></svg></span>
+      <span><span class="action__t">My account</span><span class="action__d">View and edit your profile and sizes</span></span>
+    </a>
+    <a class="action" href="#">
+      <span class="action__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l9-4 9 4-9 4-9-4z" /><path d="M3 7v10l9 4 9-4V7" /><path d="M12 11v10" /></svg></span>
+      <span><span class="action__t">Order history</span><span class="action__d">Track shipments and reorder past items</span></span>
+    </a>
+    <a class="action" href="#">
+      <span class="action__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M10 9l5 3-5 3z" fill="currentColor" stroke="none" /></svg></span>
+      <span><span class="action__t">eQuip videos</span><span class="action__d">Step-by-step platform tutorials</span></span>
+    </a>
+    <a class="action" href="#">
+      <span class="action__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M3 6l1 2M21 6l-1 2M7 6V4M11 6V4M15 6V4M19 6V4M4 8h16v3H4z" /><path d="M6 11v9h12v-9" /></svg></span>
+      <span><span class="action__t">Sizing</span><span class="action__d">Find your fit with the sizing guide</span></span>
+    </a>
+    <a class="action" href="#">
+      <span class="action__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l14-5v12L3 13v-2z" /><path d="M11.5 15.5A3 3 0 0 1 6 14" /><path d="M17 8a3 3 0 0 1 0 6" /></svg></span>
+      <span><span class="action__t">Department communication</span><span class="action__d">Updates, policies, and key info</span></span>
+    </a>
+    <a class="action" href="#">
+      <span class="action__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12l2 2 4-4" /><path d="M12 2l2.4 1.8 3 .1 1 2.8 2.4 1.8-1 2.8 1 2.8-2.4 1.8-1 2.8-3 .1L12 22l-2.4-1.8-3-.1-1-2.8L3.2 15l1-2.8-1-2.8 2.4-1.8 1-2.8 3-.1z" /></svg></span>
+      <span><span class="action__t">Approval dashboard</span><span class="action__d">Review and approve pending orders</span></span>
+    </a>
+    <a class="action" href="#">
+      <span class="action__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3.5" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3" /></svg></span>
+      <span><span class="action__t">Support &amp; resources</span><span class="action__d">Help with this shopping platform</span></span>
+    </a>
+    <a class="action" href="#">
+      <span class="action__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg></span>
+      <span><span class="action__t">Reorder essentials</span><span class="action__d">Quickly restock your go-to items</span></span>
+    </a>
+  </div>
+</section>
+
+<app-footer />

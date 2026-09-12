@@ -1,13 +1,44 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  OnInit,
+  PLATFORM_ID,
+  ViewChild,
+  inject,
+} from '@angular/core';
+
+import { TenantSettingsService } from '../../core/tenant/tenant-settings';
+import { Footer } from '../../shared/footer/footer';
+import { Header } from '../../shared/header/header';
 
 @Component({
   selector: 'app-home',
+  imports: [Header, Footer],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <main>
-      <h1>SaaS euIP B2C</h1>
-      <p>Welcome — this feature is ready to build.</p>
-    </main>
-  `,
+  templateUrl: './home.html',
+  styleUrls: ['../../shared/shared.css', './home.css'],
 })
-export class Home {}
+export class Home implements OnInit {
+  @ViewChild('categoryTrack') private readonly categoryTrack?: ElementRef<HTMLElement>;
+
+  private readonly tenantSettingsService = inject(TenantSettingsService);
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
+
+  readonly tenantSettings = this.tenantSettingsService.settings;
+
+  ngOnInit(): void {
+    if (this.isBrowser) {
+      this.tenantSettingsService.load().subscribe();
+    }
+  }
+
+  scrollCategories(direction: -1 | 1): void {
+    const track = this.categoryTrack?.nativeElement;
+    if (!track) {
+      return;
+    }
+    track.scrollBy({ left: direction * track.clientWidth * 0.8, behavior: 'smooth' });
+  }
+}

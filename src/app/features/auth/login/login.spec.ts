@@ -4,9 +4,13 @@ import { Router, provideRouter } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 import { Login } from './login';
 import { LoginResponse } from '../../../core/auth/auth';
+import { TenantSettings } from '../../../core/tenant/tenant-settings';
 
 describe('Login', () => {
   beforeEach(async () => {
+    // AuthService persists a successful login to localStorage, which
+    // (unlike TestBed's DI container) isn't reset between spec files.
+    localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [Login],
       providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
@@ -15,6 +19,7 @@ describe('Login', () => {
 
   afterEach(() => {
     TestBed.inject(HttpTestingController).verify();
+    localStorage.clear();
   });
 
   it('should create', () => {
@@ -120,5 +125,21 @@ describe('Login', () => {
 
     expect(navigateSpy).toHaveBeenCalledWith('/mfa');
     expect(login.loginError()).toBeNull();
+  });
+
+  it('should load tenant branding on init and expose it for the template', () => {
+    const fixture = TestBed.createComponent(Login);
+    const login = fixture.componentInstance;
+
+    expect(login.tenantSettings()).toBeNull();
+    login.ngOnInit();
+
+    const req = TestBed.inject(HttpTestingController).expectOne(
+      '/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS',
+    );
+    expect(req.request.body).toEqual({ action: '*GET' });
+    req.flush({ logo_url: '/photos/partner-2/logo.jpg' } as TenantSettings);
+
+    expect(login.tenantSettings()?.logo_url).toBe('/photos/partner-2/logo.jpg');
   });
 });

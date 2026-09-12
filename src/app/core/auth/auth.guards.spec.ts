@@ -10,14 +10,14 @@ describe('auth guards', () => {
   let router: Router;
 
   beforeEach(() => {
-    sessionStorage.clear();
+    localStorage.clear();
     TestBed.configureTestingModule({
       providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     });
     router = TestBed.inject(Router);
   });
 
-  afterEach(() => sessionStorage.clear());
+  afterEach(() => localStorage.clear());
 
   describe('authGuard', () => {
     it('redirects to / when there is no session', () => {

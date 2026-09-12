@@ -8,6 +8,9 @@ import { Mfa } from './mfa';
 
 describe('Mfa', () => {
   beforeEach(async () => {
+    // AuthService persists a successful verification to localStorage,
+    // which (unlike TestBed's DI container) isn't reset between spec files.
+    localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [Mfa],
       providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
@@ -16,6 +19,7 @@ describe('Mfa', () => {
 
   afterEach(() => {
     TestBed.inject(HttpTestingController).verify();
+    localStorage.clear();
   });
 
   it('should create', () => {

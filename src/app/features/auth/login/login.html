@@ -1,11 +1,20 @@
 <main class="shell">
   <!-- Hero / brand panel -->
-  <section class="hero">
+  <section
+    class="hero"
+    [style.background-image]="
+      tenantSettings()?.login_img ? 'url(' + tenantSettings()!.login_img + ')' : null
+    "
+  >
     <div class="brand">
       <span class="brand__crest" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z" />
-        </svg>
+        @if (tenantSettings(); as tenant) {
+          <img [ngSrc]="tenant.logo_url" fill alt="" />
+        } @else {
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z" />
+          </svg>
+        }
       </span>
       <div>
         <div class="brand__name">Uniform Works</div>
@@ -50,9 +59,13 @@
   <section class="panel">
     <form class="form" [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
       <span class="form-logo" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z" />
-        </svg>
+        @if (tenantSettings(); as tenant) {
+          <img [ngSrc]="tenant.logo_url" fill alt="" />
+        } @else {
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z" />
+          </svg>
+        }
       </span>
 
       <div class="form__head">
@@ -145,6 +158,14 @@
       <button type="submit" class="btn btn--primary" [disabled]="submitting()">
         {{ submitting() ? 'Signing in…' : 'Sign in' }}
       </button>
+
+      @if (tenantSettings(); as tenant) {
+        <p class="support-logo">
+          <span class="support-logo__badge">
+            <img [ngSrc]="tenant.sup_logo_url" fill alt="" />
+          </span>
+        </p>
+      }
 
       <p class="support">
         Trouble signing in?

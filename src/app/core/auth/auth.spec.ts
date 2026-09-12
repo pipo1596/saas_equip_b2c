@@ -9,7 +9,7 @@ describe('AuthService', () => {
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
-    sessionStorage.clear();
+    localStorage.clear();
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting()],
     });
@@ -19,7 +19,7 @@ describe('AuthService', () => {
 
   afterEach(() => {
     httpMock.verify();
-    sessionStorage.clear();
+    localStorage.clear();
   });
 
   it('starts out unauthenticated with no MFA pending', () => {

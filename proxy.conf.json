@@ -3,5 +3,10 @@
     "target": "http://edmontonfire.itestv2.uniformworks.ca",
     "secure": false,
     "changeOrigin": true
+  },
+  "/photos": {
+    "target": "http://edmontonfire.itestv2.uniformworks.ca",
+    "secure": false,
+    "changeOrigin": true
   }
 }

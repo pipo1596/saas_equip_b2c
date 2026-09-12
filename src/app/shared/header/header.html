@@ -1,0 +1,220 @@
+<!-- top utility bar -->
+<div class="topbar">
+  <div class="topbar__in wrap">
+    <span class="tb-item">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="8" r="3.5" />
+        <path d="M5 20c0-3.6 3.1-5.5 7-5.5s7 1.9 7 5.5" />
+      </svg>
+      Welcome, <b>{{ firstName() ?? 'there' }}</b>
+    </span>
+    <span class="tb-sep"></span>
+    <span class="tb-item tb-behalf">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M16 3.1a4 4 0 0 1 0 7.8" />
+        <path d="M21 21v-2a4 4 0 0 0-3-3.9" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
+      </svg>
+      Shopping on behalf of <b>Aaron Ermis</b><a href="#">Release</a>
+    </span>
+
+    <div class="tb-right">
+      <div class="dept-wrap">
+        <button
+          class="dept"
+          type="button"
+          aria-haspopup="menu"
+          [attr.aria-expanded]="deptMenuOpen()"
+          (click)="toggleDeptMenu()"
+        >
+          <svg class="pin" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z" />
+            <circle cx="12" cy="10" r="2.5" />
+          </svg>
+          <span class="dept__name">{{ activeDepartment().name }}</span>
+          <svg class="dept__chev" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+        <div class="dept-menu" [class.open]="deptMenuOpen()">
+          <div class="dept-menu__label">Switch location</div>
+          @for (department of departments; track department.name) {
+            <button
+              type="button"
+              class="dept-opt"
+              [class.active]="department.name === activeDepartment().name"
+              (click)="selectDepartment(department)"
+            >
+              <span class="dept-opt__dot" [style.background]="department.color">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z" />
+                  <circle cx="12" cy="10" r="2" />
+                </svg>
+              </span>
+              <span><b>{{ department.name }}</b><small>{{ department.role }}</small></span>
+              <svg class="dept-opt__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12l5 5 9-10" />
+              </svg>
+            </button>
+          }
+        </div>
+      </div>
+
+      <span class="tb-sep"></span>
+      <button class="iconbtn" type="button" aria-label="Notifications">
+        <span class="dot" aria-hidden="true"></span>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+        </svg>
+      </button>
+      <button class="iconbtn" type="button" aria-label="Open cart" (click)="openCart()">
+        @if (cartCount() > 0) {
+          <span class="badge-count">{{ cartCount() }}</span>
+        }
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="9" cy="20" r="1.4" />
+          <circle cx="18" cy="20" r="1.4" />
+          <path d="M2 3h3l2.4 12.4a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.6L23 7H6" />
+        </svg>
+      </button>
+      <div class="user-wrap">
+        <button
+          class="avatar"
+          type="button"
+          aria-haspopup="menu"
+          [attr.aria-expanded]="userMenuOpen()"
+          [attr.aria-label]="fullName() ? 'Account menu for ' + fullName() : 'Account menu'"
+          (click)="toggleUserMenu()"
+        >
+          {{ initials() ?? '?' }}
+        </button>
+        <div class="user-menu" [class.open]="userMenuOpen()">
+          @if (fullName()) {
+            <div class="user-menu__name">{{ fullName() }}</div>
+          }
+          <button type="button" class="user-menu__logout" (click)="logOut()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <path d="M16 17l5-5-5-5" />
+              <path d="M21 12H9" />
+            </svg>
+            Log off
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- main app bar -->
+<header class="appbar">
+  <div class="appbar__in wrap">
+    <div class="appbar__left">
+      <a class="wordmark" routerLink="/home">Uniform<span>Works</span></a>
+      <nav class="topnav">
+        <a href="#" class="active">Clothing</a>
+        <a href="#">Footwear</a>
+        <a href="#">Gear</a>
+        <a href="#">Full catalog</a>
+      </nav>
+    </div>
+    <div class="allot-fields">
+      <span class="af"><i>Amount</i><b>$600.00</b></span>
+      <span class="af"><i>Used</i><b>$54.47</b></span>
+      <span class="af"><i>In cart</i><b>$0.00</b></span>
+      <span class="af"><i>Available</i><b class="good">$545.53</b></span>
+      <span class="af"><i>Renews</i><b>Sep 19</b></span>
+      <div class="allot-rules-wrap">
+        <button
+          class="allot-rules-btn"
+          type="button"
+          aria-label="Additional allotment rules"
+          aria-haspopup="menu"
+          [attr.aria-expanded]="rulesMenuOpen()"
+          (click)="toggleRulesMenu()"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 11v5" />
+            <circle cx="12" cy="7.6" r="0.6" fill="currentColor" />
+          </svg>
+          Rules
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+        <div class="allot-rules-menu" [class.open]="rulesMenuOpen()">
+          <div class="arm-head">Additional allotment rules</div>
+          <ul class="arm-list">
+            <li><b>Footwear</b> — 1 pair per benefit year</li>
+            <li><b>Outerwear</b> — $200 sub-limit</li>
+            <li>Orders over $150 require supervisor approval</li>
+            <li>Unused balance does not roll over</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="appbar__search wrap">
+    <div class="search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" />
+        <path d="M21 21l-4-4" />
+      </svg>
+      <input type="search" placeholder="Search uniforms, gear, or SKU" aria-label="Search" />
+    </div>
+  </div>
+</header>
+
+<div id="overlay" [class.show]="cartOpen()" (click)="closeCart()"></div>
+<aside
+  class="drawer"
+  [class.open]="cartOpen()"
+  role="dialog"
+  aria-modal="true"
+  aria-label="Your cart"
+  [attr.aria-hidden]="!cartOpen()"
+  (keydown.escape)="closeCart()"
+>
+  <div class="drawer__head">
+    <h3>Your cart</h3>
+    <button class="drawer__close" type="button" aria-label="Close cart" (click)="closeCart()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <path d="M6 6l12 12M18 6L6 18" />
+      </svg>
+    </button>
+  </div>
+  <div class="drawer__body">
+    @if (cartLines().length === 0) {
+      <p class="cart-empty">Your cart is empty.</p>
+    } @else {
+      @for (line of cartLines(); track line.id) {
+        <div class="cart-item">
+          <div class="cart-item__thumb" aria-hidden="true"></div>
+          <div class="cart-item__body">
+            <div class="cart-item__name">{{ line.name }}</div>
+            <div class="cart-item__sku">{{ line.sku }}</div>
+            <div class="cart-item__qtyrow">
+              <span class="qty">
+                <span>{{ line.qty }}</span>
+              </span>
+              <span class="cart-item__price">{{ line.price * line.qty | currency }}</span>
+            </div>
+          </div>
+        </div>
+      }
+    }
+  </div>
+  <div class="drawer__foot">
+    <div class="drawer__sub">
+      <span>Subtotal</span>
+      <b>{{ cartSubtotal() | currency }}</b>
+    </div>
+    <p class="drawer__note">Applies against your $600 annual allotment.</p>
+    <button type="button" class="btn btn--primary" [disabled]="cartLines().length === 0">
+      Checkout
+    </button>
+  </div>
+</aside>

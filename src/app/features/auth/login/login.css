@@ -33,13 +33,33 @@
 /* ---------- Hero panel ---------- */
 .hero {
   position: relative;
-  background: linear-gradient(160deg, var(--navy) 0%, #123a5e 45%, var(--ink) 100%);
+  /* Falls back to this gradient until a tenant `login_img` loads (or if it
+     never does) — the dynamic photo is layered in via a `background-image`
+     style binding, which only overrides this one longhand property. */
+  background-color: var(--ink);
+  background-image: linear-gradient(160deg, var(--navy) 0%, #123a5e 45%, var(--ink) 100%);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   color: var(--white);
   padding: clamp(20px, 4vh, 40px) 44px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   overflow: hidden;
+}
+/* Dark scrim so the hero text stays legible over an arbitrary tenant photo. */
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(10, 22, 34, 0.55) 0%,
+    rgba(10, 22, 34, 0.35) 45%,
+    rgba(10, 22, 34, 0.85) 100%
+  );
+  pointer-events: none;
 }
 .hero::after {
   content: '';
@@ -57,6 +77,7 @@
   z-index: 1;
 }
 .brand__crest {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -67,10 +88,15 @@
   background: #f7f3ed;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
   color: var(--action);
+  overflow: hidden;
 }
 .brand__crest svg {
   width: 26px;
   height: 26px;
+}
+.brand__crest img {
+  object-fit: contain;
+  padding: 6px;
 }
 .brand__name {
   font-family: var(--font-display);
@@ -173,6 +199,20 @@
   display: block;
   margin-top: 8px;
   text-align: right;
+}
+
+.support-logo {
+  display: flex;
+  justify-content: center;
+  margin: 14px 0 0;
+}
+.support-logo__badge {
+  position: relative;
+  width: 120px;
+  height: 32px;
+}
+.support-logo__badge img {
+  object-fit: contain;
 }
 
 /* ---------- Responsive ---------- */
