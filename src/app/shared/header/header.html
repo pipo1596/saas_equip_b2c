@@ -103,7 +103,13 @@
 <header class="appbar">
   <div class="appbar__in wrap">
     <div class="appbar__left">
-      <a class="wordmark" routerLink="/home">Uniform<span>Works</span></a>
+      <a class="wordmark" routerLink="/home">
+        @if (tenantSettings()?.logo_url; as logoUrl) {
+          <span class="wordmark__logo">
+            <img [ngSrc]="logoUrl" fill alt="{{ tenantSettings()?.comp_name }}" />
+          </span>
+        } 
+      </a>
       <nav class="topnav">
         @for (item of catalogNavItems(); track item.key) {
           <button

@@ -252,6 +252,16 @@
 .wordmark span {
   color: var(--action);
 }
+.wordmark__logo {
+  position: relative;
+  display: block;
+  width: 130px;
+  height: 36px;
+}
+.wordmark__logo img {
+  object-fit: contain;
+  object-position: left center;
+}
 .topnav {
   display: flex;
   gap: 20px;

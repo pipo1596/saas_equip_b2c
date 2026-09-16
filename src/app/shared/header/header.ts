@@ -106,6 +106,8 @@ export class Header implements OnInit {
   readonly fullName = this.authService.fullName;
   readonly initials = this.authService.initials;
 
+  readonly tenantSettings = this.tenantSettingsService.settings;
+
   readonly locations = this.authService.locations;
   readonly activeLocation = this.locationSelectionService.activeLocation;
 

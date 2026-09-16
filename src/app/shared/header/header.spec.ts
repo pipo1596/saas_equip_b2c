@@ -34,6 +34,25 @@ describe('Header', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
+  it('should show no wordmark logo until tenant settings load, then the tenant logo', () => {
+    const fixture = TestBed.createComponent(Header);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.wordmark__logo')).toBeNull();
+
+    const tenantSettings = TestBed.inject(TenantSettingsService);
+    tenantSettings.settings.set({
+      logo_url: '/photos/partner-2/logo.jpg',
+      comp_name: 'Edmonton Fire Dept',
+    } as TenantSettings);
+    fixture.detectChanges();
+
+    const logo = fixture.nativeElement.querySelector('.wordmark__logo img');
+    expect(logo.getAttribute('src')).toContain('/photos/partner-2/logo.jpg');
+    expect(logo.getAttribute('alt')).toBe('Edmonton Fire Dept');
+    expect(fixture.nativeElement.querySelector('.wordmark').textContent.trim()).toBe('');
+  });
+
   it('should show no locations and no active location when logged out', () => {
     const fixture = TestBed.createComponent(Header);
     const header = fixture.componentInstance;
