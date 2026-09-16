@@ -256,6 +256,203 @@ describe('ProductList', () => {
     expect(fixture.componentInstance.page()).toBe(1);
   });
 
+  it('should clear only the size filter, leaving color selected, reset to page 1, and refetch', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', '5510');
+    auth.session.set({
+      empId: '1',
+      sessionId: 's',
+      firstName: 'P',
+      lastName: 'A',
+      locations: LOCATIONS,
+    });
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush(SAMPLE);
+
+    fixture.componentInstance.toggleSize('M');
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush(SAMPLE);
+    fixture.componentInstance.toggleColor('Black');
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush(SAMPLE);
+
+    fixture.componentInstance.goToPage(2);
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush({ ...SAMPLE, page: 2 });
+
+    fixture.componentInstance.clearSizeFilter();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.selectedSizes()).toEqual([]);
+    expect(fixture.componentInstance.selectedColors()).toEqual(['Black']);
+    expect(fixture.componentInstance.page()).toBe(1);
+
+    const req = expectProductsRequest(httpMock);
+    expect(req.request.body).toEqual({
+      action: '*PRODUCTS',
+      locationId: 18,
+      categoryId: 5510,
+      colors: ['Black'],
+      page: 1,
+      pageSize: 24,
+    });
+    req.flush(SAMPLE);
+  });
+
+  it('should clear only the color filter, leaving size selected, reset to page 1, and refetch', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', '5510');
+    auth.session.set({
+      empId: '1',
+      sessionId: 's',
+      firstName: 'P',
+      lastName: 'A',
+      locations: LOCATIONS,
+    });
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush(SAMPLE);
+
+    fixture.componentInstance.toggleSize('M');
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush(SAMPLE);
+    fixture.componentInstance.toggleColor('Black');
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush(SAMPLE);
+
+    fixture.componentInstance.goToPage(2);
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush({ ...SAMPLE, page: 2 });
+
+    fixture.componentInstance.clearColorFilter();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.selectedColors()).toEqual([]);
+    expect(fixture.componentInstance.selectedSizes()).toEqual(['M']);
+    expect(fixture.componentInstance.page()).toBe(1);
+
+    const req = expectProductsRequest(httpMock);
+    expect(req.request.body).toEqual({
+      action: '*PRODUCTS',
+      locationId: 18,
+      categoryId: 5510,
+      sizes: ['M'],
+      page: 1,
+      pageSize: 24,
+    });
+    req.flush(SAMPLE);
+  });
+
+  it('should freeze the sidebar facets once a filter is applied, instead of letting the narrowed response reshuffle them', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', '5510');
+    auth.session.set({
+      empId: '1',
+      sessionId: 's',
+      firstName: 'P',
+      lastName: 'A',
+      locations: LOCATIONS,
+    });
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush(SAMPLE);
+
+    expect(fixture.componentInstance.sizeFacets()).toEqual(SAMPLE.sizeFacets);
+
+    // Once size M is selected, the backend narrows the facets it returns —
+    // the sidebar should keep showing the original (unfiltered) set rather
+    // than reshuffling to match this narrowed response.
+    fixture.componentInstance.toggleSize('M');
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush({
+      ...SAMPLE,
+      sizeFacets: [{ value: 'M', count: 3 }],
+      colorFacets: [],
+    });
+
+    expect(fixture.componentInstance.sizeFacets()).toEqual(SAMPLE.sizeFacets);
+    expect(fixture.componentInstance.colorFacets()).toEqual(SAMPLE.colorFacets);
+
+    // Clearing the filter goes back to an unfiltered request — facets
+    // refresh again at that point.
+    fixture.componentInstance.toggleSize('M');
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush({
+      ...SAMPLE,
+      sizeFacets: [{ value: 'L', count: 5 }],
+    });
+
+    expect(fixture.componentInstance.sizeFacets()).toEqual([{ value: 'L', count: 5 }]);
+  });
+
+  it('should reset the selected filters when the category/search scope changes', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', '5510');
+    auth.session.set({
+      empId: '1',
+      sessionId: 's',
+      firstName: 'P',
+      lastName: 'A',
+      locations: LOCATIONS,
+    });
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush(SAMPLE);
+
+    fixture.componentInstance.toggleSize('M');
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush(SAMPLE);
+    expect(fixture.componentInstance.selectedSizes()).toEqual(['M']);
+
+    fixture.componentRef.setInput('categoryId', '321');
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.selectedSizes()).toEqual([]);
+    const req = expectProductsRequest(httpMock);
+    expect(req.request.body).toEqual({
+      action: '*PRODUCTS',
+      locationId: 18,
+      categoryId: 321,
+      page: 1,
+      pageSize: 24,
+    });
+    req.flush(SAMPLE);
+  });
+
+  it('should scroll the results back into view when toggling a size or color filter', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', '5510');
+    auth.session.set({
+      empId: '1',
+      sessionId: 's',
+      firstName: 'P',
+      lastName: 'A',
+      locations: LOCATIONS,
+    });
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush(SAMPLE);
+
+    // jsdom (used here) doesn't implement scrollIntoView at all — stub it
+    // the way a real browser's version would exist, so the component can
+    // find and call it.
+    const resultsTop = fixture.nativeElement.querySelector('.results-top') as HTMLElement;
+    const scrollIntoViewSpy = vi.fn();
+    resultsTop.scrollIntoView = scrollIntoViewSpy;
+
+    fixture.componentInstance.toggleSize('M');
+    fixture.detectChanges();
+    expect(scrollIntoViewSpy).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    expectProductsRequest(httpMock).flush(SAMPLE);
+
+    scrollIntoViewSpy.mockClear();
+    fixture.componentInstance.toggleColor('Black');
+    fixture.detectChanges();
+    expect(scrollIntoViewSpy).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    expectProductsRequest(httpMock).flush(SAMPLE);
+  });
+
   it('should paginate', () => {
     const fixture = TestBed.createComponent(ProductList);
     const auth = TestBed.inject(AuthService);

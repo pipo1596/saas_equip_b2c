@@ -107,13 +107,16 @@ export class ProductList {
       this.colorFacets().length > 0,
   );
 
-  // A new category/search/bucket always starts back at page 1 — only
-  // reacts to the route-bound inputs, not the filter signals below (those
-  // reset the page themselves, right where they change it).
-  private readonly resetPageOnRouteChange = effect(() => {
+  // A new category/search/bucket always starts back at page 1 with no
+  // filters selected — only reacts to the route-bound inputs, not the
+  // filter/page signals themselves (those reset the page right where they
+  // change it, without touching each other).
+  private readonly resetOnRouteChange = effect(() => {
     this.categoryId();
     this.q();
     this.page.set(1);
+    this.selectedSizes.set([]);
+    this.selectedColors.set([]);
   });
 
   private readonly loadProductsOnQueryChange = effect(() => {
@@ -144,9 +147,18 @@ export class ProductList {
         next: (result) => {
           this.products.set(result.products);
           this.totalCount.set(result.totalCount);
-          this.categoryFacets.set(result.categoryFacets);
-          this.sizeFacets.set(result.sizeFacets);
-          this.colorFacets.set(result.colorFacets);
+          // Only refresh the facet lists themselves from an unfiltered
+          // response — once a size/color is selected, the backend narrows
+          // (and sometimes reorders/drops) facets to match, which made the
+          // sidebar visibly shuffle around right as someone used it. Freeze
+          // it at whatever it looked like before any filter was applied;
+          // `resetOnRouteChange` clears both filters (and so re-arms this)
+          // whenever the category/search scope itself changes.
+          if (sizes.length === 0 && colors.length === 0) {
+            this.categoryFacets.set(result.categoryFacets);
+            this.sizeFacets.set(result.sizeFacets);
+            this.colorFacets.set(result.colorFacets);
+          }
           this.loading.set(false);
         },
         error: () => {
@@ -156,11 +168,24 @@ export class ProductList {
       });
   });
 
+  clearSizeFilter(): void {
+    this.selectedSizes.set([]);
+    this.page.set(1);
+    this.scrollResultsIntoView();
+  }
+
+  clearColorFilter(): void {
+    this.selectedColors.set([]);
+    this.page.set(1);
+    this.scrollResultsIntoView();
+  }
+
   toggleSize(size: string): void {
     this.selectedSizes.update((sizes) =>
       sizes.includes(size) ? sizes.filter((value) => value !== size) : [...sizes, size],
     );
     this.page.set(1);
+    this.scrollResultsIntoView();
   }
 
   toggleColor(color: string): void {
@@ -168,6 +193,7 @@ export class ProductList {
       colors.includes(color) ? colors.filter((value) => value !== color) : [...colors, color],
     );
     this.page.set(1);
+    this.scrollResultsIntoView();
   }
 
   goToPage(page: number): void {
@@ -175,12 +201,16 @@ export class ProductList {
       return;
     }
     this.page.set(page);
-    // Jump back to the top of the results immediately (not waiting on the
-    // new page's data to arrive) — otherwise the next page's items load in
-    // wherever the user happened to be scrolled to, which is usually the
-    // pagination controls at the very bottom. Guarded by a feature check
-    // (rather than just `isBrowser`) since jsdom, used in tests, doesn't
-    // implement `scrollIntoView` at all.
+    this.scrollResultsIntoView();
+  }
+
+  // Jumps back to the top of the results immediately (not waiting on the
+  // newly-filtered/paged data to arrive) — otherwise the new results load in
+  // wherever the user happened to be scrolled to, e.g. the pagination
+  // controls at the very bottom or a size/color chip further down the
+  // sidebar. Guarded by a feature check (rather than just `isBrowser`)
+  // since jsdom, used in tests, doesn't implement `scrollIntoView` at all.
+  private scrollResultsIntoView(): void {
     const target = this.resultsTop?.nativeElement;
     if (typeof target?.scrollIntoView === 'function') {
       target.scrollIntoView({ behavior: 'smooth', block: 'start' });

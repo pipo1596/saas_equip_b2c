@@ -17,7 +17,7 @@
      very top of the viewport, tucking it behind the header's own sticky
      bar — this reserves the same clearance used for the sticky facets
      sidebar below, plus a little breathing room. */
-  scroll-margin-top: 180px;
+  scroll-margin-top: 185px;
 }
 
 /* ---------- facets ---------- */
