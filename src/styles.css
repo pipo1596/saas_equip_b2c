@@ -33,3 +33,117 @@
   --font-display: 'Archivo', system-ui, sans-serif;
   --font-ui: 'Inter', system-ui, sans-serif;
 }
+
+/* ---------------------------------------------------------------------
+   Bootstrap theme bridge — retints Bootstrap's own utility and component
+   classes to this project's palette instead of Bootstrap's defaults, so
+   pages can adopt native Bootstrap classes (btn, card, form-control,
+   alert, text-*, bg-*) without visually drifting toward Bootstrap's own
+   blue/spacing/radius.
+
+   Root-level utilities (text-primary, bg-dark, form-control, card, ...)
+   already consume these `--bs-*` custom properties at runtime — Bootstrap
+   5.3's compiled CSS reads them directly. Buttons and the "subtle" alert
+   tones are the exception: Bootstrap bakes their colors into each
+   component's own local variables (or precomputed tint/shade hexes) at
+   build time, so retinting those needs the small explicit overrides
+   further down instead (see the .btn-primary/.alert-danger rules).
+   ------------------------------------------------------------------- */
+:root {
+  --bs-body-font-family: var(--font-ui);
+  --bs-body-color: var(--slate-900);
+  /* Deliberately NOT bridging --bs-body-bg: it defaults to white, which
+     `.card`/`.form-control` inherit for their own background — exactly
+     what this project wants (white cards/fields), even on pages whose own
+     top-level background is dark (auth) or light-gray (Home). Each page
+     sets its own background explicitly instead of relying on this. */
+  --bs-border-radius: 10px;
+  --bs-border-radius-lg: 14px;
+  --bs-border-color: var(--slate-200);
+  --bs-border-color-translucent: var(--slate-200);
+  --bs-secondary-color: var(--slate-500);
+  --bs-tertiary-bg: var(--slate-100);
+
+  --bs-primary: var(--action);
+  --bs-primary-rgb: 30, 95, 165;
+  --bs-link-color: var(--action);
+  --bs-link-color-rgb: 30, 95, 165;
+  --bs-link-hover-color: var(--action-hover);
+  --bs-link-hover-color-rgb: 23, 80, 127;
+
+  --bs-danger: var(--accent);
+  --bs-danger-rgb: 217, 74, 69;
+  --bs-success: var(--good);
+  --bs-warning: var(--amber);
+
+  --bs-dark: var(--ink);
+  --bs-dark-rgb: 10, 22, 34;
+}
+
+.btn-primary {
+  --bs-btn-bg: var(--action);
+  --bs-btn-border-color: var(--action);
+  --bs-btn-hover-bg: var(--action-hover);
+  --bs-btn-hover-border-color: var(--action-hover);
+  --bs-btn-active-bg: var(--action-hover);
+  --bs-btn-active-border-color: var(--action-hover);
+  --bs-btn-disabled-bg: var(--action);
+  --bs-btn-disabled-border-color: var(--action);
+  --bs-btn-focus-shadow-rgb: 30, 95, 165;
+}
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--action);
+  box-shadow: 0 0 0 0.25rem rgba(30, 95, 165, 0.15);
+}
+.btn-outline-light {
+  --bs-btn-color: #fff;
+  --bs-btn-border-color: rgba(255, 255, 255, 0.3);
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: rgba(255, 255, 255, 0.08);
+  --bs-btn-hover-border-color: rgba(255, 255, 255, 0.3);
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: rgba(255, 255, 255, 0.08);
+  --bs-btn-active-border-color: rgba(255, 255, 255, 0.3);
+}
+.btn-outline-secondary {
+  --bs-btn-color: var(--slate-700);
+  --bs-btn-border-color: var(--slate-200);
+  --bs-btn-hover-color: var(--action);
+  --bs-btn-hover-bg: transparent;
+  --bs-btn-hover-border-color: var(--action);
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: var(--navy);
+  --bs-btn-active-border-color: var(--navy);
+  --bs-btn-focus-shadow-rgb: 12, 28, 46;
+}
+/* Dropdown items use a plain checkmark/indicator (see .dept-opt) rather
+   than Bootstrap's own filled "active" state — neutralize its default blue
+   so selecting an item doesn't repaint its background. */
+.dropdown-item.active,
+.dropdown-item:active {
+  background-color: transparent;
+  color: var(--bs-dropdown-link-color, var(--slate-900));
+}
+.alert-danger {
+  --bs-alert-color: var(--accent);
+  --bs-alert-bg: rgba(217, 74, 69, 0.08);
+  --bs-alert-border-color: rgba(217, 74, 69, 0.3);
+}
+:root {
+  --bs-form-invalid-color: var(--accent);
+  --bs-form-invalid-border-color: var(--accent);
+}
+/* This project doesn't use Bootstrap's little embedded invalid/valid
+   check-mark icons inside fields — just the red border + message below,
+   so the background-image these two states bake in is switched off. */
+.form-control.is-invalid,
+.form-control.is-valid {
+  background-image: none;
+}
+
+/* The one thing Bootstrap's utilities can't express: this project's own
+   display/heading typeface (Bootstrap only ships a single body font). */
+.font-display {
+  font-family: var(--font-display);
+}

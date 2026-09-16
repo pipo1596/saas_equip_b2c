@@ -25,7 +25,7 @@ const SAMPLE: ProductSearchResult = {
   ],
   totalCount: 32,
   page: 1,
-  pageSize: 9,
+  pageSize: 24,
   categoryFacets: [{ progCatId: 5510, categoryName: 'Long sleeve', count: 14 }],
   sizeFacets: [{ value: 'M', count: 9 }],
   colorFacets: [{ value: 'Black', valueCode: '#0B0B0B', count: 7 }],
@@ -123,7 +123,7 @@ describe('ProductList', () => {
       locationId: 18,
       categoryId: 5510,
       page: 1,
-      pageSize: 9,
+      pageSize: 24,
     });
     req.flush(SAMPLE);
   });
@@ -147,7 +147,7 @@ describe('ProductList', () => {
       locationId: 18,
       bucket: 'FOOTWEAR',
       page: 1,
-      pageSize: 9,
+      pageSize: 24,
     });
     req.flush(SAMPLE);
   });
@@ -170,7 +170,7 @@ describe('ProductList', () => {
       action: '*PRODUCTS',
       locationId: 18,
       page: 1,
-      pageSize: 9,
+      pageSize: 24,
     });
     req.flush(SAMPLE);
   });
@@ -194,7 +194,7 @@ describe('ProductList', () => {
       locationId: 18,
       search: 'steel toe boots',
       page: 1,
-      pageSize: 9,
+      pageSize: 24,
     });
     req.flush(SAMPLE);
   });
@@ -219,7 +219,7 @@ describe('ProductList', () => {
     expect(text).toContain('32 products');
     expect(text).toContain('Sworn duty shirt, long sleeve');
     expect(text).toContain('Long sleeve');
-    expect(fixture.componentInstance.totalPages()).toBe(4);
+    expect(fixture.componentInstance.totalPages()).toBe(2);
   });
 
   it('should toggle a size filter, reset to page 1, and refetch with it included', () => {
@@ -236,7 +236,7 @@ describe('ProductList', () => {
     fixture.detectChanges();
     expectProductsRequest(httpMock).flush(SAMPLE);
 
-    fixture.componentInstance.goToPage(3);
+    fixture.componentInstance.goToPage(2);
     fixture.detectChanges();
     expectProductsRequest(httpMock).flush(SAMPLE);
 
@@ -250,7 +250,7 @@ describe('ProductList', () => {
       categoryId: 5510,
       sizes: ['M'],
       page: 1,
-      pageSize: 9,
+      pageSize: 24,
     });
     req.flush(SAMPLE);
     expect(fixture.componentInstance.page()).toBe(1);
@@ -279,11 +279,37 @@ describe('ProductList', () => {
       locationId: 18,
       categoryId: 5510,
       page: 2,
-      pageSize: 9,
+      pageSize: 24,
     });
     req.flush({ ...SAMPLE, page: 2 });
 
     expect(fixture.componentInstance.page()).toBe(2);
+  });
+
+  it('should scroll the results back into view when changing page', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', '5510');
+    auth.session.set({
+      empId: '1',
+      sessionId: 's',
+      firstName: 'P',
+      lastName: 'A',
+      locations: LOCATIONS,
+    });
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush(SAMPLE);
+
+    // jsdom (used here) doesn't implement scrollIntoView at all — stub it
+    // the way a real browser's version would exist, so goToPage() can find
+    // and call it.
+    const resultsTop = fixture.nativeElement.querySelector('.results-top') as HTMLElement;
+    const scrollIntoViewSpy = vi.fn();
+    resultsTop.scrollIntoView = scrollIntoViewSpy;
+
+    fixture.componentInstance.goToPage(2);
+
+    expect(scrollIntoViewSpy).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
   });
 
   it('should show an error message when the request fails', () => {

@@ -2,6 +2,7 @@ import { CurrencyPipe, NgOptimizedImage, NgTemplateOutlet, isPlatformBrowser } f
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   OnInit,
   PLATFORM_ID,
   computed,
@@ -16,6 +17,7 @@ import { AuthService, EmployeeLocation } from '../../core/auth/auth';
 import { CatalogCategory, CatalogMenu, CatalogViewService } from '../../core/catalog/catalog-view';
 import { LocationSelectionService } from '../../core/location/location-selection';
 import { TenantSettings, TenantSettingsService } from '../../core/tenant/tenant-settings';
+import { computeAdaptiveLogoHeight } from '../logo-sizing';
 
 type CatalogImageField = keyof Pick<TenantSettings, 'men_clth_im' | 'men_ftw_im' | 'men_gear_im'>;
 
@@ -24,6 +26,14 @@ interface CatalogNavLabel {
   readonly label: string;
   readonly imageField: CatalogImageField;
 }
+
+// The wordmark logo box's width always stays capped at this — only its
+// height adapts, so a tenant logo that isn't especially wide (closer to
+// square) renders taller instead of sitting tiny inside a box shaped for a
+// wide banner-style logo.
+const WORDMARK_LOGO_WIDTH = 130;
+const WORDMARK_LOGO_MIN_HEIGHT = 36;
+const WORDMARK_LOGO_MAX_HEIGHT = 52;
 
 const CATALOG_NAV_LABELS: readonly CatalogNavLabel[] = [
   { key: 'clothing', label: 'Clothing', imageField: 'men_clth_im' },
@@ -101,6 +111,10 @@ export class Header implements OnInit {
   private readonly router = inject(Router);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 
+  private readonly clearCatalogNavCloseTimeoutOnDestroy = inject(DestroyRef).onDestroy(() =>
+    this.cancelScheduledCatalogNavClose(),
+  );
+
   readonly session = this.authService.session;
   readonly firstName = this.authService.firstName;
   readonly fullName = this.authService.fullName;
@@ -144,6 +158,33 @@ export class Header implements OnInit {
     const key = this.openCatalogNavKey();
     return key ? (this.catalogNavItems().find((item) => item.key === key) ?? null) : null;
   });
+
+  // A short grace period between leaving a nav button/the flyout and
+  // actually closing it — without it, the gap between the button and the
+  // panel below it (they aren't DOM-nested) would close the menu the
+  // instant the mouse crosses it. Hovering back over either side cancels
+  // the pending close.
+  // Defaults to the box's old fixed height until the real logo has loaded
+  // and its aspect ratio is known.
+  readonly wordmarkLogoHeight = signal(WORDMARK_LOGO_MIN_HEIGHT);
+
+  onWordmarkLogoLoad(event: Event): void {
+    const img = event.target as HTMLImageElement;
+    if (!img.naturalWidth || !img.naturalHeight) {
+      return;
+    }
+    this.wordmarkLogoHeight.set(
+      computeAdaptiveLogoHeight(
+        img.naturalWidth,
+        img.naturalHeight,
+        WORDMARK_LOGO_WIDTH,
+        WORDMARK_LOGO_MIN_HEIGHT,
+        WORDMARK_LOGO_MAX_HEIGHT,
+      ),
+    );
+  }
+
+  private closeCatalogNavTimeoutId: ReturnType<typeof setTimeout> | null = null;
   readonly deptMenuOpen = signal(false);
   readonly rulesMenuOpen = signal(false);
   readonly userMenuOpen = signal(false);
@@ -182,13 +223,35 @@ export class Header implements OnInit {
   }
 
   toggleCatalogNav(key: CatalogNavLabel['key']): void {
+    this.cancelScheduledCatalogNavClose();
     this.deptMenuOpen.set(false);
     this.rulesMenuOpen.set(false);
     this.userMenuOpen.set(false);
     this.openCatalogNavKey.update((open) => (open === key ? null : key));
   }
 
+  openCatalogNavOnHover(key: CatalogNavLabel['key']): void {
+    this.cancelScheduledCatalogNavClose();
+    this.deptMenuOpen.set(false);
+    this.rulesMenuOpen.set(false);
+    this.userMenuOpen.set(false);
+    this.openCatalogNavKey.set(key);
+  }
+
+  scheduleCatalogNavClose(): void {
+    this.cancelScheduledCatalogNavClose();
+    this.closeCatalogNavTimeoutId = setTimeout(() => this.openCatalogNavKey.set(null), 200);
+  }
+
+  cancelScheduledCatalogNavClose(): void {
+    if (this.closeCatalogNavTimeoutId !== null) {
+      clearTimeout(this.closeCatalogNavTimeoutId);
+      this.closeCatalogNavTimeoutId = null;
+    }
+  }
+
   closeCatalogNav(): void {
+    this.cancelScheduledCatalogNavClose();
     this.openCatalogNavKey.set(null);
   }
 

@@ -53,6 +53,34 @@ describe('Header', () => {
     expect(fixture.nativeElement.querySelector('.wordmark').textContent.trim()).toBe('');
   });
 
+  it('should grow the wordmark logo box taller for a squarer logo, capped at the max height', () => {
+    const fixture = TestBed.createComponent(Header);
+    const header = fixture.componentInstance;
+
+    expect(header.wordmarkLogoHeight()).toBe(36);
+
+    // Roughly square (200x180) — at the box's fixed 130px width that ratio
+    // implies ~117px tall, well past the cap, so it should clamp to it.
+    header.onWordmarkLogoLoad({
+      target: { naturalWidth: 200, naturalHeight: 180 },
+    } as unknown as Event);
+    expect(header.wordmarkLogoHeight()).toBe(52);
+
+    // A wide banner logo (400x60) implies ~19.5px at that width — below the
+    // floor, so it should clamp back up to the box's minimum height.
+    header.onWordmarkLogoLoad({
+      target: { naturalWidth: 400, naturalHeight: 60 },
+    } as unknown as Event);
+    expect(header.wordmarkLogoHeight()).toBe(36);
+
+    // A moderate ratio (260x100) implies exactly 50px at that width —
+    // comfortably between the floor and the cap.
+    header.onWordmarkLogoLoad({
+      target: { naturalWidth: 260, naturalHeight: 100 },
+    } as unknown as Event);
+    expect(header.wordmarkLogoHeight()).toBe(50);
+  });
+
   it('should show no locations and no active location when logged out', () => {
     const fixture = TestBed.createComponent(Header);
     const header = fixture.componentInstance;
@@ -383,6 +411,44 @@ describe('Header', () => {
 
     header.toggleCatalogNav('gear');
     expect(header.deptMenuOpen()).toBe(false);
+    expect(header.openCatalogNavKey()).toBe('gear');
+  });
+
+  it('should open a catalog nav flyout on hover, and close it after a grace period once the mouse leaves', () => {
+    vi.useFakeTimers();
+    try {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+
+      header.openCatalogNavOnHover('footwear');
+      expect(header.openCatalogNavKey()).toBe('footwear');
+
+      header.scheduleCatalogNavClose();
+      vi.advanceTimersByTime(100);
+      expect(header.openCatalogNavKey()).toBe('footwear');
+
+      // Re-entering (the button, or the flyout panel itself) before the
+      // grace period elapses cancels the pending close.
+      header.cancelScheduledCatalogNavClose();
+      vi.advanceTimersByTime(200);
+      expect(header.openCatalogNavKey()).toBe('footwear');
+
+      header.scheduleCatalogNavClose();
+      vi.advanceTimersByTime(200);
+      expect(header.openCatalogNavKey()).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('should switch directly to a different flyout on hover without an intermediate close', () => {
+    const fixture = TestBed.createComponent(Header);
+    const header = fixture.componentInstance;
+
+    header.openCatalogNavOnHover('footwear');
+    header.scheduleCatalogNavClose();
+    header.openCatalogNavOnHover('gear');
+
     expect(header.openCatalogNavKey()).toBe('gear');
   });
 

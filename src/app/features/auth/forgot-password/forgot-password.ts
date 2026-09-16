@@ -26,7 +26,7 @@ function passwordsMatchValidator(group: AbstractControl): ValidationErrors | nul
   imports: [ReactiveFormsModule, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './forgot-password.html',
-  styleUrls: ['../auth-shared.css', './forgot-password.css'],
+  styleUrls: ['../auth-shared.css'],
 })
 export class ForgotPassword {
   private readonly formBuilder = inject(FormBuilder);

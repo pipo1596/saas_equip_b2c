@@ -73,7 +73,7 @@ describe('CatalogViewService', () => {
     expect(service.menu()).toEqual(SAMPLE.menu);
   });
 
-  it('issues a fresh request for every call, since the menu is location-specific', () => {
+  it('fetches fresh when the location changes', () => {
     service.load(18).subscribe();
     httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPCVEW').flush(SAMPLE);
 
@@ -83,5 +83,30 @@ describe('CatalogViewService', () => {
     req.flush({ ...SAMPLE, menu: { clothing: [], footwear: [], gear: [] } });
 
     expect(service.menu()).toEqual({ clothing: [], footwear: [], gear: [] });
+  });
+
+  it('reuses the cached response for a repeat call with the same location, without a new request', () => {
+    let first: CatalogView | undefined;
+    let second: CatalogView | undefined;
+    service.load(18).subscribe((view) => (first = view));
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPCVEW').flush(SAMPLE);
+
+    service.load(18).subscribe((view) => (second = view));
+
+    httpMock.expectNone('/cgi/APPSCDSPCH?SEPGM=APCTPCVEW');
+    expect(first).toEqual(SAMPLE);
+    expect(second).toEqual(SAMPLE);
+  });
+
+  it('shares one in-flight request between concurrent calls for the same location', () => {
+    let first: CatalogView | undefined;
+    let second: CatalogView | undefined;
+    service.load(18).subscribe((view) => (first = view));
+    service.load(18).subscribe((view) => (second = view));
+
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPCVEW').flush(SAMPLE);
+
+    expect(first).toEqual(SAMPLE);
+    expect(second).toEqual(SAMPLE);
   });
 });

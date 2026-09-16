@@ -1,27 +1,16 @@
-/* Shared primitives for the login / MFA / forgot-password screens: form
-   fields, buttons, links and error banners. Pulled out once three
-   components needed the same input-capsule/button/error styling, so each
-   auth component imports this alongside its own page-specific stylesheet
-   via the component's `styleUrl`/`styleUrls`. */
+/* Shared primitives for the login / MFA / forgot-password screens — just
+   the handful of things Bootstrap's own classes can't express (a fixed
+   card width, the icon-in-input capsule, the icon-only password toggle,
+   and the little logo badge). Everything else (buttons, alerts, form
+   fields, labels, links, spacing) comes straight from Bootstrap's
+   classes, retinted to this project's palette via the theme bridge in
+   styles.css. Imported alongside each component's own stylesheet via
+   `styleUrls`. */
 
-.auth-page {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  min-height: 100dvh;
-  padding: 24px;
-  background: var(--ink);
-  font-family: var(--font-ui);
-  color: var(--slate-900);
-}
 .auth-card {
   width: 100%;
   max-width: 420px;
-  background: var(--white);
-  border-radius: var(--radius);
-  padding: clamp(24px, 4vh, 40px);
-  box-shadow: 0 20px 60px rgba(10, 22, 34, 0.35);
+  --bs-card-border-radius: var(--card-radius);
 }
 
 .form-logo {
@@ -35,7 +24,6 @@
   border-radius: 14px;
   background: var(--field-bg);
   color: var(--action);
-  margin: 0 0 14px;
   overflow: hidden;
 }
 .form-logo img {
@@ -47,110 +35,40 @@
   height: 28px;
 }
 
-.auth-card h2 {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 24px;
-  letter-spacing: -0.3px;
-  margin-bottom: 4px;
-}
-.auth-card__lead {
-  font-size: 14px;
-  color: var(--slate-500);
-  margin: 0 0 20px;
-}
-
-.field {
-  margin-bottom: 14px;
-}
-label {
-  display: block;
-  margin-bottom: 7px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--slate-600);
-}
-.link {
-  color: var(--action);
-  text-decoration: none;
-  font-size: 13px;
-  font-weight: 500;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-}
-.link:hover {
-  text-decoration: underline;
-}
-
 /* The input, its lead icon and any trailing button all live inside one
-   flex "capsule" so widths/heights line up with the buttons below, and a
-   trailing icon button can never drift off the trailing edge. */
+   flex "capsule" so widths/heights line up with the buttons below — the
+   input itself is a plain Bootstrap `.form-control`; this just positions
+   the icon(s) over/around it. */
 .input-wrap {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  height: 44px;
-  background: var(--field-bg);
-  border: 1.5px solid var(--slate-200);
-  border-radius: var(--radius);
-  transition:
-    border-color 0.15s,
-    box-shadow 0.15s,
-    background 0.15s;
+  position: relative;
 }
-.input-wrap:hover {
-  border-color: var(--slate-300);
-}
-.input-wrap:focus-within {
-  background: var(--white);
-  border-color: var(--action);
-  box-shadow: 0 0 0 4px rgba(30, 95, 165, 0.12);
-}
-.input-wrap:has(input.ng-invalid.ng-touched) {
-  border-color: var(--accent);
+.input-wrap .form-control {
+  padding-left: 40px;
 }
 .input-wrap svg.lead {
-  flex: none;
-  margin-left: 13px;
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
   width: 18px;
   height: 18px;
   color: var(--slate-400);
   pointer-events: none;
 }
-.input-wrap input {
-  flex: 1 1 auto;
-  min-width: 0;
-  width: 100%;
-  height: 100%;
-  padding: 0 14px;
-  border: none;
-  background: transparent;
-  font-family: var(--font-ui);
-  font-size: 14px;
-  color: var(--slate-900);
-  box-shadow: none;
-  text-align: inherit;
+.input-wrap:has(input:focus) svg.lead {
+  color: var(--action);
 }
-.input-wrap input::placeholder {
-  color: var(--slate-400);
-}
-.input-wrap input:focus {
-  outline: none;
-}
-.input-wrap input:-webkit-autofill,
-.input-wrap input:-webkit-autofill:hover,
-.input-wrap input:-webkit-autofill:focus {
-  transition: background-color 9999s ease-in-out 0s;
-  -webkit-text-fill-color: var(--slate-900);
+.input-wrap .form-control:has(~ .toggle) {
+  padding-right: 40px;
 }
 
 .toggle {
-  flex: none;
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
   width: 34px;
   height: 34px;
-  margin: 0 5px 0 0;
   border: none;
   padding: 0;
   background: transparent;
@@ -168,80 +86,6 @@ label {
 .toggle svg {
   width: 19px;
   height: 19px;
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 44px;
-  font-family: var(--font-ui);
-  font-size: 15px;
-  font-weight: 600;
-  border-radius: var(--radius);
-  cursor: pointer;
-  text-decoration: none;
-  box-sizing: border-box;
-  transition:
-    background 0.15s,
-    transform 0.05s,
-    border-color 0.15s;
-}
-.btn:active {
-  transform: scale(0.99);
-}
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-.btn--primary {
-  background: var(--action);
-  color: var(--white);
-  border: none;
-  margin-top: 4px;
-}
-.btn--primary:hover:not(:disabled) {
-  background: var(--action-hover);
-}
-.btn--primary:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 4px rgba(30, 95, 165, 0.28);
-}
-
-.error {
-  font-size: 12px;
-  color: var(--accent);
-  margin-top: 6px;
-}
-.error--banner {
-  font-size: 13px;
-  margin: 0 0 16px;
-  padding: 10px 14px;
-  background: rgba(217, 74, 69, 0.08);
-  border: 1px solid rgba(217, 74, 69, 0.3);
-  border-radius: var(--radius);
-}
-
-.support {
-  font-size: 13px;
-  color: var(--slate-500);
-  text-align: center;
-  line-height: 1.6;
-  margin-top: 20px;
-}
-.support a {
-  color: var(--action);
-  text-decoration: none;
-}
-.support a:hover {
-  text-decoration: underline;
-}
-.copyright {
-  font-size: 12px;
-  color: var(--slate-400);
-  text-align: center;
-  margin-top: 6px;
 }
 
 @media (prefers-reduced-motion: reduce) {

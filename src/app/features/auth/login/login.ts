@@ -38,6 +38,9 @@ export class Login implements OnInit {
   // fallback mark below and swaps in the real logo/photo once this loads.
   readonly tenantSettings = this.tenantSettingsService.settings;
 
+  // Gates the whole screen behind a loader while tenant branding loads.
+  readonly showLoadingGate = this.tenantSettingsService.loading;
+
   readonly form = this.formBuilder.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
     password: ['', Validators.required],

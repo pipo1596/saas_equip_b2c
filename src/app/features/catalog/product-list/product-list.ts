@@ -2,7 +2,9 @@ import { CurrencyPipe, isPlatformBrowser } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   PLATFORM_ID,
+  ViewChild,
   computed,
   effect,
   inject,
@@ -22,7 +24,7 @@ import { LocationSelectionService } from '../../../core/location/location-select
 import { Footer } from '../../../shared/footer/footer';
 import { Header } from '../../../shared/header/header';
 
-const PAGE_SIZE = 9;
+const PAGE_SIZE = 24;
 const BUCKET_SLUGS = new Set(['clothing', 'footwear', 'gear']);
 
 type CatalogScope =
@@ -43,6 +45,8 @@ export class ProductList {
   private readonly locationSelectionService = inject(LocationSelectionService);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 
+  @ViewChild('resultsTop') private readonly resultsTop?: ElementRef<HTMLElement>;
+
   // Bound from the route: `categoryId` is the path param (a real category
   // id, one of the bucket slugs like "footwear", or "full-catalog"), `name`
   // the `?name=` query param the nav links pass along, and `q` the `?q=`
@@ -54,6 +58,14 @@ export class ProductList {
   readonly pageTitle = computed(() =>
     this.q() ? `Search results for "${this.q()}"` : this.name() || 'Category',
   );
+
+  // Highlights the currently browsed category in the facet list — only
+  // meaningful when the route's categoryId is itself a real numeric
+  // category id (not a bucket slug or "full-catalog").
+  readonly activeCategoryId = computed(() => {
+    const parsed = Number(this.categoryId());
+    return Number.isFinite(parsed) && this.categoryId() ? parsed : null;
+  });
 
   private readonly scope = computed<CatalogScope>(() => {
     const categoryId = this.categoryId();
@@ -85,6 +97,15 @@ export class ProductList {
 
   readonly pageSize = PAGE_SIZE;
   readonly totalPages = computed(() => Math.max(1, Math.ceil(this.totalCount() / this.pageSize)));
+
+  // Lets the sidebar column disappear entirely (rather than sit empty)
+  // when this scope has no facets to narrow by at all.
+  readonly hasFacets = computed(
+    () =>
+      this.categoryFacets().length > 0 ||
+      this.sizeFacets().length > 0 ||
+      this.colorFacets().length > 0,
+  );
 
   // A new category/search/bucket always starts back at page 1 — only
   // reacts to the route-bound inputs, not the filter signals below (those
@@ -154,5 +175,15 @@ export class ProductList {
       return;
     }
     this.page.set(page);
+    // Jump back to the top of the results immediately (not waiting on the
+    // new page's data to arrive) — otherwise the next page's items load in
+    // wherever the user happened to be scrolled to, which is usually the
+    // pagination controls at the very bottom. Guarded by a feature check
+    // (rather than just `isBrowser`) since jsdom, used in tests, doesn't
+    // implement `scrollIntoView` at all.
+    const target = this.resultsTop?.nativeElement;
+    if (typeof target?.scrollIntoView === 'function') {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 }

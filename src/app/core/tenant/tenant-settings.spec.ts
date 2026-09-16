@@ -88,6 +88,35 @@ describe('TenantSettingsService', () => {
     expect(service.settings()).toEqual(SAMPLE);
   });
 
+  it('is loading only while the request is in flight', () => {
+    expect(service.loading()).toBe(false);
+
+    service.load().subscribe();
+    expect(service.loading()).toBe(true);
+
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS').flush(SAMPLE);
+    expect(service.loading()).toBe(false);
+  });
+
+  it('stops loading even when the request fails', () => {
+    service.load().subscribe({ error: () => {} });
+    expect(service.loading()).toBe(true);
+
+    httpMock
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS')
+      .flush('failure', { status: 500, statusText: 'Server Error' });
+
+    expect(service.loading()).toBe(false);
+  });
+
+  it('does not report loading for a call that just returns the cached value', () => {
+    service.load().subscribe();
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS').flush(SAMPLE);
+
+    service.load().subscribe();
+    expect(service.loading()).toBe(false);
+  });
+
   it('does not issue a second request once cached', () => {
     service.load().subscribe();
     httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS').flush(SAMPLE);
@@ -128,7 +157,7 @@ describe('TenantSettingsService', () => {
     const existing = document.createElement('link');
     existing.rel = 'icon';
     existing.type = 'image/x-icon';
-    existing.href = 'favicon.ico';
+    existing.href = '';
     document.head.appendChild(existing);
 
     service.load().subscribe();

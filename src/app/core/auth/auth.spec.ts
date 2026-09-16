@@ -10,6 +10,7 @@ describe('AuthService', () => {
 
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting()],
     });
@@ -20,6 +21,7 @@ describe('AuthService', () => {
   afterEach(() => {
     httpMock.verify();
     localStorage.clear();
+    sessionStorage.clear();
   });
 
   it('starts out unauthenticated with no MFA pending', () => {
@@ -170,6 +172,108 @@ describe('AuthService', () => {
 
     expect(service.mfaPending()).toBe(false);
     expect(service.isAuthenticated()).toBe(true);
+  });
+
+  it('falls back to the pending challenge\'s empId/sessionId when the MFA1 success response omits them, and survives a refresh', () => {
+    service.login('pierre.achkar@3linc.com', 'Setup123!').subscribe();
+    httpMock
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN')
+      .flush({ success: true, mfaRequired: true, empId: '1', sessionId: 'sess-1', message: null });
+
+    service.verifyMfa('123456').subscribe();
+    // The verify response confirms success but — unlike the fixture used
+    // elsewhere in this file — doesn't repeat empId/sessionId, which a real
+    // MFA1 success response is not guaranteed to do.
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN').flush({
+      success: true,
+      mfaRequired: false,
+      firstName: 'Pierre',
+      lastName: 'Achkar',
+      message: null,
+    } satisfies LoginResponse);
+    httpMock
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
+      .flush({ empId: '1', firstName: 'Pierre', lastName: 'Achkar', locations: [] });
+
+    expect(service.session()).toEqual(
+      expect.objectContaining({ empId: '1', sessionId: 'sess-1' }),
+    );
+
+    // Simulate a refresh: a brand new AuthService instance restoring only
+    // from what was actually persisted to localStorage.
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    const restored = TestBed.inject(AuthService);
+
+    expect(restored.isAuthenticated()).toBe(true);
+    expect(restored.session()).toEqual(
+      expect.objectContaining({ empId: '1', sessionId: 'sess-1' }),
+    );
+  });
+
+  it('survives a page refresh mid-MFA by restoring the pending challenge from sessionStorage', () => {
+    service.login('pierre.achkar@3linc.com', 'Setup123!').subscribe();
+    httpMock
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN')
+      .flush({ success: true, mfaRequired: true, empId: '1', sessionId: 'sess-1', message: null });
+
+    // Simulate a refresh: a brand new AuthService instance, same persisted
+    // sessionStorage, nothing else carried over from the old instance.
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    const restored = TestBed.inject(AuthService);
+
+    expect(restored.mfaPending()).toBe(true);
+
+    const httpMockAfterRefresh = TestBed.inject(HttpTestingController);
+    restored.verifyMfa('123456').subscribe();
+    const verifyReq = httpMockAfterRefresh.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN');
+    expect(verifyReq.request.body).toEqual({
+      empId: '1',
+      sessionId: 'sess-1',
+      code: '123456',
+      action: 'MFA1',
+    });
+    verifyReq.flush({ success: true, mfaRequired: false, empId: '1', sessionId: 'sess-1', message: null });
+    httpMockAfterRefresh.expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE').flush({ empId: '1' });
+    httpMockAfterRefresh.verify();
+  });
+
+  it('discards a corrupt pending-MFA entry from sessionStorage instead of restoring it', () => {
+    sessionStorage.setItem('auth.pendingMfa', JSON.stringify({ empId: '1' }));
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    const restored = TestBed.inject(AuthService);
+
+    expect(restored.mfaPending()).toBe(false);
+    expect(sessionStorage.getItem('auth.pendingMfa')).toBeNull();
+  });
+
+  it('clears the persisted pending-MFA entry once verification succeeds', () => {
+    service.login('pierre.achkar@3linc.com', 'Setup123!').subscribe();
+    httpMock
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN')
+      .flush({ success: true, mfaRequired: true, empId: '1', sessionId: 'sess-1', message: null });
+    expect(sessionStorage.getItem('auth.pendingMfa')).not.toBeNull();
+
+    service.verifyMfa('123456').subscribe();
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN').flush({
+      success: true,
+      mfaRequired: false,
+      empId: '1',
+      sessionId: 'sess-1',
+      message: null,
+    });
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE').flush({ empId: '1' });
+
+    expect(sessionStorage.getItem('auth.pendingMfa')).toBeNull();
   });
 
   it('clears the session and any pending MFA state on logout', () => {

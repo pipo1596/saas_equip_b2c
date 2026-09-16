@@ -6,9 +6,16 @@ import {
   PLATFORM_ID,
   computed,
   inject,
+  signal,
 } from '@angular/core';
 
 import { TenantSettingsService } from '../../core/tenant/tenant-settings';
+import { computeAdaptiveLogoHeight } from '../logo-sizing';
+
+// See the equivalent constants in the header for why only height adapts.
+const FOOT_LOGO_WIDTH = 130;
+const FOOT_LOGO_MIN_HEIGHT = 40;
+const FOOT_LOGO_MAX_HEIGHT = 58;
 
 function normalizeUrl(url: string | null | undefined): string | null {
   if (!url || !url.trim()) {
@@ -34,6 +41,26 @@ export class Footer implements OnInit {
 
   readonly tenantSettings = this.tenantSettingsService.settings;
   readonly currentYear = new Date().getFullYear();
+
+  // Defaults to the box's old fixed height until the real logo has loaded
+  // and its aspect ratio is known.
+  readonly footLogoHeight = signal(FOOT_LOGO_MIN_HEIGHT);
+
+  onFootLogoLoad(event: Event): void {
+    const img = event.target as HTMLImageElement;
+    if (!img.naturalWidth || !img.naturalHeight) {
+      return;
+    }
+    this.footLogoHeight.set(
+      computeAdaptiveLogoHeight(
+        img.naturalWidth,
+        img.naturalHeight,
+        FOOT_LOGO_WIDTH,
+        FOOT_LOGO_MIN_HEIGHT,
+        FOOT_LOGO_MAX_HEIGHT,
+      ),
+    );
+  }
 
   // Department support falls back to these placeholder values until the
   // tenant's own contact settings load (or if a field is left blank).

@@ -1,6 +1,6 @@
 <!-- top utility bar -->
 <div class="topbar">
-  <div class="topbar__in wrap">
+  <div class="topbar__in container">
     <span class="tb-item">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <circle cx="12" cy="8" r="3.5" />
@@ -11,7 +11,7 @@
     
 
     <div class="tb-right">
-      <div class="dept-wrap">
+      <div class="dept-wrap dropdown">
         <button
           class="dept"
           type="button"
@@ -28,12 +28,12 @@
             <path d="M6 9l6 6 6-6" />
           </svg>
         </button>
-        <div class="dept-menu" [class.open]="deptMenuOpen()">
-          <div class="dept-menu__label">Switch location</div>
+        <div class="dept-menu dropdown-menu dropdown-menu-end shadow-lg" data-bs-popper [class.show]="deptMenuOpen()">
+          <div class="dropdown-header">Switch location</div>
           @for (location of locations(); track location.empLocId) {
             <button
               type="button"
-              class="dept-opt"
+              class="dept-opt dropdown-item d-flex align-items-center gap-2 rounded"
               [class.active]="location.locationId === activeLocation()?.locationId"
               (click)="selectLocation(location)"
             >
@@ -43,7 +43,7 @@
                   <circle cx="12" cy="10" r="2" />
                 </svg>
               </span>
-              <span><b>{{ location.locationName }}</b><small>Location {{ location.locationCode }}</small></span>
+              <span class="flex-grow-1"><b>{{ location.locationName }}</b><small>Location {{ location.locationCode }}</small></span>
               <svg class="dept-opt__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M5 12l5 5 9-10" />
               </svg>
@@ -60,9 +60,9 @@
           <path d="M13.7 21a2 2 0 0 1-3.4 0" />
         </svg>
       </button>
-      <button class="iconbtn" type="button" aria-label="Open cart" (click)="openCart()">
+      <button class="iconbtn position-relative" type="button" aria-label="Open cart" (click)="openCart()">
         @if (cartCount() > 0) {
-          <span class="badge-count">{{ cartCount() }}</span>
+          <span class="badge-count badge rounded-pill bg-primary position-absolute top-0 start-100 translate-middle">{{ cartCount() }}</span>
         }
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="9" cy="20" r="1.4" />
@@ -70,7 +70,7 @@
           <path d="M2 3h3l2.4 12.4a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.6L23 7H6" />
         </svg>
       </button>
-      <div class="user-wrap">
+      <div class="user-wrap dropdown">
         <button
           class="avatar"
           type="button"
@@ -81,11 +81,11 @@
         >
           {{ initials() ?? '?' }}
         </button>
-        <div class="user-menu" [class.open]="userMenuOpen()">
+        <div class="user-menu dropdown-menu dropdown-menu-end shadow-lg" data-bs-popper [class.show]="userMenuOpen()">
           @if (fullName()) {
             <div class="user-menu__name">{{ fullName() }}</div>
           }
-          <button type="button" class="user-menu__logout" (click)="logOut()">
+          <button type="button" class="dropdown-item d-flex align-items-center gap-2 text-danger" (click)="logOut()">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
               <path d="M16 17l5-5-5-5" />
@@ -101,15 +101,9 @@
 
 <!-- main app bar -->
 <header class="appbar">
-  <div class="appbar__in wrap">
+  <div class="appbar__top">
+    <div class="appbar__in container">
     <div class="appbar__left">
-      <a class="wordmark" routerLink="/home">
-        @if (tenantSettings()?.logo_url; as logoUrl) {
-          <span class="wordmark__logo">
-            <img [ngSrc]="logoUrl" fill alt="{{ tenantSettings()?.comp_name }}" />
-          </span>
-        } 
-      </a>
       <nav class="topnav">
         @for (item of catalogNavItems(); track item.key) {
           <button
@@ -119,6 +113,8 @@
             aria-haspopup="menu"
             [attr.aria-expanded]="openCatalogNavKey() === item.key"
             (click)="toggleCatalogNav(item.key)"
+            (mouseenter)="openCatalogNavOnHover(item.key)"
+            (mouseleave)="scheduleCatalogNavClose()"
           >
             {{ item.label }}
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -126,7 +122,7 @@
             </svg>
           </button>
         }
-        <a routerLink="/products/full-catalog" [queryParams]="{ name: 'Full Catalog' }">Full catalog</a>
+        <a class="text-decoration-none" routerLink="/products/full-catalog" [queryParams]="{ name: 'Full Catalog' }">Full catalog</a>
       </nav>
     </div>
     <div class="allot-fields">
@@ -135,7 +131,7 @@
       <span class="af"><i>In cart</i><b>$0.00</b></span>
       <span class="af"><i>Available</i><b class="good">$545.53</b></span>
       <span class="af"><i>Renews</i><b>Sep 19</b></span>
-      <div class="allot-rules-wrap">
+      <div class="allot-rules-wrap dropdown">
         <button
           class="allot-rules-btn"
           type="button"
@@ -154,7 +150,7 @@
             <path d="M6 9l6 6 6-6" />
           </svg>
         </button>
-        <div class="allot-rules-menu" [class.open]="rulesMenuOpen()">
+        <div class="allot-rules-menu dropdown-menu dropdown-menu-end shadow-lg p-3" data-bs-popper [class.show]="rulesMenuOpen()">
           <div class="arm-head">Additional allotment rules</div>
           <ul class="arm-list">
             <li><b>Footwear</b> — 1 pair per benefit year</li>
@@ -165,8 +161,50 @@
         </div>
       </div>
     </div>
+    </div>
+
+    @if (activeCatalogNavItem(); as item) {
+      <div
+        class="mega-menu"
+        (mouseenter)="cancelScheduledCatalogNavClose()"
+        (mouseleave)="scheduleCatalogNavClose()"
+      >
+        <div class="mega-menu__in container">
+          <div class="mega-menu__media">
+            @if (item.image) {
+              <img [ngSrc]="item.image" fill alt="" />
+            }
+          </div>
+          <div class="mega-menu__body">
+            <a
+              [routerLink]="['/products', item.key]"
+              [queryParams]="{ name: item.label }"
+              (click)="closeCatalogNav()"
+              class="mega-menu__viewall"
+            >View all {{ item.label }}</a>
+            <div class="mega-menu__grid" [style.--cols]="item.columnCount">
+              <ng-container
+                *ngTemplateOutlet="categoryBranch; context: { $implicit: item.categories }"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    }
   </div>
-  <form class="appbar__search wrap" [formGroup]="searchForm" (ngSubmit)="search()">
+  <form class="appbar__search container" [formGroup]="searchForm" (ngSubmit)="search()">
+    <a class="wordmark" routerLink="/home">
+      @if (tenantSettings()?.logo_url; as logoUrl) {
+        <span class="wordmark__logo" [style.height.px]="wordmarkLogoHeight()">
+          <img
+            [ngSrc]="logoUrl"
+            fill
+            alt="{{ tenantSettings()?.comp_name }}"
+            (load)="onWordmarkLogoLoad($event)"
+          />
+        </span>
+      }
+    </a>
     <div class="search">
       <button type="submit" class="search__btn" aria-label="Search">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -182,83 +220,57 @@
       />
     </div>
   </form>
-
-  @if (activeCatalogNavItem(); as item) {
-    <div class="mega-menu">
-      <div class="mega-menu__in wrap">
-        <div class="mega-menu__media">
-          @if (item.image) {
-            <img [ngSrc]="item.image" fill alt="" />
-          }
-        </div>
-        <div class="mega-menu__body">
-          <a
-            [routerLink]="['/products', item.key]"
-            [queryParams]="{ name: item.label }"
-            (click)="closeCatalogNav()"
-            class="mega-menu__viewall"
-          >View all {{ item.label }}</a>
-          <div class="mega-menu__grid" [style.--cols]="item.columnCount">
-            <ng-container
-              *ngTemplateOutlet="categoryBranch; context: { $implicit: item.categories }"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  }
 </header>
 
 <div id="mega-menu-overlay" [class.show]="activeCatalogNavItem() !== null" (click)="closeCatalogNav()"></div>
 
-<div id="overlay" [class.show]="cartOpen()" (click)="closeCart()"></div>
+<div class="offcanvas-backdrop fade" [class.show]="cartOpen()" [hidden]="!cartOpen()" (click)="closeCart()"></div>
 <aside
-  class="drawer"
-  [class.open]="cartOpen()"
+  class="offcanvas offcanvas-end shadow-lg"
+  [class.show]="cartOpen()"
+  tabindex="-1"
   role="dialog"
   aria-modal="true"
   aria-label="Your cart"
   [attr.aria-hidden]="!cartOpen()"
   (keydown.escape)="closeCart()"
 >
-  <div class="drawer__head">
-    <h3>Your cart</h3>
-    <button class="drawer__close" type="button" aria-label="Close cart" (click)="closeCart()">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-        <path d="M6 6l12 12M18 6L6 18" />
-      </svg>
-    </button>
+  <div class="offcanvas-header border-bottom">
+    <h3 class="offcanvas-title font-display fw-bold fs-5">Your cart</h3>
+    <button class="btn-close" type="button" aria-label="Close cart" (click)="closeCart()"></button>
   </div>
-  <div class="drawer__body">
-    @if (cartLines().length === 0) {
-      <p class="cart-empty">Your cart is empty.</p>
-    } @else {
-      @for (line of cartLines(); track line.id) {
-        <div class="cart-item">
-          <div class="cart-item__thumb" aria-hidden="true"></div>
-          <div class="cart-item__body">
-            <div class="cart-item__name">{{ line.name }}</div>
-            <div class="cart-item__sku">{{ line.sku }}</div>
-            <div class="cart-item__qtyrow">
-              <span class="qty">
-                <span>{{ line.qty }}</span>
-              </span>
-              <span class="cart-item__price">{{ line.price * line.qty | currency }}</span>
+  <div class="offcanvas-body d-flex flex-column">
+    <div class="flex-grow-1 overflow-y-auto">
+      @if (cartLines().length === 0) {
+        <p class="cart-empty">Your cart is empty.</p>
+      } @else {
+        @for (line of cartLines(); track line.id) {
+          <div class="cart-item">
+            <div class="cart-item__thumb" aria-hidden="true"></div>
+            <div class="cart-item__body">
+              <div class="cart-item__name">{{ line.name }}</div>
+              <div class="cart-item__sku">{{ line.sku }}</div>
+              <div class="cart-item__qtyrow">
+                <span class="qty">
+                  <span>{{ line.qty }}</span>
+                </span>
+                <span class="cart-item__price">{{ line.price * line.qty | currency }}</span>
+              </div>
             </div>
           </div>
-        </div>
+        }
       }
-    }
-  </div>
-  <div class="drawer__foot">
-    <div class="drawer__sub">
-      <span>Subtotal</span>
-      <b>{{ cartSubtotal() | currency }}</b>
     </div>
-    <p class="drawer__note">Applies against your $600 annual allotment.</p>
-    <button type="button" class="btn btn--primary" [disabled]="cartLines().length === 0">
-      Checkout
-    </button>
+    <div class="border-top pt-3 mt-2">
+      <div class="drawer__sub d-flex justify-content-between align-items-baseline mb-2">
+        <span>Subtotal</span>
+        <b>{{ cartSubtotal() | currency }}</b>
+      </div>
+      <p class="drawer__note">Applies against your $600 annual allotment.</p>
+      <button type="button" class="btn btn-primary w-100" [disabled]="cartLines().length === 0">
+        Checkout
+      </button>
+    </div>
   </div>
 </aside>
 

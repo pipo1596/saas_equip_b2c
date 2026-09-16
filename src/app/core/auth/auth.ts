@@ -23,6 +23,12 @@ const ACTION = {
 // already be logged in when the same origin is opened in a new tab.
 const AUTH_STORAGE_KEY = 'auth.session';
 
+// sessionStorage (not localStorage) — unlike a completed session, an
+// in-progress MFA challenge is specific to the tab that started it and
+// shouldn't resurface days later in a new tab; it only needs to survive a
+// refresh of the same tab while the user is entering their code.
+const PENDING_MFA_STORAGE_KEY = 'auth.pendingMfa';
+
 function capitalize(value: string): string {
   return value ? value.charAt(0).toUpperCase() + value.slice(1) : '';
 }
@@ -65,7 +71,7 @@ export class AuthService {
   private readonly dispatchUrl = `${environment.apiBaseUrl}/cgi/APPSCDSPCH?SEPGM=APCLOGIN`;
 
   readonly session = signal<Session | null>(this.restoreSession());
-  readonly pendingMfa = signal<PendingMfa | null>(null);
+  readonly pendingMfa = signal<PendingMfa | null>(this.restorePendingMfa());
 
   readonly isAuthenticated = computed(() => this.session() !== null);
   readonly mfaPending = computed(() => this.pendingMfa() !== null);
@@ -123,6 +129,7 @@ export class AuthService {
     this.session.set(null);
     this.pendingMfa.set(null);
     this.employeeService.clear();
+    this.clearPendingMfa();
     if (this.isBrowser) {
       localStorage.removeItem(AUTH_STORAGE_KEY);
     }
@@ -134,21 +141,33 @@ export class AuthService {
     }
 
     if (response.mfaRequired) {
-      this.pendingMfa.set({
+      const pending: PendingMfa = {
         empId: response.empId ?? '',
         sessionId: response.sessionId ?? '',
-      });
+      };
+      this.pendingMfa.set(pending);
+      this.persistPendingMfa(pending);
       return;
     }
 
+    // A successful MFA1 verification doesn't necessarily repeat the
+    // empId/sessionId the server already correlated via the code exchange
+    // — when it doesn't, fall back to the values from the pending
+    // challenge (the original LOGIN1 response) instead of persisting a
+    // session with blank identifiers. `restoreSession()` rejects a blank
+    // empId/sessionId on the next page load, so without this a session
+    // that "worked" for the rest of this tab's lifetime would silently log
+    // the user back out on refresh.
+    const pending = this.pendingMfa();
     const session: Session = {
-      empId: response.empId ?? '',
-      sessionId: response.sessionId ?? '',
+      empId: response.empId || pending?.empId || '',
+      sessionId: response.sessionId || pending?.sessionId || '',
       firstName: response.firstName ?? '',
       lastName: response.lastName ?? '',
       locations: [],
     };
     this.pendingMfa.set(null);
+    this.clearPendingMfa();
     this.session.set(session);
     this.persistSession(session);
     this.loadEmployeeDetails(session);
@@ -194,6 +213,40 @@ export class AuthService {
         return null;
       }
       return parsed as Session;
+    } catch {
+      return null;
+    }
+  }
+
+  private persistPendingMfa(pending: PendingMfa): void {
+    if (!this.isBrowser) {
+      return;
+    }
+    sessionStorage.setItem(PENDING_MFA_STORAGE_KEY, JSON.stringify(pending));
+  }
+
+  private clearPendingMfa(): void {
+    if (!this.isBrowser) {
+      return;
+    }
+    sessionStorage.removeItem(PENDING_MFA_STORAGE_KEY);
+  }
+
+  private restorePendingMfa(): PendingMfa | null {
+    if (!this.isBrowser) {
+      return null;
+    }
+    try {
+      const raw = sessionStorage.getItem(PENDING_MFA_STORAGE_KEY);
+      if (!raw) {
+        return null;
+      }
+      const parsed = JSON.parse(raw) as Partial<PendingMfa>;
+      if (!parsed.empId || !parsed.sessionId) {
+        sessionStorage.removeItem(PENDING_MFA_STORAGE_KEY);
+        return null;
+      }
+      return parsed as PendingMfa;
     } catch {
       return null;
     }

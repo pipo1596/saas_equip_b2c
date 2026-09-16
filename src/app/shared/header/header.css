@@ -48,9 +48,6 @@
 }
 
 /* location switcher */
-.dept-wrap {
-  position: relative;
-}
 .dept {
   display: flex;
   align-items: center;
@@ -80,50 +77,13 @@
   flex: none;
 }
 .dept-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
+  /* Everything else (position, background, border, shadow, padding,
+     show/hide) comes from Bootstrap's own `.dropdown-menu` — see
+     header.html. */
   width: 270px;
-  background: #fff;
-  border: 1px solid var(--slate-200);
-  border-radius: 12px;
-  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.16);
-  padding: 8px;
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-6px);
-  transition:
-    opacity 0.14s,
-    transform 0.14s,
-    visibility 0.14s;
-  z-index: 60;
-}
-.dept-menu.open {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-}
-.dept-menu__label {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--slate-500);
-  padding: 6px 8px;
 }
 .dept-opt {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 9px 8px;
-  border: none;
-  background: transparent;
-  border-radius: 9px;
   cursor: pointer;
-  text-align: left;
-  font-family: inherit;
-}
-.dept-opt:hover {
-  background: var(--slate-100);
 }
 .dept-opt__dot {
   width: 26px;
@@ -146,9 +106,6 @@
   font-size: 11.5px;
   color: var(--slate-500);
 }
-.dept-opt span:nth-child(2) {
-  flex: 1;
-}
 .dept-opt__check {
   color: var(--action);
   opacity: 0;
@@ -160,32 +117,10 @@
 
 /* account / log-off menu */
 .user-wrap {
-  position: relative;
   margin-left: 6px;
 }
 .user-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
   width: 200px;
-  background: #fff;
-  border: 1px solid var(--slate-200);
-  border-radius: 12px;
-  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.16);
-  padding: 8px;
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-6px);
-  transition:
-    opacity 0.14s,
-    transform 0.14s,
-    visibility 0.14s;
-  z-index: 60;
-}
-.user-menu.open {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
 }
 .user-menu__name {
   font-family: var(--font-display);
@@ -196,28 +131,6 @@
   border-bottom: 1px solid var(--slate-100);
   margin-bottom: 4px;
 }
-.user-menu__logout {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
-  border: none;
-  background: transparent;
-  border-radius: 9px;
-  cursor: pointer;
-  text-align: left;
-  font-family: var(--font-ui);
-  font-size: 13.5px;
-  font-weight: 500;
-  color: var(--accent);
-}
-.user-menu__logout:hover {
-  background: var(--slate-100);
-}
-.user-menu__logout svg {
-  flex: none;
-}
 
 /* ---------- main app bar ---------- */
 .appbar {
@@ -226,6 +139,13 @@
   position: sticky;
   top: 0;
   z-index: 40;
+}
+.appbar__top {
+  /* Anchors .mega-menu right below this row specifically (not the search
+     row below it too) — without this, the flyout sits far enough beneath
+     the nav buttons that a normal mouse move to reach it takes longer than
+     the close grace period, and it closes before the cursor arrives. */
+  position: relative;
 }
 .appbar__in {
   padding-top: 12px;
@@ -253,10 +173,13 @@
   color: var(--action);
 }
 .wordmark__logo {
+  /* Height is set inline from the component (see wordmarkLogoHeight) once
+     the real logo's aspect ratio is known — a squarer logo gets a taller
+     box instead of shrinking to fit a box shaped for a wide banner logo. */
   position: relative;
   display: block;
   width: 130px;
-  height: 36px;
+  transition: height 0.15s ease-out;
 }
 .wordmark__logo img {
   object-fit: contain;
@@ -327,7 +250,7 @@
   flex: none;
   width: 200px;
   height: 160px;
-  border-radius: 12px;
+  border-radius: 2px;
   overflow: hidden;
   background: var(--slate-100);
 }
@@ -357,9 +280,14 @@
      across all of them. Sizing columns to the actual section count instead
      guarantees every section gets its own column whenever there are 4 or
      fewer of them. */
+  /* Fixed-width (capped, not 1fr) tracks — with 1fr, a wide container plus
+     a short link list stretched every column far apart from the next to
+     fill the row. Capping the width instead packs columns snugly on the
+     left and lets any leftover row width collect once, after the last
+     column, rather than being split into gaps between every column. */
   display: grid;
-  grid-template-columns: repeat(min(var(--cols, 4), var(--max-cols, 4)), 1fr);
-  column-gap: 28px;
+  grid-template-columns: repeat(min(var(--cols, 4), var(--max-cols, 4)), minmax(0, 190px));
+  column-gap: 48px;
   row-gap: 20px;
 }
 .mega-menu__grid > .cat-flyout__list > li > .cat-flyout__link {
@@ -446,9 +374,6 @@
 .af b.good {
   color: var(--good);
 }
-.allot-rules-wrap {
-  position: relative;
-}
 .allot-rules-btn {
   display: inline-flex;
   align-items: center;
@@ -471,28 +396,7 @@
   flex: none;
 }
 .allot-rules-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
   width: 288px;
-  background: #fff;
-  border: 1px solid var(--slate-200);
-  border-radius: 12px;
-  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.16);
-  padding: 14px;
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-6px);
-  transition:
-    opacity 0.14s,
-    transform 0.14s,
-    visibility 0.14s;
-  z-index: 61;
-}
-.allot-rules-menu.open {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
 }
 .arm-head {
   font-family: var(--font-display);
@@ -530,7 +434,9 @@
 .appbar__search {
   padding-bottom: 12px;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
 }
 .iconbtn {
   position: relative;
@@ -557,21 +463,6 @@
   border-radius: 50%;
   background: var(--accent);
   border: 2px solid #fff;
-}
-.badge-count {
-  position: absolute;
-  top: 3px;
-  right: 2px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: var(--action);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 600;
-  display: grid;
-  place-items: center;
 }
 .avatar {
   width: 38px;
@@ -629,71 +520,11 @@
   box-shadow: 0 0 0 3px rgba(30, 95, 165, 0.12);
 }
 
-/* ---------- cart drawer + overlay ---------- */
-#overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(10, 22, 34, 0.45);
-  opacity: 0;
-  visibility: hidden;
-  transition:
-    opacity 0.2s,
-    visibility 0.2s;
-  z-index: 80;
-}
-#overlay.show {
-  opacity: 1;
-  visibility: visible;
-}
-.drawer {
-  position: fixed;
-  top: 0;
-  right: 0;
-  height: 100%;
-  width: 400px;
-  max-width: 92vw;
-  background: #fff;
-  z-index: 90;
-  display: flex;
-  flex-direction: column;
-  transform: translateX(100%);
-  transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: -8px 0 40px rgba(15, 23, 42, 0.18);
-}
-.drawer.open {
-  transform: translateX(0);
-}
-.drawer__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px 22px;
-  border-bottom: 1px solid var(--slate-200);
-}
-.drawer__head h3 {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 18px;
-}
-.drawer__close {
-  width: 34px;
-  height: 34px;
-  border: none;
-  background: var(--slate-100);
-  border-radius: 9px;
-  cursor: pointer;
-  color: var(--slate-600);
-  display: grid;
-  place-items: center;
-}
-.drawer__close:hover {
-  background: var(--slate-200);
-}
-.drawer__body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 12px 22px;
-}
+/* ---------- cart drawer + overlay ----------
+   Position, size, backdrop, header/close button and open/close transition
+   all come from Bootstrap's own `.offcanvas`/`.offcanvas-end` and
+   `.offcanvas-backdrop` — see header.html. Just the cart-specific content
+   (line items, quantity pill, totals) stays custom below. */
 .cart-empty {
   color: var(--slate-500);
   font-size: 14px;
@@ -750,16 +581,6 @@
   font-weight: 600;
   font-size: 13.5px;
 }
-.drawer__foot {
-  border-top: 1px solid var(--slate-200);
-  padding: 18px 22px 22px;
-}
-.drawer__sub {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 6px;
-}
 .drawer__sub span:first-child {
   font-size: 14px;
   color: var(--slate-600);
@@ -773,9 +594,6 @@
   font-size: 12px;
   color: var(--slate-500);
   margin-bottom: 14px;
-}
-.drawer__foot .btn {
-  width: 100%;
 }
 
 /* ---------- responsive ---------- */
@@ -800,10 +618,11 @@
     overflow-x: auto;
   }
   .appbar__search {
-    justify-content: flex-start;
+    flex-wrap: wrap;
   }
   .search {
-    width: 100%;
+    flex: 1;
+    width: auto;
   }
   .mega-menu__media {
     width: 170px;
@@ -831,9 +650,6 @@
   }
   .af-title {
     display: none;
-  }
-  .search {
-    width: 100%;
   }
   .mega-menu {
     max-height: calc(100vh - 60px);

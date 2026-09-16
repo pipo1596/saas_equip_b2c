@@ -147,4 +147,23 @@ describe('Login', () => {
 
     expect(login.tenantSettings()?.logo_url).toBe('/photos/partner-2/logo.jpg');
   });
+
+  it('should show the loading gate as soon as tenant settings start loading', () => {
+    const fixture = TestBed.createComponent(Login);
+    const login = fixture.componentInstance;
+
+    expect(login.showLoadingGate()).toBe(false);
+    login.ngOnInit();
+
+    expect(login.showLoadingGate()).toBe(true);
+
+    TestBed.inject(HttpTestingController)
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS')
+      .flush({
+        logo_url: '/photos/partner-2/logo.jpg',
+        sup_logo_url: '/photos/partner-2/logo.jpg',
+      } as TenantSettings);
+
+    expect(login.showLoadingGate()).toBe(false);
+  });
 });

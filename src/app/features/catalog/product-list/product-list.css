@@ -1,43 +1,37 @@
-.product-list {
-  min-height: 50vh;
-  padding: 28px 24px 64px;
+:host {
+  display: block;
+  background: #e9f0f7;
+  min-height: 60vh;
 }
-.breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--slate-500);
-  margin-bottom: 18px;
-}
-.breadcrumb a {
-  color: var(--slate-500);
-}
-.breadcrumb a:hover {
-  color: var(--action);
-}
+
 .product-list__title {
   font-family: var(--font-display);
   font-weight: 800;
   font-size: clamp(24px, 3vw, 32px);
   color: var(--navy);
   letter-spacing: -0.4px;
-  margin-bottom: 24px;
 }
-.product-list__layout {
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  gap: 32px;
-  align-items: start;
+
+.results-top {
+  /* `scrollIntoView` (see goToPage) otherwise aligns this flush with the
+     very top of the viewport, tucking it behind the header's own sticky
+     bar — this reserves the same clearance used for the sticky facets
+     sidebar below, plus a little breathing room. */
+  scroll-margin-top: 180px;
 }
 
 /* ---------- facets ---------- */
 .product-list__facets {
-  position: sticky;
   top: 88px;
+  /* Bootstrap's `.sticky-top` defaults to z-index:1020 — meant for things
+     that should float above the whole page, but this sidebar is still
+     regular page content. Left at that value it would render in front of
+     the header's own sticky bar (z-index 40) and its mega-menu flyout
+     (z-index 50 inside that), so it's brought back down below both. */
+  z-index: 1;
 }
-.facet-group {
-  margin-bottom: 28px;
+.facet-group + .facet-group {
+  margin-top: 28px;
 }
 .facet-group h2 {
   font-family: var(--font-display);
@@ -46,60 +40,28 @@
   text-transform: uppercase;
   letter-spacing: 0.3px;
   color: var(--slate-900);
-  margin-bottom: 10px;
-}
-.facet-list {
-  list-style: none;
+  margin-bottom: 12px;
 }
 .facet-link {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 4px 0;
+  padding: 6px 8px;
+  margin: 0 -8px;
+  border-radius: 8px;
   font-size: 13.5px;
   color: var(--slate-700);
   text-decoration: none;
 }
 .facet-link:hover {
+  background: var(--slate-100);
   color: var(--action);
 }
-.facet-count {
-  color: var(--slate-400);
-  font-size: 12px;
-}
-.facet-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border: 1px solid var(--slate-200);
-  border-radius: 999px;
-  background: var(--surface);
-  font-family: var(--font-ui);
-  font-size: 12.5px;
-  color: var(--slate-700);
-  cursor: pointer;
-}
-.chip:hover {
-  border-color: var(--action);
-  color: var(--action);
-}
-.chip--active {
-  background: var(--navy);
-  border-color: var(--navy);
-  color: #fff;
-}
-.chip--active .facet-count {
-  color: rgba(255, 255, 255, 0.7);
-}
-.chip--swatch {
-  padding-left: 6px;
+.facet-link--active {
+  background: var(--slate-100);
+  color: var(--navy);
+  font-weight: 600;
 }
 .swatch {
   width: 14px;
@@ -111,108 +73,36 @@
 .swatch--sm {
   width: 12px;
   height: 12px;
-  margin-right: 4px;
 }
 
-/* ---------- results ---------- */
-.product-list__status {
-  color: var(--slate-500);
-  font-size: 14px;
-  padding: 32px 0;
-  text-align: center;
-}
-.product-list__status--error {
-  color: var(--accent);
-}
-.product-list__count {
-  font-size: 13px;
-  color: var(--slate-500);
-  margin-bottom: 16px;
-}
-.product-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 24px;
-}
+/* ---------- product cards ---------- */
 .product-card {
-  border: 1px solid var(--slate-200);
-  border-radius: var(--card-radius);
-  overflow: hidden;
-  background: var(--surface);
+  --bs-card-border-radius: 0;
+  transition:
+    box-shadow 0.15s,
+    transform 0.15s;
 }
-.product-card__media {
-  aspect-ratio: 1;
-  background: var(--slate-100);
-}
-.product-card__media img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.product-card__body {
-  padding: 14px;
+.product-card:hover {
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12) !important;
+  transform: translateY(-3px);
 }
 .product-card__title {
-  font-family: var(--font-ui);
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--slate-900);
-  margin-bottom: 4px;
-}
-.product-card__sku {
-  font-size: 12px;
-  color: var(--slate-500);
-  margin-bottom: 8px;
-}
-.product-card__colors {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 8px;
-}
-.product-card__price {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
   font-family: var(--font-ui);
   font-weight: 700;
-  font-size: 14px;
+  font-size: 15px;
+  line-height: 1.3;
+  color: var(--slate-900);
+}
+.product-card__price {
   color: var(--navy);
 }
 
-/* ---------- pagination ---------- */
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  margin-top: 32px;
-}
-.pagination__btn {
-  height: 38px;
-  padding: 0 16px;
-  border: 1px solid var(--slate-200);
-  border-radius: var(--radius);
-  background: var(--surface);
-  font-family: var(--font-ui);
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--slate-700);
-  cursor: pointer;
-}
-.pagination__btn:hover:not(:disabled) {
-  border-color: var(--action);
-  color: var(--action);
-}
-.pagination__btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.pagination__status {
-  font-size: 13px;
-  color: var(--slate-500);
-}
-
-@media (max-width: 860px) {
-  .product-list__layout {
-    grid-template-columns: 1fr;
-  }
+@media (max-width: 991.98px) {
   .product-list__facets {
     position: static;
   }

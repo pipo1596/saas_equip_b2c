@@ -5,7 +5,7 @@
   <title>SaasEuipB2c</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/x-icon" href="">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
@@ -14,6 +14,17 @@
   >
 </head>
 <body>
-  <app-root></app-root>
+  <app-root>
+    <!-- Shown until Angular bootstraps and replaces this — for routes that
+         require a login (rendered client-side only, see
+         app.routes.server.ts), this is the only thing ever visible before
+         the auth guard decides whether to show the real page or redirect
+         to the login screen. -->
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f4f6f9">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading…</span>
+      </div>
+    </div>
+  </app-root>
 </body>
 </html>

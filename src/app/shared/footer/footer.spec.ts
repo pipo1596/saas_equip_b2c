@@ -35,6 +35,23 @@ describe('Footer', () => {
     expect(footer.tenantSettings()?.copyrg_txt).toBe('Copyright test');
   });
 
+  it('should grow the footer logo box taller for a squarer logo, capped at the max height', () => {
+    const fixture = TestBed.createComponent(Footer);
+    const footer = fixture.componentInstance;
+
+    expect(footer.footLogoHeight()).toBe(40);
+
+    // Roughly square (200x180) — at the box's fixed 130px width that ratio
+    // implies ~117px tall, well past the cap, so it should clamp to it.
+    footer.onFootLogoLoad({ target: { naturalWidth: 200, naturalHeight: 180 } } as unknown as Event);
+    expect(footer.footLogoHeight()).toBe(58);
+
+    // A wide banner logo (400x60) implies ~19.5px at that width — below the
+    // floor, so it should clamp back up to the box's minimum height.
+    footer.onFootLogoLoad({ target: { naturalWidth: 400, naturalHeight: 60 } } as unknown as Event);
+    expect(footer.footLogoHeight()).toBe(40);
+  });
+
   it('should fall back to placeholder department contact details before settings load', () => {
     const fixture = TestBed.createComponent(Footer);
     const footer = fixture.componentInstance;

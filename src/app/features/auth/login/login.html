@@ -1,12 +1,19 @@
-<main class="shell">
+@if (showLoadingGate()) {
+  <div class="d-flex align-items-center justify-content-center min-vh-100 bg-dark">
+    <div class="spinner-border text-light" role="status">
+      <span class="visually-hidden">Loading…</span>
+    </div>
+  </div>
+} @else {
+<main class="shell row g-0 mx-auto min-vh-100">
   <!-- Hero / brand panel -->
   <section
-    class="hero"
+    class="hero col-12 col-md-6 order-2 order-md-1 d-flex flex-column justify-content-between text-white p-4 p-md-5"
     [style.background-image]="
       tenantSettings()?.login_img ? 'url(' + tenantSettings()!.login_img + ')' : null
     "
   >
-    <div class="brand">
+    <div class="brand d-flex align-items-center gap-3 position-relative">
       <span class="brand__crest" aria-hidden="true">
         @if (tenantSettings(); as tenant) {
           <img [ngSrc]="tenant.logo_url" fill alt="" />
@@ -17,34 +24,34 @@
         }
       </span>
       <div>
-        <div class="brand__name">Uniform Works</div>
-        <div class="brand__sub">Customer portal</div>
+        <div class="font-display fw-semibold">Uniform Works</div>
+        <div class="small" style="color: #9fb6cc">Customer portal</div>
       </div>
     </div>
 
-    <div class="hero__body">
-      <span class="tag">
+    <div class="hero__body position-relative">
+      <span class="tag d-inline-flex align-items-center gap-2 small fw-medium">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z" />
         </svg>
         Secure customer access
       </span>
-      <h1>Your gear, your team, one portal.</h1>
-      <p class="hero__lead">
+      <h1 class="font-display fw-bold">Your gear, your team, one portal.</h1>
+      <p class="hero__lead d-none d-md-block">
         Manage credit-card orders, track shipments, and outfit your crew from a single secure
         dashboard.
       </p>
     </div>
 
-    <div class="trust">
-      <span>
+    <div class="trust d-none d-md-flex gap-4 position-relative">
+      <span class="d-flex align-items-center gap-2 small">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z" />
           <path d="M9 12l2 2 4-4" />
         </svg>
         Secure access
       </span>
-      <span>
+      <span class="d-flex align-items-center gap-2 small">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" />
           <circle cx="7" cy="18" r="1.6" />
@@ -56,9 +63,9 @@
   </section>
 
   <!-- Form panel -->
-  <section class="panel">
-    <form class="form" [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
-      <span class="form-logo" aria-hidden="true">
+  <section class="panel col-12 col-md-6 order-1 order-md-2 bg-white d-flex align-items-center justify-content-center overflow-auto p-4 p-md-5">
+    <form class="form w-100" [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+      <span class="form-logo mb-3" aria-hidden="true">
         @if (tenantSettings(); as tenant) {
           <img [ngSrc]="tenant.logo_url" fill alt="" />
         } @else {
@@ -68,17 +75,17 @@
         }
       </span>
 
-      <div class="form__head">
-        <h2>Welcome back</h2>
-        <p>Sign in to your Uniform Works partner account.</p>
+      <div class="mb-4">
+        <h2 class="font-display fw-semibold fs-4 mb-1">Welcome back</h2>
+        <p class="text-secondary small mb-0">Sign in to your Uniform Works partner account.</p>
       </div>
 
       @if (loginError()) {
-        <p class="error error--banner" role="alert">{{ loginError() }}</p>
+        <div class="alert alert-danger py-2 px-3 small" role="alert">{{ loginError() }}</div>
       }
 
-      <div class="field">
-        <label for="email">Email</label>
+      <div class="mb-3">
+        <label for="email" class="form-label small fw-medium text-secondary">Email</label>
         <div class="input-wrap">
           <svg class="lead" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M4 6h16v12H4z" />
@@ -87,6 +94,8 @@
           <input
             id="email"
             type="email"
+            class="form-control"
+            [class.is-invalid]="form.controls.email.invalid && form.controls.email.touched"
             formControlName="email"
             placeholder="name@department.gov"
             autocomplete="email"
@@ -97,7 +106,7 @@
           />
         </div>
         @if (form.controls.email.invalid && form.controls.email.touched) {
-          <p class="error" id="email-error">
+          <p class="text-danger small mt-1 mb-0" id="email-error">
             {{
               form.controls.email.hasError('required')
                 ? 'Enter your email address.'
@@ -107,8 +116,8 @@
         }
       </div>
 
-      <div class="field">
-        <label for="password">Password</label>
+      <div class="mb-3">
+        <label for="password" class="form-label small fw-medium text-secondary">Password</label>
         <div class="input-wrap">
           <svg class="lead" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <rect x="4" y="10" width="16" height="10" rx="2" />
@@ -117,6 +126,8 @@
           <input
             id="password"
             [type]="showPassword() ? 'text' : 'password'"
+            class="form-control"
+            [class.is-invalid]="form.controls.password.invalid && form.controls.password.touched"
             formControlName="password"
             placeholder="Enter your password"
             autocomplete="current-password"
@@ -150,28 +161,29 @@
           </button>
         </div>
         @if (form.controls.password.invalid && form.controls.password.touched) {
-          <p class="error" id="password-error">Enter your password.</p>
+          <p class="text-danger small mt-1 mb-0" id="password-error">Enter your password.</p>
         }
-        <a class="link link--forgot" routerLink="/forgot-password">Forgot password?</a>
+        <a class="link-primary text-decoration-none small fw-medium d-block text-end mt-2" routerLink="/forgot-password">Forgot password?</a>
       </div>
 
-      <button type="submit" class="btn btn--primary" [disabled]="submitting()">
+      <button type="submit" class="btn btn-primary w-100 mt-1" [disabled]="submitting()">
         {{ submitting() ? 'Signing in…' : 'Sign in' }}
       </button>
 
       @if (tenantSettings(); as tenant) {
-        <p class="support-logo">
+        <p class="support-logo d-flex justify-content-center mt-3 mb-0">
           <span class="support-logo__badge">
             <img [ngSrc]="tenant.sup_logo_url" fill alt="" />
           </span>
         </p>
       }
 
-      <p class="support">
+      <p class="text-center text-secondary small mt-3 mb-0">
         Trouble signing in?
-        <a href="mailto:support&#64;uniformworks.ca">Contact support</a><br />
+        <a href="mailto:support&#64;uniformworks.ca" class="link-primary text-decoration-none">Contact support</a>
       </p>
-      <p class="copyright">Copyright &copy; {{ currentYear }} Uniform Works. All rights reserved.</p>
+      <p class="text-center text-secondary small mt-1 mb-0">Copyright &copy; {{ currentYear }} Uniform Works. All rights reserved.</p>
     </form>
   </section>
 </main>
+}

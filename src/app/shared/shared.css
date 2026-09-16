@@ -1,12 +1,12 @@
 /* Small cross-cutting primitives reused by the header, footer and home
-   body — everything else stays component-scoped. */
-
-.wrap {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 24px;
-}
-
+   body — everything else stays component-scoped. Horizontal-space
+   constraints use Bootstrap's own `.container` class instead of a custom
+   wrapper. Colors/hover states for these buttons come from Bootstrap's own
+   `.btn-primary`/`.btn-outline-light` (see the theme bridge in
+   styles.css) — this just carries the project's own shape, since it
+   doesn't match Bootstrap's default button sizing. Deliberately no
+   `border` here (unlike the old `.btn--primary`/`.btn--ghost-light`) so
+   Bootstrap's own border can show through for outline buttons. */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -19,23 +19,7 @@
   font-size: 14.5px;
   font-weight: 600;
   cursor: pointer;
-  border: none;
   text-decoration: none;
-}
-.btn--primary {
-  background: var(--action);
-  color: #fff;
-}
-.btn--primary:hover {
-  background: #2a6cb5;
-}
-.btn--ghost-light {
-  background: transparent;
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-.btn--ghost-light:hover {
-  background: rgba(255, 255, 255, 0.08);
 }
 
 @media (prefers-reduced-motion: reduce) {

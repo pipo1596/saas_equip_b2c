@@ -1,7 +1,7 @@
 import { DOCUMENT, isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Injectable, PLATFORM_ID, inject, signal } from '@angular/core';
-import { Observable, of, shareReplay, tap } from 'rxjs';
+import { Observable, finalize, of, shareReplay, tap } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 
@@ -66,6 +66,10 @@ export class TenantSettingsService {
   private readonly dispatchUrl = `${environment.apiBaseUrl}/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS`;
 
   readonly settings = signal<TenantSettings | null>(null);
+  // True only while a real request is in flight — never for a call that's
+  // just handed back the already-cached value, so callers can show a
+  // loading state without it firing on every repeat call.
+  readonly loading = signal(false);
 
   private request$: Observable<TenantSettings> | null = null;
 
@@ -82,6 +86,7 @@ export class TenantSettingsService {
     }
 
     if (!this.request$) {
+      this.loading.set(true);
       this.request$ = this.http
         .post<TenantSettings>(this.dispatchUrl, { action: '*GET' })
         .pipe(
@@ -89,6 +94,7 @@ export class TenantSettingsService {
             this.settings.set(settings);
             this.applyFavicon(settings.logo_url);
           }),
+          finalize(() => this.loading.set(false)),
           shareReplay(1),
         );
     }
