@@ -1,0 +1,135 @@
+<app-header />
+
+<section class="wrap product-list">
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a routerLink="/home">Home</a>
+    <span aria-hidden="true">/</span>
+    <span>{{ pageTitle() }}</span>
+  </nav>
+
+  <h1 class="product-list__title">{{ pageTitle() }}</h1>
+
+  <div class="product-list__layout">
+    <aside class="product-list__facets">
+      @if (categoryFacets().length > 0) {
+        <div class="facet-group">
+          <h2>Category</h2>
+          <ul class="facet-list">
+            @for (facet of categoryFacets(); track facet.progCatId) {
+              <li>
+                <a
+                  [routerLink]="['/products', facet.progCatId]"
+                  [queryParams]="{ name: facet.categoryName }"
+                  class="facet-link"
+                >
+                  {{ facet.categoryName }}
+                  <span class="facet-count">{{ facet.count }}</span>
+                </a>
+              </li>
+            }
+          </ul>
+        </div>
+      }
+      @if (sizeFacets().length > 0) {
+        <div class="facet-group">
+          <h2>Size</h2>
+          <div class="facet-chips">
+            @for (facet of sizeFacets(); track facet.value) {
+              <button
+                type="button"
+                class="chip"
+                [class.chip--active]="selectedSizes().includes(facet.value)"
+                (click)="toggleSize(facet.value)"
+              >
+                {{ facet.value }}
+                <span class="facet-count">{{ facet.count }}</span>
+              </button>
+            }
+          </div>
+        </div>
+      }
+      @if (colorFacets().length > 0) {
+        <div class="facet-group">
+          <h2>Color</h2>
+          <div class="facet-chips">
+            @for (facet of colorFacets(); track facet.value) {
+              <button
+                type="button"
+                class="chip chip--swatch"
+                [class.chip--active]="selectedColors().includes(facet.value)"
+                (click)="toggleColor(facet.value)"
+              >
+                <span class="swatch" [style.background]="facet.valueCode"></span>
+                {{ facet.value }}
+                <span class="facet-count">{{ facet.count }}</span>
+              </button>
+            }
+          </div>
+        </div>
+      }
+    </aside>
+
+    <div class="product-list__main">
+      @if (loading()) {
+        <p class="product-list__status">Loading products…</p>
+      } @else if (error(); as message) {
+        <p class="product-list__status product-list__status--error">{{ message }}</p>
+      } @else if (products().length === 0) {
+        <p class="product-list__status">No products found.</p>
+      } @else {
+        <p class="product-list__count">{{ totalCount() }} products</p>
+        <div class="product-grid">
+          @for (product of products(); track product.productPk) {
+            <div class="product-card">
+              <div class="product-card__media">
+                @if (product.imageUrl) {
+                  <img [src]="product.imageUrl" [alt]="product.title" />
+                }
+              </div>
+              <div class="product-card__body">
+                <p class="product-card__title">{{ product.title }}</p>
+                <p class="product-card__sku">{{ product.skuCode }}</p>
+                @if (product.colors.length > 0) {
+                  <div class="product-card__colors">
+                    @for (color of product.colors; track color.valueCode) {
+                      <span
+                        class="swatch swatch--sm"
+                        [style.background]="color.valueCode"
+                        [attr.title]="color.valueDesc"
+                      ></span>
+                    }
+                  </div>
+                }
+                <p class="product-card__price">{{ product.price | currency }}</p>
+              </div>
+            </div>
+          }
+        </div>
+
+        @if (totalPages() > 1) {
+          <div class="pagination">
+            <button
+              type="button"
+              class="pagination__btn"
+              [disabled]="page() <= 1"
+              (click)="goToPage(page() - 1)"
+            >
+              Previous
+            </button>
+            <span class="pagination__status">Page {{ page() }} of {{ totalPages() }}</span>
+            <button
+              type="button"
+              class="pagination__btn"
+              [disabled]="page() >= totalPages()"
+              (click)="goToPage(page() + 1)"
+            >
+              Next
+            </button>
+          </div>
+        }
+      }
+    </div>
+  </div>
+</section>
+
+<app-footer />

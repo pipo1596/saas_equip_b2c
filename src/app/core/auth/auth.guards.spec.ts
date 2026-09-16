@@ -28,7 +28,7 @@ describe('auth guards', () => {
 
     it('allows navigation once a session exists', () => {
       const auth = TestBed.inject(AuthService);
-      auth.session.set({ empId: '1', sessionId: 's', firstName: 'P', lastName: 'A' });
+      auth.session.set({ empId: '1', sessionId: 's', firstName: 'P', lastName: 'A', locations: [] });
       const result = TestBed.runInInjectionContext(() => authGuard({} as never, {} as never));
       expect(result).toBe(true);
     });
@@ -42,7 +42,7 @@ describe('auth guards', () => {
 
     it('redirects an already-authenticated user to /home', () => {
       const auth = TestBed.inject(AuthService);
-      auth.session.set({ empId: '1', sessionId: 's', firstName: 'P', lastName: 'A' });
+      auth.session.set({ empId: '1', sessionId: 's', firstName: 'P', lastName: 'A', locations: [] });
       const result = TestBed.runInInjectionContext(() => guestGuard({} as never, {} as never));
       expect(result).toBeInstanceOf(UrlTree);
       expect(router.serializeUrl(result as UrlTree)).toBe('/home');

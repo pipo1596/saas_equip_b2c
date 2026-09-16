@@ -27,6 +27,22 @@ describe('AuthService', () => {
     expect(service.mfaPending()).toBe(false);
   });
 
+  it('discards a cached session from before `locations` existed on the Session shape', () => {
+    localStorage.setItem(
+      'auth.session',
+      JSON.stringify({ empId: '1', sessionId: 's', firstName: 'P', lastName: 'A' }),
+    );
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    const restored = TestBed.inject(AuthService);
+
+    expect(restored.isAuthenticated()).toBe(false);
+    expect(localStorage.getItem('auth.session')).toBeNull();
+  });
+
   it('sets the session on a successful login with no MFA step', () => {
     service.login('pierre.achkar@3linc.com', 'Setup123!').subscribe();
 
@@ -42,12 +58,69 @@ describe('AuthService', () => {
     };
     req.flush(response);
 
+    httpMock
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
+      .flush({ empId: '1', firstName: 'Pierre', lastName: 'Achkar' });
+
     expect(service.isAuthenticated()).toBe(true);
     expect(service.session()).toEqual({
       empId: '1',
       sessionId: 'sess-1',
       firstName: 'Pierre',
       lastName: 'Achkar',
+      locations: [],
+    });
+  });
+
+  it('carries the locations from the employee record into the session (LOGIN1 does not return them)', () => {
+    service.login('pierre.achkar@3linc.com', 'Setup123!').subscribe();
+
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN').flush({
+      success: true,
+      mfaRequired: false,
+      empId: '1',
+      sessionId: 'sess-1',
+      firstName: 'Pierre',
+      lastName: 'Achkar',
+      message: null,
+    } satisfies LoginResponse);
+
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE').flush({
+      empId: '1',
+      firstName: 'Pierre',
+      lastName: 'Achkar',
+      locations: [
+        { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Edmonton Fire Dept Chief' },
+      ],
+    });
+
+    expect(service.session()?.locations).toEqual([
+      { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Edmonton Fire Dept Chief' },
+    ]);
+  });
+
+  it('fetches the employee record right after login and uses it as the source of truth for the name', () => {
+    service.login('pierre.achkar@3linc.com', 'Setup123!').subscribe();
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN').flush({
+      success: true,
+      mfaRequired: false,
+      empId: '1',
+      sessionId: 'sess-1',
+      firstName: 'P',
+      lastName: 'A',
+      message: null,
+    } satisfies LoginResponse);
+
+    const employeeReq = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE');
+    expect(employeeReq.request.body).toEqual({ empId: '1', sessionId: 'sess-1', action: '*GET' });
+    employeeReq.flush({ empId: '1', firstName: 'Pierre', lastName: 'Achkar' });
+
+    expect(service.session()).toEqual({
+      empId: '1',
+      sessionId: 'sess-1',
+      firstName: 'Pierre',
+      lastName: 'Achkar',
+      locations: [],
     });
   });
 
@@ -91,6 +164,10 @@ describe('AuthService', () => {
       message: null,
     } satisfies LoginResponse);
 
+    httpMock
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
+      .flush({ empId: '1', firstName: 'Pierre', lastName: 'Achkar' });
+
     expect(service.mfaPending()).toBe(false);
     expect(service.isAuthenticated()).toBe(true);
   });
@@ -104,6 +181,9 @@ describe('AuthService', () => {
       sessionId: 'sess-1',
       message: null,
     } satisfies LoginResponse);
+    httpMock
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
+      .flush({ empId: '1', firstName: 'Pierre', lastName: 'Achkar' });
 
     expect(service.isAuthenticated()).toBe(true);
     service.logout();

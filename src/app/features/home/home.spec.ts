@@ -3,10 +3,14 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideRouter } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 
+import { AuthService } from '../../core/auth/auth';
 import { Home } from './home';
 
 describe('Home', () => {
   beforeEach(async () => {
+    // AuthService restores its session from localStorage, which (unlike
+    // TestBed's DI container) isn't reset between spec files.
+    localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [Home],
       providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
@@ -15,6 +19,7 @@ describe('Home', () => {
 
   afterEach(() => {
     TestBed.inject(HttpTestingController).verify();
+    localStorage.clear();
   });
 
   it('should create', () => {
@@ -40,5 +45,16 @@ describe('Home', () => {
     const fixture = TestBed.createComponent(Home);
     const home = fixture.componentInstance;
     expect(() => home.scrollCategories(1)).not.toThrow();
+  });
+
+  it("should greet the logged-in employee by first name, and fall back when logged out", () => {
+    const fixture = TestBed.createComponent(Home);
+    const home = fixture.componentInstance;
+    expect(home.firstName()).toBeNull();
+
+    const auth = TestBed.inject(AuthService);
+    auth.session.set({ empId: '1', sessionId: 's', firstName: 'aaron', lastName: 'ermis', locations: [] });
+
+    expect(home.firstName()).toBe('Aaron');
   });
 });

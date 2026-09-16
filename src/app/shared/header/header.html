@@ -8,16 +8,7 @@
       </svg>
       Welcome, <b>{{ firstName() ?? 'there' }}</b>
     </span>
-    <span class="tb-sep"></span>
-    <span class="tb-item tb-behalf">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M16 3.1a4 4 0 0 1 0 7.8" />
-        <path d="M21 21v-2a4 4 0 0 0-3-3.9" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
-      </svg>
-      Shopping on behalf of <b>Aaron Ermis</b><a href="#">Release</a>
-    </span>
+    
 
     <div class="tb-right">
       <div class="dept-wrap">
@@ -32,27 +23,27 @@
             <path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z" />
             <circle cx="12" cy="10" r="2.5" />
           </svg>
-          <span class="dept__name">{{ activeDepartment().name }}</span>
+          <span class="dept__name">{{ activeLocation()?.locationName ?? 'Select location' }}</span>
           <svg class="dept__chev" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M6 9l6 6 6-6" />
           </svg>
         </button>
         <div class="dept-menu" [class.open]="deptMenuOpen()">
           <div class="dept-menu__label">Switch location</div>
-          @for (department of departments; track department.name) {
+          @for (location of locations(); track location.empLocId) {
             <button
               type="button"
               class="dept-opt"
-              [class.active]="department.name === activeDepartment().name"
-              (click)="selectDepartment(department)"
+              [class.active]="location.locationId === activeLocation()?.locationId"
+              (click)="selectLocation(location)"
             >
-              <span class="dept-opt__dot" [style.background]="department.color">
+              <span class="dept-opt__dot">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z" />
                   <circle cx="12" cy="10" r="2" />
                 </svg>
               </span>
-              <span><b>{{ department.name }}</b><small>{{ department.role }}</small></span>
+              <span><b>{{ location.locationName }}</b><small>Location {{ location.locationCode }}</small></span>
               <svg class="dept-opt__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M5 12l5 5 9-10" />
               </svg>
@@ -114,10 +105,22 @@
     <div class="appbar__left">
       <a class="wordmark" routerLink="/home">Uniform<span>Works</span></a>
       <nav class="topnav">
-        <a href="#" class="active">Clothing</a>
-        <a href="#">Footwear</a>
-        <a href="#">Gear</a>
-        <a href="#">Full catalog</a>
+        @for (item of catalogNavItems(); track item.key) {
+          <button
+            type="button"
+            class="topnav-link"
+            [class.active]="openCatalogNavKey() === item.key"
+            aria-haspopup="menu"
+            [attr.aria-expanded]="openCatalogNavKey() === item.key"
+            (click)="toggleCatalogNav(item.key)"
+          >
+            {{ item.label }}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+        }
+        <a routerLink="/products/full-catalog" [queryParams]="{ name: 'Full Catalog' }">Full catalog</a>
       </nav>
     </div>
     <div class="allot-fields">
@@ -157,16 +160,50 @@
       </div>
     </div>
   </div>
-  <div class="appbar__search wrap">
+  <form class="appbar__search wrap" [formGroup]="searchForm" (ngSubmit)="search()">
     <div class="search">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="11" cy="11" r="7" />
-        <path d="M21 21l-4-4" />
-      </svg>
-      <input type="search" placeholder="Search uniforms, gear, or SKU" aria-label="Search" />
+      <button type="submit" class="search__btn" aria-label="Search">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" />
+          <path d="M21 21l-4-4" />
+        </svg>
+      </button>
+      <input
+        type="search"
+        formControlName="term"
+        placeholder="Search uniforms, gear, or SKU"
+        aria-label="Search"
+      />
     </div>
-  </div>
+  </form>
+
+  @if (activeCatalogNavItem(); as item) {
+    <div class="mega-menu">
+      <div class="mega-menu__in wrap">
+        <div class="mega-menu__media">
+          @if (item.image) {
+            <img [ngSrc]="item.image" fill alt="" />
+          }
+        </div>
+        <div class="mega-menu__body">
+          <a
+            [routerLink]="['/products', item.key]"
+            [queryParams]="{ name: item.label }"
+            (click)="closeCatalogNav()"
+            class="mega-menu__viewall"
+          >View all {{ item.label }}</a>
+          <div class="mega-menu__grid" [style.--cols]="item.columnCount">
+            <ng-container
+              *ngTemplateOutlet="categoryBranch; context: { $implicit: item.categories }"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  }
 </header>
+
+<div id="mega-menu-overlay" [class.show]="activeCatalogNavItem() !== null" (click)="closeCatalogNav()"></div>
 
 <div id="overlay" [class.show]="cartOpen()" (click)="closeCart()"></div>
 <aside
@@ -218,3 +255,23 @@
     </button>
   </div>
 </aside>
+
+<ng-template #categoryBranch let-categories>
+  <ul class="cat-flyout__list">
+    @for (category of categories; track category.progCatId) {
+      <li>
+        <a
+          [routerLink]="['/products', category.progCatId]"
+          [queryParams]="{ name: category.categoryName }"
+          (click)="closeCatalogNav()"
+          class="cat-flyout__link"
+        >{{ category.categoryName }}</a>
+        @if (category.children.length > 0) {
+          <ng-container
+            *ngTemplateOutlet="categoryBranch; context: { $implicit: category.children }"
+          />
+        }
+      </li>
+    }
+  </ul>
+</ng-template>

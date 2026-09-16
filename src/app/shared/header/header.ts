@@ -1,13 +1,81 @@
-import { CurrencyPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { CurrencyPipe, NgOptimizedImage, NgTemplateOutlet, isPlatformBrowser } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  PLATFORM_ID,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
+import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
-import { AuthService } from '../../core/auth/auth';
+import { AuthService, EmployeeLocation } from '../../core/auth/auth';
+import { CatalogCategory, CatalogMenu, CatalogViewService } from '../../core/catalog/catalog-view';
+import { LocationSelectionService } from '../../core/location/location-selection';
+import { TenantSettings, TenantSettingsService } from '../../core/tenant/tenant-settings';
 
-interface Department {
-  readonly name: string;
-  readonly role: string;
-  readonly color: string;
+type CatalogImageField = keyof Pick<TenantSettings, 'men_clth_im' | 'men_ftw_im' | 'men_gear_im'>;
+
+interface CatalogNavLabel {
+  readonly key: keyof CatalogMenu;
+  readonly label: string;
+  readonly imageField: CatalogImageField;
+}
+
+const CATALOG_NAV_LABELS: readonly CatalogNavLabel[] = [
+  { key: 'clothing', label: 'Clothing', imageField: 'men_clth_im' },
+  { key: 'footwear', label: 'Footwear', imageField: 'men_ftw_im' },
+  { key: 'gear', label: 'Gear', imageField: 'men_gear_im' },
+];
+
+interface DisplayCategory {
+  readonly progCatId: number;
+  readonly categoryName: string;
+  readonly children: readonly DisplayCategory[];
+}
+
+interface CatalogNavItem extends CatalogNavLabel {
+  readonly categories: readonly DisplayCategory[];
+  readonly image: string | null;
+  // How many grid columns to actually use — capped at 4, but never more than
+  // there are top-level sections, so e.g. 3 sections don't get crammed into
+  // 2 columns while a 4th sits empty (an artifact of the browser choosing
+  // column-count purely to balance height, not to spread content).
+  readonly columnCount: number;
+}
+
+// A category whose direct children are all further sub-categories (none of
+// them a real leaf item right under it) doesn't get its own header — it's
+// collapsed into its descendants' label instead, prefixed with " > ", so a
+// leaf never ends up nested three headers deep under nothing but more
+// headers with no items of their own.
+function buildDisplayCategories(
+  categories: readonly CatalogCategory[],
+  prefix = '',
+): DisplayCategory[] {
+  return categories.flatMap((category): DisplayCategory[] => {
+    const label = prefix ? `${prefix} > ${category.categoryName}` : category.categoryName;
+
+    if (category.children.length === 0) {
+      return [{ progCatId: category.progCatId, categoryName: label, children: [] }];
+    }
+
+    const hasDirectLeafChild = category.children.some((child) => child.children.length === 0);
+    if (hasDirectLeafChild) {
+      return [
+        {
+          progCatId: category.progCatId,
+          categoryName: label,
+          children: buildDisplayCategories(category.children),
+        },
+      ];
+    }
+
+    return buildDisplayCategories(category.children, label);
+  });
 }
 
 interface CartLine {
@@ -18,48 +86,74 @@ interface CartLine {
   readonly qty: number;
 }
 
-function capitalize(value: string): string {
-  return value ? value.charAt(0).toUpperCase() + value.slice(1) : '';
-}
-
 @Component({
   selector: 'app-header',
-  imports: [RouterLink, CurrencyPipe],
+  imports: [RouterLink, CurrencyPipe, NgOptimizedImage, ReactiveFormsModule, NgTemplateOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './header.html',
   styleUrls: ['../shared.css', './header.css'],
 })
-export class Header {
+export class Header implements OnInit {
   private readonly authService = inject(AuthService);
+  private readonly catalogViewService = inject(CatalogViewService);
+  private readonly locationSelectionService = inject(LocationSelectionService);
+  private readonly tenantSettingsService = inject(TenantSettingsService);
   private readonly router = inject(Router);
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 
   readonly session = this.authService.session;
+  readonly firstName = this.authService.firstName;
+  readonly fullName = this.authService.fullName;
+  readonly initials = this.authService.initials;
 
-  private readonly name = computed(() => {
-    const session = this.session();
-    return {
-      first: capitalize(session?.firstName ?? ''),
-      last: capitalize(session?.lastName ?? ''),
-    };
+  readonly locations = this.authService.locations;
+  readonly activeLocation = this.locationSelectionService.activeLocation;
+
+  // Refreshes the catalog menu whenever the active location defaults or
+  // changes — both cases flow through `activeLocation`.
+  private readonly loadCatalogMenuOnLocationChange = effect(() => {
+    const location = this.activeLocation();
+    if (location && this.isBrowser) {
+      this.catalogViewService.load(location.locationId).subscribe();
+    }
   });
-  readonly firstName = computed(() => this.name().first || null);
-  readonly fullName = computed(() => `${this.name().first} ${this.name().last}`.trim() || null);
-  readonly initials = computed(() => {
-    const { first, last } = this.name();
-    return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || null;
+
+  // Only the buckets with categories for this location's menu show up —
+  // e.g. a location with no clothing assortment just won't get that tab.
+  readonly catalogNavItems = computed<CatalogNavItem[]>(() => {
+    const menu = this.catalogViewService.menu();
+    if (!menu) {
+      return [];
+    }
+    const tenant = this.tenantSettingsService.settings();
+    return CATALOG_NAV_LABELS.map((item) => {
+      const categories = buildDisplayCategories(menu[item.key]);
+      return {
+        ...item,
+        categories,
+        image: tenant?.[item.imageField] || null,
+        columnCount: Math.max(1, Math.min(4, categories.length)),
+      };
+    }).filter((item) => item.categories.length > 0);
   });
 
-  readonly departments: readonly Department[] = [
-    { name: 'Metro EMS', role: 'Field paramedic', color: '#0F6E56' },
-    { name: 'Seaview Fire Dept.', role: 'Firefighter', color: '#0C1C2E' },
-    { name: 'Austin Police Dept.', role: 'Sworn officer', color: '#12314C' },
-  ];
-  readonly activeDepartment = signal<Department>(this.departments[0]);
-
+  readonly openCatalogNavKey = signal<CatalogNavLabel['key'] | null>(null);
+  readonly activeCatalogNavItem = computed<CatalogNavItem | null>(() => {
+    const key = this.openCatalogNavKey();
+    return key ? (this.catalogNavItems().find((item) => item.key === key) ?? null) : null;
+  });
   readonly deptMenuOpen = signal(false);
   readonly rulesMenuOpen = signal(false);
   readonly userMenuOpen = signal(false);
   readonly cartOpen = signal(false);
+
+  // `(ngSubmit)` is an output of `FormGroupDirective` (via `[formGroup]`) —
+  // without wrapping the control in a group, a bare `<form>` has no
+  // directive providing it, so the browser falls back to a native submit
+  // (full page reload) instead of calling `search()`.
+  readonly searchForm = new FormGroup({
+    term: new FormControl('', { nonNullable: true }),
+  });
 
   // No cart/product service exists yet, so this starts empty rather than
   // faking line items — the drawer just shows its empty state for now.
@@ -71,24 +165,52 @@ export class Header {
     this.cartLines().reduce((total, line) => total + line.price * line.qty, 0),
   );
 
+  ngOnInit(): void {
+    if (this.isBrowser) {
+      this.tenantSettingsService.load().subscribe();
+    }
+  }
+
+  search(): void {
+    const term = this.searchForm.controls.term.value.trim();
+    if (!term) {
+      return;
+    }
+    this.router.navigate(['/products'], { queryParams: { q: term } });
+  }
+
+  toggleCatalogNav(key: CatalogNavLabel['key']): void {
+    this.deptMenuOpen.set(false);
+    this.rulesMenuOpen.set(false);
+    this.userMenuOpen.set(false);
+    this.openCatalogNavKey.update((open) => (open === key ? null : key));
+  }
+
+  closeCatalogNav(): void {
+    this.openCatalogNavKey.set(null);
+  }
+
   toggleDeptMenu(): void {
+    this.openCatalogNavKey.set(null);
     this.rulesMenuOpen.set(false);
     this.userMenuOpen.set(false);
     this.deptMenuOpen.update((open) => !open);
   }
 
-  selectDepartment(department: Department): void {
-    this.activeDepartment.set(department);
+  selectLocation(location: EmployeeLocation): void {
+    this.locationSelectionService.select(location);
     this.deptMenuOpen.set(false);
   }
 
   toggleRulesMenu(): void {
+    this.openCatalogNavKey.set(null);
     this.deptMenuOpen.set(false);
     this.userMenuOpen.set(false);
     this.rulesMenuOpen.update((open) => !open);
   }
 
   toggleUserMenu(): void {
+    this.openCatalogNavKey.set(null);
     this.deptMenuOpen.set(false);
     this.rulesMenuOpen.set(false);
     this.userMenuOpen.update((open) => !open);

@@ -4,6 +4,9 @@ import { Injectable, PLATFORM_ID, computed, inject, signal } from '@angular/core
 import { type Observable, tap } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
+import { EmployeeService, type EmployeeLocation } from '../employee/employee';
+
+export type { EmployeeLocation } from '../employee/employee';
 
 // The legacy CGI dispatcher branches on this `action` field rather than the
 // URL/SEPGM value. `login` and `verifyMfa` are confirmed against the real
@@ -19,6 +22,10 @@ const ACTION = {
 // localStorage (not sessionStorage) — a session started in one tab should
 // already be logged in when the same origin is opened in a new tab.
 const AUTH_STORAGE_KEY = 'auth.session';
+
+function capitalize(value: string): string {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : '';
+}
 
 export interface LoginResponse {
   success: boolean;
@@ -42,6 +49,7 @@ export interface Session {
   sessionId: string;
   firstName: string;
   lastName: string;
+  locations: EmployeeLocation[];
 }
 
 interface PendingMfa {
@@ -52,6 +60,7 @@ interface PendingMfa {
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
+  private readonly employeeService = inject(EmployeeService);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
   private readonly dispatchUrl = `${environment.apiBaseUrl}/cgi/APPSCDSPCH?SEPGM=APCLOGIN`;
 
@@ -60,6 +69,21 @@ export class AuthService {
 
   readonly isAuthenticated = computed(() => this.session() !== null);
   readonly mfaPending = computed(() => this.pendingMfa() !== null);
+
+  private readonly name = computed(() => {
+    const session = this.session();
+    return {
+      first: capitalize(session?.firstName ?? ''),
+      last: capitalize(session?.lastName ?? ''),
+    };
+  });
+  readonly firstName = computed(() => this.name().first || null);
+  readonly fullName = computed(() => `${this.name().first} ${this.name().last}`.trim() || null);
+  readonly initials = computed(() => {
+    const { first, last } = this.name();
+    return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || null;
+  });
+  readonly locations = computed(() => this.session()?.locations ?? []);
 
   login(email: string, password: string): Observable<LoginResponse> {
     return this.http
@@ -98,6 +122,7 @@ export class AuthService {
   logout(): void {
     this.session.set(null);
     this.pendingMfa.set(null);
+    this.employeeService.clear();
     if (this.isBrowser) {
       localStorage.removeItem(AUTH_STORAGE_KEY);
     }
@@ -121,10 +146,27 @@ export class AuthService {
       sessionId: response.sessionId ?? '',
       firstName: response.firstName ?? '',
       lastName: response.lastName ?? '',
+      locations: [],
     };
     this.pendingMfa.set(null);
     this.session.set(session);
     this.persistSession(session);
+    this.loadEmployeeDetails(session);
+  }
+
+  // The login/MFA response's name fields are a stopgap, and it doesn't carry
+  // locations at all — the employee record is the source of truth for both.
+  private loadEmployeeDetails(session: Session): void {
+    this.employeeService.load(session.empId, session.sessionId).subscribe((employee) => {
+      const updated: Session = {
+        ...session,
+        firstName: employee.firstName || session.firstName,
+        lastName: employee.lastName || session.lastName,
+        locations: employee.locations ?? session.locations,
+      };
+      this.session.set(updated);
+      this.persistSession(updated);
+    });
   }
 
   private persistSession(session: Session): void {
@@ -140,7 +182,18 @@ export class AuthService {
     }
     try {
       const raw = localStorage.getItem(AUTH_STORAGE_KEY);
-      return raw ? (JSON.parse(raw) as Session) : null;
+      if (!raw) {
+        return null;
+      }
+      const parsed = JSON.parse(raw) as Partial<Session>;
+      // A session cached before a field (e.g. `locations`) was added to the
+      // Session shape would otherwise silently restore without it — discard
+      // it instead so the user logs in again and gets the full payload.
+      if (!parsed.empId || !parsed.sessionId || !Array.isArray(parsed.locations)) {
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+        return null;
+      }
+      return parsed as Session;
     } catch {
       return null;
     }

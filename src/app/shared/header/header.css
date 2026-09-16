@@ -25,20 +25,6 @@
   font-weight: 600;
   color: var(--slate-900);
 }
-.tb-behalf svg {
-  color: var(--amber);
-}
-.tb-behalf b {
-  color: #6b5212;
-}
-.tb-behalf a {
-  color: var(--action);
-  font-weight: 600;
-  margin-left: 2px;
-}
-.tb-behalf a:hover {
-  text-decoration: underline;
-}
 .tb-sep {
   width: 1px;
   height: 16px;
@@ -146,6 +132,7 @@
   flex: none;
   display: grid;
   place-items: center;
+  background: var(--navy);
   color: #fff;
 }
 .dept-opt b {
@@ -281,6 +268,144 @@
 .topnav a.active {
   color: var(--navy);
   border-color: var(--action);
+}
+.topnav-link {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--slate-700);
+  padding: 4px 0;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  cursor: pointer;
+}
+.topnav-link svg {
+  color: var(--slate-400);
+  transition: transform 0.14s;
+}
+.topnav-link:hover,
+.topnav-link.active {
+  color: var(--navy);
+  border-color: var(--action);
+}
+.topnav-link.active svg {
+  transform: rotate(180deg);
+}
+
+/* ---------- catalog mega menu ---------- */
+.mega-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  background: #fff;
+  border-bottom: 1px solid var(--slate-200);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.14);
+  z-index: 50;
+}
+.mega-menu__in {
+  display: flex;
+  gap: 36px;
+  padding: 28px 24px 32px;
+}
+.mega-menu__media {
+  position: relative;
+  flex: none;
+  width: 200px;
+  height: 160px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--slate-100);
+}
+.mega-menu__media img {
+  object-fit: cover;
+}
+.mega-menu__body {
+  flex: 1;
+  min-width: 0;
+}
+.mega-menu__viewall {
+  display: inline-block;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--action);
+  margin-bottom: 18px;
+}
+.mega-menu__viewall:hover {
+  text-decoration: underline;
+}
+.mega-menu__grid > .cat-flyout__list {
+  /* `--cols` is set per open item to min(4, section count) — a plain
+     column-count (or CSS multi-column) balances by height, which can pack
+     several short sections into one column and leave other columns
+     completely empty even when there's more than enough content to spread
+     across all of them. Sizing columns to the actual section count instead
+     guarantees every section gets its own column whenever there are 4 or
+     fewer of them. */
+  display: grid;
+  grid-template-columns: repeat(min(var(--cols, 4), var(--max-cols, 4)), 1fr);
+  column-gap: 28px;
+  row-gap: 20px;
+}
+.mega-menu__grid > .cat-flyout__list > li > .cat-flyout__link {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--slate-900);
+  padding: 0;
+  margin-bottom: 10px;
+}
+.mega-menu__grid > .cat-flyout__list > li > .cat-flyout__link:hover {
+  color: var(--action);
+}
+.cat-flyout__list {
+  list-style: none;
+}
+.cat-flyout__list .cat-flyout__list {
+  padding-left: 12px;
+  margin-top: 6px;
+}
+.cat-flyout__link {
+  display: block;
+  padding: 1px 0;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--slate-700);
+  text-decoration: none;
+}
+/* Bold any category with children, at any depth — not just the root. */
+.cat-flyout__list li:has(> .cat-flyout__list) > .cat-flyout__link {
+  font-weight: 700;
+}
+.cat-flyout__link:hover {
+  color: var(--navy);
+  text-decoration: none;
+}
+
+#mega-menu-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 22, 34, 0.3);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.2s,
+    visibility 0.2s;
+  /* Below .appbar's own z-index (40) — .appbar is a stacking context (it's
+     position: sticky with a z-index), so its child .mega-menu (z-index 50)
+     only outranks siblings *within* that context. Against this overlay,
+     what matters is .appbar's own stacking level, so this must stay lower
+     than 40 or it paints over the mega menu and swallows every click. */
+  z-index: 35;
+}
+#mega-menu-overlay.show {
+  opacity: 1;
+  visibility: visible;
 }
 .allot-fields {
   display: flex;
@@ -458,12 +583,20 @@
   position: relative;
   width: min(480px, 100%);
 }
-.search svg {
+.search__btn {
   position: absolute;
   left: 13px;
   top: 50%;
   transform: translateY(-50%);
+  display: flex;
+  border: none;
+  background: transparent;
+  padding: 0;
   color: var(--slate-400);
+  cursor: pointer;
+}
+.search__btn:hover {
+  color: var(--action);
 }
 .search input {
   width: 100%;
@@ -662,6 +795,13 @@
   .search {
     width: 100%;
   }
+  .mega-menu__media {
+    width: 170px;
+    height: 140px;
+  }
+  .mega-menu__grid {
+    --max-cols: 3;
+  }
 }
 @media (max-width: 640px) {
   .topbar__in {
@@ -671,16 +811,6 @@
     display: none;
   }
   .topbar__in > .tb-sep {
-    display: none;
-  }
-  .tb-behalf {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-  .tb-behalf a {
     display: none;
   }
   .wordmark {
@@ -694,5 +824,24 @@
   }
   .search {
     width: 100%;
+  }
+  .mega-menu {
+    max-height: calc(100vh - 60px);
+    overflow-y: auto;
+  }
+  .mega-menu__in {
+    flex-direction: column;
+    gap: 18px;
+    padding: 18px 16px 24px;
+  }
+  .mega-menu__media {
+    width: 100%;
+    height: 140px;
+  }
+  .mega-menu__grid {
+    --max-cols: 2;
+  }
+  .mega-menu__grid > .cat-flyout__list {
+    column-gap: 20px;
   }
 }

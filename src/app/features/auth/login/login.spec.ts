@@ -71,6 +71,11 @@ describe('Login', () => {
       message: null,
     };
     req.flush(response);
+
+    TestBed.inject(HttpTestingController)
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
+      .flush({ empId: '1', firstName: 'Pierre', lastName: 'Achkar' });
+
     await submitPromise;
 
     expect(navigateSpy).toHaveBeenCalledWith('/home');
