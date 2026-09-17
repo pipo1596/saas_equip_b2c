@@ -13,12 +13,16 @@ const LOCATIONS = [
 describe('LocationSelectionService', () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting()],
     });
   });
 
-  afterEach(() => localStorage.clear());
+  afterEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
 
   it('defaults to no active location when logged out', () => {
     const service = TestBed.inject(LocationSelectionService);

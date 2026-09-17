@@ -1,5 +1,6 @@
 import { CurrencyPipe, isPlatformBrowser } from '@angular/common';
 import {
+  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
   ElementRef,
@@ -63,7 +64,7 @@ type CatalogScope =
   templateUrl: './product-list.html',
   styleUrls: ['../../../shared/shared.css', './product-list.css'],
 })
-export class ProductList {
+export class ProductList implements AfterViewInit {
   private readonly catalogProductsService = inject(CatalogProductsService);
   private readonly locationSelectionService = inject(LocationSelectionService);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
@@ -201,6 +202,16 @@ export class ProductList {
       });
   });
 
+  ngAfterViewInit(): void {
+    // Landing on this route can otherwise leave the browser at whatever
+    // scroll position the previous page was at (e.g. the router keeps
+    // scroll position, or this is a fresh category coming from a link
+    // further down the home page) — jump to the top of the results on
+    // first render, without the "smooth" animation used for later
+    // filter/page changes.
+    this.scrollResultsIntoView('auto');
+  }
+
   toggleGroupCollapsed(optionName: string): void {
     this.collapsedGroups.update((current) => {
       const next = new Set(current);
@@ -245,10 +256,10 @@ export class ProductList {
   // controls at the very bottom or a size/color chip further down the
   // sidebar. Guarded by a feature check (rather than just `isBrowser`)
   // since jsdom, used in tests, doesn't implement `scrollIntoView` at all.
-  private scrollResultsIntoView(): void {
+  private scrollResultsIntoView(behavior: ScrollBehavior = 'smooth'): void {
     const target = this.resultsTop?.nativeElement;
     if (typeof target?.scrollIntoView === 'function') {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      target.scrollIntoView({ behavior, block: 'start' });
     }
   }
 }

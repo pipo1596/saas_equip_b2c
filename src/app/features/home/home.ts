@@ -1,4 +1,4 @@
-import { isPlatformBrowser } from '@angular/common';
+import { isPlatformBrowser, NgOptimizedImage } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -6,17 +6,21 @@ import {
   OnInit,
   PLATFORM_ID,
   ViewChild,
+  effect,
   inject,
 } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 import { AuthService } from '../../core/auth/auth';
+import { CatalogViewService } from '../../core/catalog/catalog-view';
+import { LocationSelectionService } from '../../core/location/location-selection';
 import { TenantSettingsService } from '../../core/tenant/tenant-settings';
 import { Footer } from '../../shared/footer/footer';
 import { Header } from '../../shared/header/header';
 
 @Component({
   selector: 'app-home',
-  imports: [Header, Footer],
+  imports: [Header, Footer, RouterLink, NgOptimizedImage],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './home.html',
   styleUrls: ['../../shared/shared.css', './home.css'],
@@ -26,10 +30,22 @@ export class Home implements OnInit {
 
   private readonly tenantSettingsService = inject(TenantSettingsService);
   private readonly authService = inject(AuthService);
+  private readonly catalogViewService = inject(CatalogViewService);
+  private readonly locationSelectionService = inject(LocationSelectionService);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 
   readonly tenantSettings = this.tenantSettingsService.settings;
   readonly firstName = this.authService.firstName;
+  readonly categories = this.catalogViewService.categories;
+
+  // Refreshes the "Shop by category" list whenever the active location
+  // defaults or changes, same as the header's own catalog menu load.
+  private readonly loadCategoriesOnLocationChange = effect(() => {
+    const location = this.locationSelectionService.activeLocation();
+    if (location && this.isBrowser) {
+      this.catalogViewService.loadCategories(location.locationId).subscribe();
+    }
+  });
 
   ngOnInit(): void {
     if (this.isBrowser) {

@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
-import { Observable, of, shareReplay, tap } from 'rxjs';
+import { Observable, map, of, shareReplay, tap } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 
@@ -24,6 +24,20 @@ export interface CatalogView {
   programId: number;
   menu: CatalogMenu;
   categoryCount: number;
+}
+
+// A "leaf" category — one shoppable enough to feature on the Home page's
+// "Shop by category" carousel, as opposed to the full parent/child tree
+// `CatalogCategory` describes for the header's nav menu.
+export interface LeafCategory {
+  progCatId: number;
+  categoryName: string;
+  productCount: number;
+  imageUrl: string;
+}
+
+export interface LeafCategoriesResponse {
+  categories: LeafCategory[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -68,5 +82,46 @@ export class CatalogViewService {
         );
     }
     return this.request$;
+  }
+
+  readonly categories = signal<LeafCategory[]>([]);
+
+  private cachedCategoriesLocationId: number | null = null;
+  private cachedCategoriesResponse: LeafCategoriesResponse | null = null;
+  private categoriesRequest$: Observable<LeafCategoriesResponse> | null = null;
+
+  /**
+   * Fetches a location's shoppable ("leaf") categories once and caches
+   * them — same reasoning and cache-per-location shape as `load()` above,
+   * just a separate cache since the two are independent datasets from the
+   * same dispatcher.
+   */
+  loadCategories(locationId: number): Observable<LeafCategoriesResponse> {
+    if (this.cachedCategoriesLocationId !== locationId) {
+      this.cachedCategoriesLocationId = locationId;
+      this.cachedCategoriesResponse = null;
+      this.categoriesRequest$ = null;
+    }
+
+    if (this.cachedCategoriesResponse) {
+      return of(this.cachedCategoriesResponse);
+    }
+
+    if (!this.categoriesRequest$) {
+      this.categoriesRequest$ = this.http
+        .post<LeafCategoriesResponse>(this.dispatchUrl, { locationId, action: '*CATEGORIES' })
+        .pipe(
+          // The live API sends `null` instead of `[]` for other empty array
+          // fields on this same endpoint (see CatalogProductsService) —
+          // normalize defensively here too.
+          map((response) => ({ categories: response.categories ?? [] })),
+          tap((response) => {
+            this.cachedCategoriesResponse = response;
+            this.categories.set(response.categories);
+          }),
+          shareReplay(1),
+        );
+    }
+    return this.categoriesRequest$;
   }
 }

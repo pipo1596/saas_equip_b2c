@@ -11,6 +11,7 @@ describe('Login', () => {
     // AuthService persists a successful login to localStorage, which
     // (unlike TestBed's DI container) isn't reset between spec files.
     localStorage.clear();
+    sessionStorage.clear();
     await TestBed.configureTestingModule({
       imports: [Login],
       providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
@@ -20,6 +21,7 @@ describe('Login', () => {
   afterEach(() => {
     TestBed.inject(HttpTestingController).verify();
     localStorage.clear();
+    sessionStorage.clear();
   });
 
   it('should create', () => {

@@ -10,14 +10,21 @@ describe('auth guards', () => {
   let router: Router;
 
   beforeEach(() => {
+    // AuthService restores both the session (localStorage) and any pending
+    // MFA challenge (sessionStorage) from storage, which — unlike TestBed's
+    // DI container — isn't reset between spec files.
     localStorage.clear();
+    sessionStorage.clear();
     TestBed.configureTestingModule({
       providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     });
     router = TestBed.inject(Router);
   });
 
-  afterEach(() => localStorage.clear());
+  afterEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
 
   describe('authGuard', () => {
     it('redirects to / when there is no session', () => {

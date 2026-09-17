@@ -216,7 +216,7 @@ section.block.block--flush-top {
 .ccard__img {
   height: 180px;
   position: relative;
-  background: linear-gradient(160deg, #edf1f6, #dae3ee);
+ /* background: linear-gradient(160deg, #edf1f6, #dae3ee);*/
   display: grid;
   place-items: center;
   color: #b4c1d2;
@@ -225,11 +225,15 @@ section.block.block--flush-top {
   width: 64px;
   height: 64px;
 }
+.ccard__img img {
+  object-fit: contain;
+}
 .ccard__count {
   position: absolute;
+  z-index: 1;
   top: 12px;
   right: 12px;
-  background: rgba(255, 255, 255, 0.9);
+  background: linear-gradient(160deg, #edf1f6, #dae3ee);
   color: var(--slate-600);
   font-size: 11px;
   font-weight: 600;
@@ -250,6 +254,8 @@ section.block.block--flush-top {
 }
 .ccard__body {
   padding: 16px 16px 18px;
+   background: linear-gradient(160deg, #edf1f6, #dae3ee);
+  
 }
 .ccard__name {
   font-family: var(--font-display);

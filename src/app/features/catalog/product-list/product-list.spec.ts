@@ -56,6 +56,7 @@ describe('ProductList', () => {
 
   beforeEach(async () => {
     localStorage.clear();
+    sessionStorage.clear();
     await TestBed.configureTestingModule({
       imports: [ProductList],
       providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
@@ -63,7 +64,10 @@ describe('ProductList', () => {
     httpMock = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => localStorage.clear());
+  afterEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
 
   it('should create', () => {
     const fixture = TestBed.createComponent(ProductList);

@@ -21,13 +21,17 @@ describe('Header', () => {
     // TestBed's DI container) isn't reset between spec files — clear it so
     // a prior test's persisted login doesn't leak in here.
     localStorage.clear();
+    sessionStorage.clear();
     await TestBed.configureTestingModule({
       imports: [Header],
       providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
   });
 
-  afterEach(() => localStorage.clear());
+  afterEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
 
   it('should create', () => {
     const fixture = TestBed.createComponent(Header);

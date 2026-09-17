@@ -83,7 +83,7 @@
       <p>Approved for the Firefighter allotment.</p>
     </div>
     <div class="headline-row">
-      <a class="seeall" href="#">View full catalog</a>
+      <a class="seeall" routerLink="/products/full-catalog" [queryParams]="{ name: 'Full Catalog' }">View full catalog</a>
       <button class="car-nav" type="button" aria-label="Previous" (click)="scrollCategories(-1)">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M15 6l-6 6 6 6" />
@@ -98,95 +98,34 @@
   </div>
   <div class="carousel">
     <div class="car-track" #categoryTrack>
-      <a class="ccard" href="#">
-        <div class="ccard__img">
-          <span class="ccard__count">14 styles</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M8 4l4 2 4-2 4 3-3 3v9H7V10L4 7z" /><path d="M9.5 6a2.5 2.5 0 0 0 5 0" /></svg>
-        </div>
-        <div class="ccard__body">
-          <div class="ccard__name">Polo shirts</div>
-          <div class="ccard__desc">Duty and casual polos</div>
-          <span class="ccard__shop">Shop <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span>
-        </div>
-      </a>
-      <a class="ccard" href="#">
-        <div class="ccard__img">
-          <span class="ccard__count">32 styles</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M8 3l4 3 4-3 5 4-3 3v11H6V10L3 7z" /></svg>
-        </div>
-        <div class="ccard__body">
-          <div class="ccard__name">Uniforms</div>
-          <div class="ccard__desc">Shirts and trousers</div>
-          <span class="ccard__shop">Shop <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span>
-        </div>
-      </a>
-      <a class="ccard" href="#">
-        <div class="ccard__img">
-          <span class="ccard__count">21 styles</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M7 4l5 2 5-2 3 3-2.5 2.5V20H6.5V9.5L4 7z" /></svg>
-        </div>
-        <div class="ccard__body">
-          <div class="ccard__name">T-shirts &amp; PT wear</div>
-          <div class="ccard__desc">Training and off-duty</div>
-          <span class="ccard__shop">Shop <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span>
-        </div>
-      </a>
-      <a class="ccard" href="#">
-        <div class="ccard__img">
-          <span class="ccard__count">18 styles</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M6 4h4v9c0 1 3 2 5 4l3 2v2H6z" /><path d="M6 17h13" /></svg>
-        </div>
-        <div class="ccard__body">
-          <div class="ccard__name">Footwear</div>
-          <div class="ccard__desc">Boots and duty shoes</div>
-          <span class="ccard__shop">Shop <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span>
-        </div>
-      </a>
-      <a class="ccard" href="#">
-        <div class="ccard__img">
-          <span class="ccard__badge">New</span>
-          <span class="ccard__count">14 styles</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M8 3l4 4 4-4 4 3-2 4v11H6V10L4 6z" /><path d="M12 7v14" /></svg>
-        </div>
-        <div class="ccard__body">
-          <div class="ccard__name">Outerwear</div>
-          <div class="ccard__desc">Jackets and shells</div>
-          <span class="ccard__shop">Shop <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span>
-        </div>
-      </a>
-      <a class="ccard" href="#">
-        <div class="ccard__img">
-          <span class="ccard__count">27 styles</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4" y="7" width="16" height="12" rx="2" /><path d="M9 7V5a3 3 0 0 1 6 0v2" /></svg>
-        </div>
-        <div class="ccard__body">
-          <div class="ccard__name">Gear</div>
-          <div class="ccard__desc">Duty and tactical gear</div>
-          <span class="ccard__shop">Shop <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span>
-        </div>
-      </a>
-      <a class="ccard" href="#">
-        <div class="ccard__img">
-          <span class="ccard__count">11 styles</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M4 13a8 8 0 0 1 16 0" /><path d="M2 13h20v3H2z" /></svg>
-        </div>
-        <div class="ccard__body">
-          <div class="ccard__name">Headwear</div>
-          <div class="ccard__desc">Caps and knit beanies</div>
-          <span class="ccard__shop">Shop <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span>
-        </div>
-      </a>
-      <a class="ccard" href="#">
-        <div class="ccard__img">
-          <span class="ccard__count">40+ styles</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v10M7 12h10" /></svg>
-        </div>
-        <div class="ccard__body">
-          <div class="ccard__name">Accessories</div>
-          <div class="ccard__desc">Belts, gloves, and more</div>
-          <span class="ccard__shop">Shop <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span>
-        </div>
-      </a>
+      @for (category of categories(); track category.progCatId) {
+        <a
+          class="ccard"
+          [routerLink]="['/products', category.progCatId]"
+          [queryParams]="{ name: category.categoryName }"
+        >
+          <div class="ccard__img">
+            <span class="ccard__count">
+              {{ category.productCount }} style{{ category.productCount === 1 ? '' : 's' }}
+            </span>
+            @if (category.imageUrl) {
+              <img [ngSrc]="category.imageUrl" fill alt="" />
+            } @else {
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true">
+                <rect x="4" y="7" width="16" height="12" rx="2" />
+                <path d="M9 7V5a3 3 0 0 1 6 0v2" />
+              </svg>
+            }
+          </div>
+          <div class="ccard__body">
+            <div class="ccard__name">{{ category.categoryName }}</div>
+            <span class="ccard__shop">
+              Shop
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+            </span>
+          </div>
+        </a>
+      }
     </div>
   </div>
 </section>
