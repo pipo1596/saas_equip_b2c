@@ -21,11 +21,11 @@
         <aside class="col-lg-3">
           <div class="card border-0 rounded-0 shadow-sm product-list__facets sticky-top">
             <div class="card-body">
-              @if (categoryFacets().length > 0) {
+              @if (visibleCategoryFacets().length > 0) {
                 <div class="facet-group">
                   <h2>Category</h2>
                   <ul class="facet-list list-unstyled mb-0">
-                    @for (facet of categoryFacets(); track facet.progCatId) {
+                    @for (facet of visibleCategoryFacets(); track facet.progCatId) {
                       <li>
                         <a
                           [routerLink]="['/products', facet.progCatId]"
@@ -34,7 +34,7 @@
                           [class.facet-link--active]="facet.progCatId === activeCategoryId()"
                         >
                           <span>{{ facet.categoryName }}</span>
-                          <span class="badge rounded-pill text-bg-light">{{ facet.count }}</span>
+                          <span class="badge rounded text-bg-light">{{ facet.count }}</span>
                         </a>
                       </li>
                     }
@@ -42,7 +42,7 @@
                 </div>
               }
               @for (group of optionFacets(); track group.optionName; let isFirstGroup = $first) {
-                <div class="facet-group" [class.mt-4]="categoryFacets().length > 0 || !isFirstGroup">
+                <div class="facet-group" [class.mt-4]="visibleCategoryFacets().length > 0 || !isFirstGroup">
                   <div class="d-flex align-items-center justify-content-between mb-2">
                     <button
                       type="button"
@@ -82,7 +82,7 @@
                       @for (facetValue of group.values; track facetValue.value) {
                         <button
                           type="button"
-                          class="btn btn-sm btn-outline-secondary rounded-pill d-inline-flex align-items-center gap-1 facet-chip"
+                          class="btn btn-sm btn-outline-secondary rounded d-inline-flex align-items-center gap-1 facet-chip"
                           [class.active]="(selectedOptions()[group.optionName] ?? []).includes(facetValue.value)"
                           (click)="toggleOption(group.optionName, facetValue.value)"
                         >
@@ -90,7 +90,7 @@
                             <span class="swatch" [style.background]="facetValue.valueCode"></span>
                           }
                           {{ facetValue.value }}
-                          <span class="badge rounded-pill text-bg-light">{{ facetValue.count }}</span>
+                          <span class="badge rounded text-bg-light">{{ facetValue.count }}</span>
                         </button>
                       }
                     </div>
@@ -142,7 +142,10 @@
                   </div>
                   <div class="card-body d-flex flex-column">
                     <p class="product-card__title mb-1">{{ product.title }}</p>
-                    <p class="text-secondary small mb-2">#{{ product.productId }} | Mfg# {{ product.skuCode }}</p>
+                    <p class="text-secondary small mb-2">{{ product.productId }}</p>
+                    @if (product.skuCode !== null) {
+                    <p class="text-secondary small mb-2">Mfg# {{ product.skuCode }}</p>
+                    }
                     @if (product.colors.length > 0) {
                       <div class="d-flex gap-1 mb-2">
                         @for (color of product.colors; track color.valueCode) {

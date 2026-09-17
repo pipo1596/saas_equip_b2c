@@ -51,6 +51,23 @@ function expectProductsRequest(httpMock: HttpTestingController): TestRequest {
   return matches[0];
 }
 
+// This page also loads the same leaf-category list the Home page's "Shop by
+// category" carousel uses, to know which categoryFacets are actual leaf
+// categories worth listing (vs. a parent/group node in the same facet set).
+function expectCategoriesRequest(httpMock: HttpTestingController): TestRequest {
+  const matches = httpMock.match(
+    (req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCTPCVEW' && req.body?.action === '*CATEGORIES',
+  );
+  expect(matches.length).toBe(1);
+  return matches[0];
+}
+
+function categoryFacetNames(fixture: { nativeElement: HTMLElement }): string[] {
+  return Array.from(fixture.nativeElement.querySelectorAll('.facet-link')).map((link) =>
+    link.querySelector('span')!.textContent!.trim(),
+  );
+}
+
 describe('ProductList', () => {
   let httpMock: HttpTestingController;
 
@@ -581,6 +598,66 @@ describe('ProductList', () => {
     expectProductsRequest(httpMock).flush({ ...SAMPLE, categoryFacets: updatedCategoryFacets });
 
     expect(fixture.componentInstance.categoryFacets()).toEqual(updatedCategoryFacets);
+  });
+
+  it('should only list category facets with a positive count that are also leaf categories', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', 'full-catalog');
+    auth.session.set({
+      empId: '1',
+      sessionId: 's',
+      firstName: 'P',
+      lastName: 'A',
+      locations: LOCATIONS,
+    });
+    fixture.detectChanges();
+
+    expectProductsRequest(httpMock).flush({
+      ...SAMPLE,
+      categoryFacets: [
+        // A parent/group node with no products of its own directly in it.
+        { progCatId: 100, categoryName: 'Apparel', count: 0 },
+        // A parent/group node that does carry a count, but isn't itself a
+        // leaf category shoppers can browse into.
+        { progCatId: 200, categoryName: 'Accessory', count: 12 },
+        { progCatId: 5510, categoryName: 'Long sleeve', count: 14 },
+      ],
+    });
+    expectCategoriesRequest(httpMock).flush({
+      categories: [
+        { progCatId: 5510, categoryName: 'Long sleeve', productCount: 14, imageUrl: '' },
+      ],
+    });
+    fixture.detectChanges();
+
+    expect(categoryFacetNames(fixture)).toEqual(['Long sleeve']);
+  });
+
+  it('should show every category facet with a positive count while the leaf category list is still loading', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', 'full-catalog');
+    auth.session.set({
+      empId: '1',
+      sessionId: 's',
+      firstName: 'P',
+      lastName: 'A',
+      locations: LOCATIONS,
+    });
+    fixture.detectChanges();
+
+    expectProductsRequest(httpMock).flush({
+      ...SAMPLE,
+      categoryFacets: [
+        { progCatId: 100, categoryName: 'Apparel', count: 0 },
+        { progCatId: 200, categoryName: 'Accessory', count: 12 },
+        { progCatId: 5510, categoryName: 'Long sleeve', count: 14 },
+      ],
+    });
+    fixture.detectChanges();
+
+    expect(categoryFacetNames(fixture)).toEqual(['Accessory', 'Long sleeve']);
   });
 
   it('should reset the selected option filters when the category/search scope changes', () => {

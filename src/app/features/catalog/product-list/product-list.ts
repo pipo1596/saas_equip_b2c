@@ -20,6 +20,7 @@ import {
   OptionFacetGroup,
   Product,
 } from '../../../core/catalog/catalog-products';
+import { CatalogViewService } from '../../../core/catalog/catalog-view';
 import { LocationSelectionService } from '../../../core/location/location-selection';
 import { Footer } from '../../../shared/footer/footer';
 import { Header } from '../../../shared/header/header';
@@ -66,6 +67,7 @@ type CatalogScope =
 })
 export class ProductList implements AfterViewInit {
   private readonly catalogProductsService = inject(CatalogProductsService);
+  private readonly catalogViewService = inject(CatalogViewService);
   private readonly locationSelectionService = inject(LocationSelectionService);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 
@@ -116,6 +118,22 @@ export class ProductList implements AfterViewInit {
   readonly products = signal<Product[]>([]);
   readonly totalCount = signal(0);
   readonly categoryFacets = signal<CategoryFacet[]>([]);
+  // Categories with zero matches in the current scope aren't worth showing
+  // as a filter option at all, and this list should only ever offer the
+  // shoppable "leaf" categories — never a parent/group node — so it's
+  // cross-referenced against the same leaf-category set the Home page's
+  // "Shop by category" carousel uses. Falls back to showing every facet
+  // with a positive count while that leaf list is still loading, rather
+  // than flashing an empty sidebar.
+  readonly visibleCategoryFacets = computed(() => {
+    const withCount = this.categoryFacets().filter((facet) => facet.count > 0);
+    const leafCategories = this.catalogViewService.categories();
+    if (leafCategories.length === 0) {
+      return withCount;
+    }
+    const leafIds = new Set(leafCategories.map((category) => category.progCatId));
+    return withCount.filter((facet) => leafIds.has(facet.progCatId));
+  });
   // Sorted with "Size" first (see `sizeFirst`) whenever it's (re)populated.
   readonly optionFacets = signal<OptionFacetGroup[]>([]);
   // Which option groups are collapsed, by `optionName` — reset every time
@@ -132,7 +150,7 @@ export class ProductList implements AfterViewInit {
   // Lets the sidebar column disappear entirely (rather than sit empty)
   // when this scope has no facets to narrow by at all.
   readonly hasFacets = computed(
-    () => this.categoryFacets().length > 0 || this.optionFacets().length > 0,
+    () => this.visibleCategoryFacets().length > 0 || this.optionFacets().length > 0,
   );
 
   // A new category/search/bucket always starts back at page 1 with no
@@ -144,6 +162,17 @@ export class ProductList implements AfterViewInit {
     this.q();
     this.page.set(1);
     this.selectedOptions.set({});
+  });
+
+  // Same leaf-category load the Home page uses — kept here too since a
+  // shopper can land directly on a product list without ever visiting Home.
+  // `CatalogViewService` caches per location, so this is a no-op if it's
+  // already loaded.
+  private readonly loadLeafCategoriesOnLocationChange = effect(() => {
+    const location = this.locationSelectionService.activeLocation();
+    if (location && this.isBrowser) {
+      this.catalogViewService.loadCategories(location.locationId).subscribe();
+    }
   });
 
   private readonly loadProductsOnQueryChange = effect(() => {
