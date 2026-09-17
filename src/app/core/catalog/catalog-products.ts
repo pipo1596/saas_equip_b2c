@@ -25,15 +25,20 @@ export interface CategoryFacet {
   count: number;
 }
 
-export interface SizeFacet {
-  value: string;
-  count: number;
-}
-
-export interface ColorFacet {
+// `valueCode` is mainly for a "Color" group (hex-ish swatch codes) — an
+// empty string means this option has no swatch, e.g. Size/Material.
+export interface OptionFacetValue {
   value: string;
   valueCode: string;
   count: number;
+}
+
+// One product-option group (Size, Color, Material, Fit, ...). The backend
+// decides what groups exist for a given category/search — never assume
+// Size/Color are the only ones, or that they're always present.
+export interface OptionFacetGroup {
+  optionName: string;
+  values: OptionFacetValue[];
 }
 
 export interface ProductSearchResult {
@@ -42,8 +47,7 @@ export interface ProductSearchResult {
   page: number;
   pageSize: number;
   categoryFacets: CategoryFacet[];
-  sizeFacets: SizeFacet[];
-  colorFacets: ColorFacet[];
+  optionFacets: OptionFacetGroup[];
 }
 
 export interface ProductSearchParams {
@@ -53,10 +57,31 @@ export interface ProductSearchParams {
   categoryId?: number;
   bucket?: string;
   search?: string;
-  sizes?: string[];
-  colors?: string[];
+  // Keyed by the exact `optionName` an `optionFacets` group came back
+  // with (e.g. "Size", "Color") — build this from whatever the user
+  // actually selected, never from a hardcoded set of names. Only groups
+  // with at least one selected value end up in the request.
+  optionFilters?: Partial<Record<string, string[]>>;
   page?: number;
   pageSize?: number;
+}
+
+// The backend wants one flat, delimited string rather than JSON:
+// "Size:S,M;Color:Black" — groups separated by `;`, an option's name from
+// its values by `:`, and multiple values within a group by `,`. Values
+// within a group are OR'd; different groups are AND'd together. Groups
+// with no selected values are dropped entirely, and no filters at all
+// becomes '' (the caller then omits the field, matching "no filter").
+function buildOptionFiltersString(
+  optionFilters: Partial<Record<string, string[]>> | undefined,
+): string {
+  if (!optionFilters) {
+    return '';
+  }
+  return Object.entries(optionFilters)
+    .filter((entry): entry is [string, string[]] => !!entry[1]?.length)
+    .map(([name, values]) => `${name}:${values.join(',')}`)
+    .join(';');
 }
 
 // The live API sometimes sends `null` for an array field (e.g. a product
@@ -70,8 +95,10 @@ function normalizeSearchResult(result: ProductSearchResult): ProductSearchResult
       colors: product.colors ?? [],
     })),
     categoryFacets: result.categoryFacets ?? [],
-    sizeFacets: result.sizeFacets ?? [],
-    colorFacets: result.colorFacets ?? [],
+    optionFacets: (result.optionFacets ?? []).map((group) => ({
+      ...group,
+      values: group.values ?? [],
+    })),
   };
 }
 
@@ -81,7 +108,8 @@ export class CatalogProductsService {
   private readonly dispatchUrl = `${environment.apiBaseUrl}/cgi/APPSCDSPCH?SEPGM=APCTPCVEW`;
 
   search(params: ProductSearchParams): Observable<ProductSearchResult> {
-    const { locationId, categoryId, bucket, search, sizes, colors, page, pageSize } = params;
+    const { locationId, categoryId, bucket, search, optionFilters, page, pageSize } = params;
+    const optionFiltersString = buildOptionFiltersString(optionFilters);
     return this.http
       .post<ProductSearchResult>(this.dispatchUrl, {
         action: '*PRODUCTS',
@@ -89,8 +117,7 @@ export class CatalogProductsService {
         ...(categoryId !== undefined ? { categoryId } : {}),
         ...(bucket !== undefined ? { bucket } : {}),
         ...(search ? { search } : {}),
-        ...(sizes?.length ? { sizes } : {}),
-        ...(colors?.length ? { colors } : {}),
+        ...(optionFiltersString ? { optionFilters: optionFiltersString } : {}),
         ...(page !== undefined ? { page } : {}),
         ...(pageSize !== undefined ? { pageSize } : {}),
       })

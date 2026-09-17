@@ -27,8 +27,16 @@ const SAMPLE: ProductSearchResult = {
   page: 1,
   pageSize: 24,
   categoryFacets: [{ progCatId: 5510, categoryName: 'Long sleeve', count: 14 }],
-  sizeFacets: [{ value: 'M', count: 9 }],
-  colorFacets: [{ value: 'Black', valueCode: '#0B0B0B', count: 7 }],
+  optionFacets: [
+    {
+      optionName: 'Size',
+      values: [{ value: 'M', valueCode: '', count: 9 }],
+    },
+    {
+      optionName: 'Color',
+      values: [{ value: 'Black', valueCode: '#0B0B0B', count: 7 }],
+    },
+  ],
 };
 
 // `<app-header/>` is rendered by this page and independently hits the exact
@@ -222,7 +230,7 @@ describe('ProductList', () => {
     expect(fixture.componentInstance.totalPages()).toBe(2);
   });
 
-  it('should toggle a size filter, reset to page 1, and refetch with it included', () => {
+  it('should toggle an option filter, reset to page 1, and refetch with a flattened optionFilters string', () => {
     const fixture = TestBed.createComponent(ProductList);
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
@@ -240,7 +248,7 @@ describe('ProductList', () => {
     fixture.detectChanges();
     expectProductsRequest(httpMock).flush(SAMPLE);
 
-    fixture.componentInstance.toggleSize('M');
+    fixture.componentInstance.toggleOption('Size', 'M');
     fixture.detectChanges();
 
     const req = expectProductsRequest(httpMock);
@@ -248,7 +256,7 @@ describe('ProductList', () => {
       action: '*PRODUCTS',
       locationId: 18,
       categoryId: 5510,
-      sizes: ['M'],
+      optionFilters: 'Size:M',
       page: 1,
       pageSize: 24,
     });
@@ -256,7 +264,7 @@ describe('ProductList', () => {
     expect(fixture.componentInstance.page()).toBe(1);
   });
 
-  it('should clear only the size filter, leaving color selected, reset to page 1, and refetch', () => {
+  it('combines multiple selected values within one option group and multiple groups together', () => {
     const fixture = TestBed.createComponent(ProductList);
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
@@ -270,37 +278,30 @@ describe('ProductList', () => {
     fixture.detectChanges();
     expectProductsRequest(httpMock).flush(SAMPLE);
 
-    fixture.componentInstance.toggleSize('M');
-    fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
-    fixture.componentInstance.toggleColor('Black');
+    fixture.componentInstance.toggleOption('Size', 'S');
     fixture.detectChanges();
     expectProductsRequest(httpMock).flush(SAMPLE);
 
-    fixture.componentInstance.goToPage(2);
+    fixture.componentInstance.toggleOption('Size', 'M');
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush({ ...SAMPLE, page: 2 });
+    expectProductsRequest(httpMock).flush(SAMPLE);
 
-    fixture.componentInstance.clearSizeFilter();
+    fixture.componentInstance.toggleOption('Color', 'Black');
     fixture.detectChanges();
-
-    expect(fixture.componentInstance.selectedSizes()).toEqual([]);
-    expect(fixture.componentInstance.selectedColors()).toEqual(['Black']);
-    expect(fixture.componentInstance.page()).toBe(1);
 
     const req = expectProductsRequest(httpMock);
     expect(req.request.body).toEqual({
       action: '*PRODUCTS',
       locationId: 18,
       categoryId: 5510,
-      colors: ['Black'],
+      optionFilters: 'Size:S,M;Color:Black',
       page: 1,
       pageSize: 24,
     });
     req.flush(SAMPLE);
   });
 
-  it('should clear only the color filter, leaving size selected, reset to page 1, and refetch', () => {
+  it('should clear only one option group, leaving the other selected, reset to page 1, and refetch', () => {
     const fixture = TestBed.createComponent(ProductList);
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
@@ -314,10 +315,10 @@ describe('ProductList', () => {
     fixture.detectChanges();
     expectProductsRequest(httpMock).flush(SAMPLE);
 
-    fixture.componentInstance.toggleSize('M');
+    fixture.componentInstance.toggleOption('Size', 'M');
     fixture.detectChanges();
     expectProductsRequest(httpMock).flush(SAMPLE);
-    fixture.componentInstance.toggleColor('Black');
+    fixture.componentInstance.toggleOption('Color', 'Black');
     fixture.detectChanges();
     expectProductsRequest(httpMock).flush(SAMPLE);
 
@@ -325,11 +326,11 @@ describe('ProductList', () => {
     fixture.detectChanges();
     expectProductsRequest(httpMock).flush({ ...SAMPLE, page: 2 });
 
-    fixture.componentInstance.clearColorFilter();
+    fixture.componentInstance.clearOptionFilter('Size');
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.selectedColors()).toEqual([]);
-    expect(fixture.componentInstance.selectedSizes()).toEqual(['M']);
+    expect(fixture.componentInstance.selectedOptions()['Size']).toEqual([]);
+    expect(fixture.componentInstance.selectedOptions()['Color']).toEqual(['Black']);
     expect(fixture.componentInstance.page()).toBe(1);
 
     const req = expectProductsRequest(httpMock);
@@ -337,14 +338,14 @@ describe('ProductList', () => {
       action: '*PRODUCTS',
       locationId: 18,
       categoryId: 5510,
-      sizes: ['M'],
+      optionFilters: 'Color:Black',
       page: 1,
       pageSize: 24,
     });
     req.flush(SAMPLE);
   });
 
-  it('should freeze the sidebar facets once a filter is applied, instead of letting the narrowed response reshuffle them', () => {
+  it('should freeze the sidebar option facets once a filter is applied, instead of letting the narrowed response reshuffle them', () => {
     const fixture = TestBed.createComponent(ProductList);
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
@@ -358,35 +359,180 @@ describe('ProductList', () => {
     fixture.detectChanges();
     expectProductsRequest(httpMock).flush(SAMPLE);
 
-    expect(fixture.componentInstance.sizeFacets()).toEqual(SAMPLE.sizeFacets);
+    // SAMPLE lists Size then Color, but Color sorts ahead of Size.
+    const expectedSorted = [SAMPLE.optionFacets[1], SAMPLE.optionFacets[0]];
+    expect(fixture.componentInstance.optionFacets()).toEqual(expectedSorted);
 
     // Once size M is selected, the backend narrows the facets it returns —
     // the sidebar should keep showing the original (unfiltered) set rather
     // than reshuffling to match this narrowed response.
-    fixture.componentInstance.toggleSize('M');
+    fixture.componentInstance.toggleOption('Size', 'M');
     fixture.detectChanges();
     expectProductsRequest(httpMock).flush({
       ...SAMPLE,
-      sizeFacets: [{ value: 'M', count: 3 }],
-      colorFacets: [],
+      optionFacets: [{ optionName: 'Size', values: [{ value: 'M', valueCode: '', count: 3 }] }],
     });
 
-    expect(fixture.componentInstance.sizeFacets()).toEqual(SAMPLE.sizeFacets);
-    expect(fixture.componentInstance.colorFacets()).toEqual(SAMPLE.colorFacets);
+    expect(fixture.componentInstance.optionFacets()).toEqual(expectedSorted);
 
     // Clearing the filter goes back to an unfiltered request — facets
     // refresh again at that point.
-    fixture.componentInstance.toggleSize('M');
+    fixture.componentInstance.toggleOption('Size', 'M');
     fixture.detectChanges();
     expectProductsRequest(httpMock).flush({
       ...SAMPLE,
-      sizeFacets: [{ value: 'L', count: 5 }],
+      optionFacets: [{ optionName: 'Size', values: [{ value: 'L', valueCode: '', count: 5 }] }],
     });
 
-    expect(fixture.componentInstance.sizeFacets()).toEqual([{ value: 'L', count: 5 }]);
+    expect(fixture.componentInstance.optionFacets()).toEqual([
+      { optionName: 'Size', values: [{ value: 'L', valueCode: '', count: 5 }] },
+    ]);
   });
 
-  it('should reset the selected filters when the category/search scope changes', () => {
+  it('should move "Color" and "Size" option groups to the front, Color ahead of Size, wherever the backend placed them', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', '5510');
+    auth.session.set({
+      empId: '1',
+      sessionId: 's',
+      firstName: 'P',
+      lastName: 'A',
+      locations: LOCATIONS,
+    });
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush({
+      ...SAMPLE,
+      optionFacets: [
+        { optionName: 'Body', values: [{ value: 'Reg', valueCode: '', count: 2 }] },
+        { optionName: 'Size', values: [{ value: 'M', valueCode: '', count: 9 }] },
+        { optionName: 'Fit', values: [{ value: 'Slim', valueCode: '', count: 4 }] },
+        { optionName: 'Color', values: [{ value: 'Black', valueCode: '#0B0B0B', count: 7 }] },
+      ],
+    });
+
+    expect(fixture.componentInstance.optionFacets().map((group) => group.optionName)).toEqual([
+      'Color',
+      'Size',
+      'Body',
+      'Fit',
+    ]);
+  });
+
+  it('should move "Size" to the front and NOT match look-alike groups like "Product Size" or "Body/Sleeve"', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', '5510');
+    auth.session.set({
+      empId: '1',
+      sessionId: 's',
+      firstName: 'P',
+      lastName: 'A',
+      locations: LOCATIONS,
+    });
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush({
+      ...SAMPLE,
+      optionFacets: [
+        { optionName: 'Body', values: [{ value: 'Reg', valueCode: '', count: 2 }] },
+        { optionName: 'Body/Sleeve', values: [{ value: 'Long', valueCode: '', count: 2 }] },
+        { optionName: 'Inseam', values: [{ value: 'Reg', valueCode: '', count: 5 }] },
+        { optionName: 'Product Size', values: [{ value: '10', valueCode: '', count: 3 }] },
+        { optionName: 'Size', values: [{ value: 'M', valueCode: '', count: 9 }] },
+        { optionName: 'Width', values: [{ value: 'Wide', valueCode: '', count: 4 }] },
+      ],
+    });
+
+    expect(fixture.componentInstance.optionFacets().map((group) => group.optionName)).toEqual([
+      'Size',
+      'Body',
+      'Body/Sleeve',
+      'Inseam',
+      'Product Size',
+      'Width',
+    ]);
+  });
+
+  it('should match "Size" even with stray leading/trailing whitespace or different casing from the backend', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', '5510');
+    auth.session.set({
+      empId: '1',
+      sessionId: 's',
+      firstName: 'P',
+      lastName: 'A',
+      locations: LOCATIONS,
+    });
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush({
+      ...SAMPLE,
+      optionFacets: [
+        { optionName: 'Body', values: [{ value: 'Reg', valueCode: '', count: 2 }] },
+        { optionName: ' SIZE ', values: [{ value: 'M', valueCode: '', count: 9 }] },
+      ],
+    });
+
+    expect(fixture.componentInstance.optionFacets().map((group) => group.optionName)).toEqual([
+      ' SIZE ',
+      'Body',
+    ]);
+  });
+
+  it('should leave the group order alone when neither "Color" nor "Size" is present', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', '5510');
+    auth.session.set({
+      empId: '1',
+      sessionId: 's',
+      firstName: 'P',
+      lastName: 'A',
+      locations: LOCATIONS,
+    });
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush({
+      ...SAMPLE,
+      optionFacets: [
+        { optionName: 'Body', values: [{ value: 'Reg', valueCode: '', count: 2 }] },
+        { optionName: 'Fit', values: [{ value: 'Slim', valueCode: '', count: 4 }] },
+      ],
+    });
+
+    expect(fixture.componentInstance.optionFacets().map((group) => group.optionName)).toEqual([
+      'Body',
+      'Fit',
+    ]);
+  });
+
+  it('should collapse every option group but the first (post Color-then-Size sort) by default', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', '5510');
+    auth.session.set({
+      empId: '1',
+      sessionId: 's',
+      firstName: 'P',
+      lastName: 'A',
+      locations: LOCATIONS,
+    });
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush({
+      ...SAMPLE,
+      optionFacets: [
+        { optionName: 'Body', values: [{ value: 'Reg', valueCode: '', count: 2 }] },
+        { optionName: 'Size', values: [{ value: 'M', valueCode: '', count: 9 }] },
+        { optionName: 'Color', values: [{ value: 'Black', valueCode: '#0B0B0B', count: 7 }] },
+      ],
+    });
+
+    // Color sorts first, so it's the only one left expanded.
+    expect(fixture.componentInstance.collapsedGroups().has('Color')).toBe(false);
+    expect(fixture.componentInstance.collapsedGroups().has('Size')).toBe(true);
+    expect(fixture.componentInstance.collapsedGroups().has('Body')).toBe(true);
+  });
+
+  it('should toggle a group between collapsed and expanded', () => {
     const fixture = TestBed.createComponent(ProductList);
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
@@ -400,15 +546,62 @@ describe('ProductList', () => {
     fixture.detectChanges();
     expectProductsRequest(httpMock).flush(SAMPLE);
 
-    fixture.componentInstance.toggleSize('M');
+    // Color outranks Size in the sort priority, so with both present here,
+    // Color is the one left expanded and Size is the one collapsed.
+    expect(fixture.componentInstance.collapsedGroups().has('Size')).toBe(true);
+
+    fixture.componentInstance.toggleGroupCollapsed('Size');
+    expect(fixture.componentInstance.collapsedGroups().has('Size')).toBe(false);
+
+    fixture.componentInstance.toggleGroupCollapsed('Size');
+    expect(fixture.componentInstance.collapsedGroups().has('Size')).toBe(true);
+  });
+
+  it('should always refresh categoryFacets, since its counts are unaffected by optionFilters', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', '5510');
+    auth.session.set({
+      empId: '1',
+      sessionId: 's',
+      firstName: 'P',
+      lastName: 'A',
+      locations: LOCATIONS,
+    });
     fixture.detectChanges();
     expectProductsRequest(httpMock).flush(SAMPLE);
-    expect(fixture.componentInstance.selectedSizes()).toEqual(['M']);
+
+    fixture.componentInstance.toggleOption('Size', 'M');
+    fixture.detectChanges();
+    const updatedCategoryFacets = [{ progCatId: 5510, categoryName: 'Long sleeve', count: 3 }];
+    expectProductsRequest(httpMock).flush({ ...SAMPLE, categoryFacets: updatedCategoryFacets });
+
+    expect(fixture.componentInstance.categoryFacets()).toEqual(updatedCategoryFacets);
+  });
+
+  it('should reset the selected option filters when the category/search scope changes', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', '5510');
+    auth.session.set({
+      empId: '1',
+      sessionId: 's',
+      firstName: 'P',
+      lastName: 'A',
+      locations: LOCATIONS,
+    });
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush(SAMPLE);
+
+    fixture.componentInstance.toggleOption('Size', 'M');
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush(SAMPLE);
+    expect(fixture.componentInstance.selectedOptions()['Size']).toEqual(['M']);
 
     fixture.componentRef.setInput('categoryId', '321');
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.selectedSizes()).toEqual([]);
+    expect(fixture.componentInstance.selectedOptions()).toEqual({});
     const req = expectProductsRequest(httpMock);
     expect(req.request.body).toEqual({
       action: '*PRODUCTS',
@@ -420,7 +613,7 @@ describe('ProductList', () => {
     req.flush(SAMPLE);
   });
 
-  it('should scroll the results back into view when toggling a size or color filter', () => {
+  it('should scroll the results back into view when toggling an option filter', () => {
     const fixture = TestBed.createComponent(ProductList);
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
@@ -441,13 +634,13 @@ describe('ProductList', () => {
     const scrollIntoViewSpy = vi.fn();
     resultsTop.scrollIntoView = scrollIntoViewSpy;
 
-    fixture.componentInstance.toggleSize('M');
+    fixture.componentInstance.toggleOption('Size', 'M');
     fixture.detectChanges();
     expect(scrollIntoViewSpy).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
     expectProductsRequest(httpMock).flush(SAMPLE);
 
     scrollIntoViewSpy.mockClear();
-    fixture.componentInstance.toggleColor('Black');
+    fixture.componentInstance.toggleOption('Color', 'Black');
     fixture.detectChanges();
     expect(scrollIntoViewSpy).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
     expectProductsRequest(httpMock).flush(SAMPLE);

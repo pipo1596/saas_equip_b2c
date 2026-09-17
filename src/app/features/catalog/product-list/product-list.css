@@ -75,6 +75,45 @@
   height: 12px;
 }
 
+.facet-group__toggle {
+  /* This is a `.btn-link` purely so the whole heading row is clickable —
+     it shouldn't actually look like a link. */
+  --bs-btn-color: var(--slate-900);
+  --bs-btn-hover-color: var(--action);
+}
+.facet-group__chevron {
+  color: var(--slate-400);
+  flex: none;
+  transition: transform 0.15s;
+}
+.facet-group__chevron--open {
+  transform: rotate(180deg);
+}
+.facet-group__values {
+  max-height: 220px;
+  overflow-y: auto;
+  /* Keeps the last row's chips from sitting flush against the scrollbar. */
+  padding-right: 4px;
+}
+
+.facet-chip {
+  /* Belt-and-suspenders: the custom properties alone should be enough
+     (Bootstrap's own .btn reads padding/font-size from these), but they're
+     backed up with plain, !important-marked properties here too so this
+     can't quietly lose to some other rule. */
+  --bs-btn-padding-y: 0.1rem;
+  --bs-btn-padding-x: 0.45rem;
+  --bs-btn-font-size: 0.7rem;
+  padding: 0.1rem 0.45rem !important;
+  font-size: 0.7rem !important;
+  line-height: 1.4 !important;
+  gap: 4px !important;
+}
+.facet-chip .swatch {
+  width: 10px;
+  height: 10px;
+}
+
 /* ---------- product cards ---------- */
 .product-card {
   --bs-card-border-radius: 0;

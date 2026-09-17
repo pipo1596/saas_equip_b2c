@@ -20,8 +20,16 @@ const SAMPLE: ProductSearchResult = {
   page: 1,
   pageSize: 9,
   categoryFacets: [{ progCatId: 5510, categoryName: 'Long sleeve', count: 14 }],
-  sizeFacets: [{ value: 'M', count: 9 }],
-  colorFacets: [{ value: 'Black', valueCode: '#0B0B0B', count: 7 }],
+  optionFacets: [
+    {
+      optionName: 'Size',
+      values: [{ value: 'M', valueCode: '', count: 9 }],
+    },
+    {
+      optionName: 'Color',
+      values: [{ value: 'Black', valueCode: '#0B0B0B', count: 7 }],
+    },
+  ],
 };
 
 describe('CatalogProductsService', () => {
@@ -38,7 +46,7 @@ describe('CatalogProductsService', () => {
 
   afterEach(() => httpMock.verify());
 
-  it('searches by category, omitting bucket/search/sizes/colors/page when not given', () => {
+  it('searches by category, omitting bucket/search/optionFilters/page when not given', () => {
     let result: ProductSearchResult | undefined;
     service.search({ locationId: 18, categoryId: 5510 }).subscribe((r) => (result = r));
 
@@ -66,13 +74,12 @@ describe('CatalogProductsService', () => {
     req.flush(SAMPLE);
   });
 
-  it('includes search, sizes, colors, and paging only when provided', () => {
+  it('includes search, paging, and a flattened optionFilters string only when provided', () => {
     service
       .search({
         locationId: 18,
         search: 'shirt',
-        sizes: ['S', 'M'],
-        colors: ['Black'],
+        optionFilters: { Size: ['S', 'M'], Color: ['Black'] },
         page: 2,
         pageSize: 9,
       })
@@ -83,16 +90,31 @@ describe('CatalogProductsService', () => {
       action: '*PRODUCTS',
       locationId: 18,
       search: 'shirt',
-      sizes: ['S', 'M'],
-      colors: ['Black'],
+      optionFilters: 'Size:S,M;Color:Black',
       page: 2,
       pageSize: 9,
     });
     req.flush(SAMPLE);
   });
 
-  it('omits empty sizes/colors arrays and a blank search term', () => {
-    service.search({ locationId: 18, search: '', sizes: [], colors: [] }).subscribe();
+  it('drops option groups with no selected values from the flattened string', () => {
+    service
+      .search({ locationId: 18, optionFilters: { Size: [], Color: ['Navy'] } })
+      .subscribe();
+
+    const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPCVEW');
+    expect(req.request.body).toEqual({
+      action: '*PRODUCTS',
+      locationId: 18,
+      optionFilters: 'Color:Navy',
+    });
+    req.flush(SAMPLE);
+  });
+
+  it('omits optionFilters entirely and a blank search term when nothing is selected', () => {
+    service
+      .search({ locationId: 18, search: '', optionFilters: { Size: [], Color: [] } })
+      .subscribe();
 
     const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPCVEW');
     expect(req.request.body).toEqual({
@@ -122,13 +144,27 @@ describe('CatalogProductsService', () => {
       page: 1,
       pageSize: 9,
       categoryFacets: null,
-      sizeFacets: null,
-      colorFacets: null,
+      optionFacets: null,
     } as never);
 
     expect(result?.products[0].colors).toEqual([]);
     expect(result?.categoryFacets).toEqual([]);
-    expect(result?.sizeFacets).toEqual([]);
-    expect(result?.colorFacets).toEqual([]);
+    expect(result?.optionFacets).toEqual([]);
+  });
+
+  it('normalizes a null values array within an option facet group to an empty array', () => {
+    let result: ProductSearchResult | undefined;
+    service.search({ locationId: 18, categoryId: 5510 }).subscribe((r) => (result = r));
+
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPCVEW').flush({
+      products: [],
+      totalCount: 0,
+      page: 1,
+      pageSize: 9,
+      categoryFacets: [],
+      optionFacets: [{ optionName: 'Size', values: null }],
+    } as never);
+
+    expect(result?.optionFacets).toEqual([{ optionName: 'Size', values: [] }]);
   });
 });

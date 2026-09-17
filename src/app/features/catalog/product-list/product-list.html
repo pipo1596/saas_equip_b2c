@@ -41,66 +41,60 @@
                   </ul>
                 </div>
               }
-              @if (sizeFacets().length > 0) {
-                <div class="facet-group" [class.mt-4]="categoryFacets().length > 0">
+              @for (group of optionFacets(); track group.optionName; let isFirstGroup = $first) {
+                <div class="facet-group" [class.mt-4]="categoryFacets().length > 0 || !isFirstGroup">
                   <div class="d-flex align-items-center justify-content-between mb-2">
-                    <h2 class="mb-0">Size</h2>
-                    @if (selectedSizes().length > 0) {
+                    <button
+                      type="button"
+                      class="facet-group__toggle btn btn-link p-0 text-decoration-none d-flex align-items-center gap-2"
+                      (click)="toggleGroupCollapsed(group.optionName)"
+                      [attr.aria-expanded]="!collapsedGroups().has(group.optionName)"
+                    >
+                      <svg
+                        class="facet-group__chevron"
+                        [class.facet-group__chevron--open]="!collapsedGroups().has(group.optionName)"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.4"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
+                      <h2 class="mb-0">{{ group.optionName }}</h2>
+                    </button>
+                    @if ((selectedOptions()[group.optionName] ?? []).length > 0) {
                       <button
                         type="button"
                         class="btn btn-link btn-sm p-0 text-decoration-none"
-                        (click)="clearSizeFilter()"
+                        (click)="clearOptionFilter(group.optionName)"
                       >
                         Clear
                       </button>
                     }
                   </div>
-                  <div class="d-flex flex-wrap gap-2">
-                    @for (facet of sizeFacets(); track facet.value) {
-                      <button
-                        type="button"
-                        class="btn btn-sm btn-outline-secondary rounded-pill"
-                        [class.active]="selectedSizes().includes(facet.value)"
-                        (click)="toggleSize(facet.value)"
-                      >
-                        {{ facet.value }}
-                        <span class="badge rounded-pill text-bg-light ms-1">{{ facet.count }}</span>
-                      </button>
-                    }
-                  </div>
-                </div>
-              }
-              @if (colorFacets().length > 0) {
-                <div
-                  class="facet-group"
-                  [class.mt-4]="categoryFacets().length > 0 || sizeFacets().length > 0"
-                >
-                  <div class="d-flex align-items-center justify-content-between mb-2">
-                    <h2 class="mb-0">Color</h2>
-                    @if (selectedColors().length > 0) {
-                      <button
-                        type="button"
-                        class="btn btn-link btn-sm p-0 text-decoration-none"
-                        (click)="clearColorFilter()"
-                      >
-                        Clear
-                      </button>
-                    }
-                  </div>
-                  <div class="d-flex flex-wrap gap-2">
-                    @for (facet of colorFacets(); track facet.value) {
-                      <button
-                        type="button"
-                        class="btn btn-sm btn-outline-secondary rounded-pill d-inline-flex align-items-center gap-1"
-                        [class.active]="selectedColors().includes(facet.value)"
-                        (click)="toggleColor(facet.value)"
-                      >
-                        <span class="swatch" [style.background]="facet.valueCode"></span>
-                        {{ facet.value }}
-                        <span class="badge rounded-pill text-bg-light">{{ facet.count }}</span>
-                      </button>
-                    }
-                  </div>
+                  @if (!collapsedGroups().has(group.optionName)) {
+                    <div class="d-flex flex-wrap gap-1 facet-group__values">
+                      @for (facetValue of group.values; track facetValue.value) {
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline-secondary rounded-pill d-inline-flex align-items-center gap-1 facet-chip"
+                          [class.active]="(selectedOptions()[group.optionName] ?? []).includes(facetValue.value)"
+                          (click)="toggleOption(group.optionName, facetValue.value)"
+                        >
+                          @if (facetValue.valueCode) {
+                            <span class="swatch" [style.background]="facetValue.valueCode"></span>
+                          }
+                          {{ facetValue.value }}
+                          <span class="badge rounded-pill text-bg-light">{{ facetValue.count }}</span>
+                        </button>
+                      }
+                    </div>
+                  }
                 </div>
               }
             </div>
