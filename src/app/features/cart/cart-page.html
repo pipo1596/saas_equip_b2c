@@ -1,0 +1,138 @@
+<app-header />
+
+<section class="cart-page">
+  <div class="container py-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a routerLink="/home">Home</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Your Cart</li>
+      </ol>
+    </nav>
+
+    <h1 class="cart-page__title mb-3">Your Cart</h1>
+
+    @if (loading()) {
+      <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading your cart…</span>
+        </div>
+      </div>
+    } @else {
+      @if (error(); as message) {
+        <div class="alert alert-danger" role="alert">{{ message }}</div>
+      }
+
+      @if (cart().items.length === 0) {
+        <div class="cart-page__empty text-center py-5">
+          <p class="mb-3">Your cart is empty.</p>
+          <a routerLink="/products/full-catalog" class="btn btn-primary">Continue shopping</a>
+        </div>
+      } @else {
+        <div class="row g-4">
+          <div class="col-lg-8">
+            <div class="cart-page__panel">
+              @for (item of cart().items; track item.cartItemId) {
+                <div class="cart-page__row">
+                  @if (item.imageUrl) {
+                    <div class="cart-page__thumb" [style.backgroundImage]="'url(' + item.imageUrl + ')'" aria-hidden="true"></div>
+                  } @else {
+                    <div class="cart-page__thumb" aria-hidden="true"></div>
+                  }
+                  <div class="cart-page__body">
+                    <div class="cart-page__name">{{ item.productTitle }}</div>
+                    <div class="cart-page__sku">
+                      {{ item.skuCode }}
+                      @if (item.options.length > 0) {
+                        · {{ formatOptions(item) }}
+                      }
+                    </div>
+                    @if (item.isAvailable === 'N') {
+                      <p class="cart-page__flag text-danger">No longer available</p>
+                    } @else if (item.priceChanged === 'Y') {
+                      <p class="cart-page__flag">
+                        Price updated to {{ item.currentPrice | currency }} since you added this.
+                      </p>
+                    }
+                    <button
+                      type="button"
+                      class="cart-page__remove"
+                      [disabled]="updatingSkuId() === item.skuId || clearing()"
+                      (click)="removeItem(item)"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <div class="qty-stepper">
+                    <button
+                      type="button"
+                      class="qty-stepper__btn"
+                      [disabled]="updatingSkuId() === item.skuId || clearing()"
+                      (click)="setQuantity(item, item.quantity - 1)"
+                      aria-label="Decrease quantity"
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      class="qty-stepper__input"
+                      min="0"
+                      step="1"
+                      [value]="item.quantity"
+                      [disabled]="updatingSkuId() === item.skuId || clearing()"
+                      (change)="setQuantity(item, $any($event.target).valueAsNumber)"
+                      [attr.aria-label]="'Quantity for ' + item.productTitle"
+                    />
+                    <button
+                      type="button"
+                      class="qty-stepper__btn"
+                      [disabled]="updatingSkuId() === item.skuId || clearing()"
+                      (click)="setQuantity(item, item.quantity + 1)"
+                      aria-label="Increase quantity"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div class="cart-page__price">
+                    <span class="cart-page__linetotal">{{ item.lineTotalPrice | currency }}</span>
+                    @if (item.lineTotalPoints !== null) {
+                      <span class="cart-page__points">{{ item.lineTotalPoints }} pts</span>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+            <button
+              type="button"
+              class="cart-page__clear"
+              [disabled]="clearing() || updatingSkuId() !== null"
+              (click)="clearCart()"
+            >
+              {{ clearing() ? 'Clearing…' : 'Clear cart' }}
+            </button>
+          </div>
+
+          <div class="col-lg-4">
+            <div class="cart-page__summary">
+              <h2 class="cart-page__summary-title mb-3">Order Summary</h2>
+              <div class="d-flex justify-content-between align-items-baseline mb-2">
+                <span>Subtotal</span>
+                <b>{{ cart().subtotalPrice | currency }}</b>
+              </div>
+              @if (cart().subtotalPoints !== null) {
+                <div class="d-flex justify-content-between align-items-baseline mb-2">
+                  <span>Points</span>
+                  <b>{{ cart().subtotalPoints }} pts</b>
+                </div>
+              }
+              <a routerLink="/products/full-catalog" class="btn btn-outline-secondary w-100 mt-3">
+                Continue shopping
+              </a>
+            </div>
+          </div>
+        </div>
+      }
+    }
+  </div>
+</section>
+
+<app-footer />

@@ -42,4 +42,9 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/catalog/product-detail/product-detail').then((m) => m.ProductDetail),
   },
+  {
+    path: 'cart',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/cart/cart-page').then((m) => m.CartPage),
+  },
 ];

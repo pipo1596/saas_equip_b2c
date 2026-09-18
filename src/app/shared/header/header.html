@@ -62,7 +62,7 @@
       </button>
       <button class="iconbtn position-relative" type="button" aria-label="Open cart" (click)="openCart()">
         @if (cartCount() > 0) {
-          <span class="badge-count badge rounded-pill bg-primary position-absolute top-0 start-100 translate-middle">{{ cartCount() }}</span>
+          <span class="badge-count badge rounded-pill bg-primary position-absolute">{{ cartCount() }}</span>
         }
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="9" cy="20" r="1.4" />
@@ -241,21 +241,43 @@
   </div>
   <div class="offcanvas-body d-flex flex-column">
     <div class="flex-grow-1 overflow-y-auto">
-      @if (cartLines().length === 0) {
+      @if (cart().items.length === 0) {
         <p class="cart-empty">Your cart is empty.</p>
       } @else {
-        @for (line of cartLines(); track line.id) {
+        @for (item of cart().items; track item.cartItemId) {
           <div class="cart-item">
-            <div class="cart-item__thumb" aria-hidden="true"></div>
+            @if (item.imageUrl) {
+              <div class="cart-item__thumb" [style.backgroundImage]="'url(' + item.imageUrl + ')'" aria-hidden="true"></div>
+            } @else {
+              <div class="cart-item__thumb" aria-hidden="true"></div>
+            }
             <div class="cart-item__body">
-              <div class="cart-item__name">{{ line.name }}</div>
-              <div class="cart-item__sku">{{ line.sku }}</div>
+              <div class="cart-item__name">{{ item.productTitle }}</div>
+              <div class="cart-item__sku">
+                {{ item.skuCode }}
+                @if (item.options.length > 0) {
+                  · {{ cartItemOptionsLabel(item) }}
+                }
+              </div>
+              @if (item.isAvailable === 'N') {
+                <p class="cart-item__flag text-danger">No longer available</p>
+              } @else if (item.priceChanged === 'Y') {
+                <p class="cart-item__flag">Price updated to {{ item.currentPrice | currency }} since you added this.</p>
+              }
               <div class="cart-item__qtyrow">
                 <span class="qty">
-                  <span>{{ line.qty }}</span>
+                  <span>{{ item.quantity }}</span>
                 </span>
-                <span class="cart-item__price">{{ line.price * line.qty | currency }}</span>
+                <span class="cart-item__price">{{ item.lineTotalPrice | currency }}</span>
               </div>
+              <button
+                type="button"
+                class="cart-item__remove"
+                [disabled]="cartRemovingSkuId() === item.skuId"
+                (click)="removeCartItem(item.skuId)"
+              >
+                Remove
+              </button>
             </div>
           </div>
         }
@@ -267,7 +289,12 @@
         <b>{{ cartSubtotal() | currency }}</b>
       </div>
       <p class="drawer__note">Applies against your $600 annual allotment.</p>
-      <button type="button" class="btn btn-primary w-100" [disabled]="cartLines().length === 0">
+      <button
+        type="button"
+        class="btn btn-primary w-100"
+        [disabled]="cart().items.length === 0"
+        (click)="goToCart()"
+      >
         Checkout
       </button>
     </div>

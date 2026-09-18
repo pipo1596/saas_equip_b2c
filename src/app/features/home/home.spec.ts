@@ -19,7 +19,32 @@ describe('Home', () => {
   });
 
   afterEach(() => {
-    TestBed.inject(HttpTestingController).verify();
+    // Rendering Home also renders `<app-header/>`, whose own `ngOnInit` now
+    // always fires a cart `*GET` too (alongside tenant settings and, once a
+    // location is set, the catalog menu) — drain whatever a given test
+    // didn't itself already handle before the strict `verify()` below, so
+    // one test's incidental request can't leave a dangling subscription
+    // that bleeds into whichever spec file runs next in this worker.
+    const httpMock = TestBed.inject(HttpTestingController);
+    httpMock
+      .match((req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS')
+      .forEach((req) => req.flush({}));
+    httpMock
+      .match((req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCCART')
+      .forEach((req) =>
+        req.flush({ cartId: null, itemCount: 0, subtotalPrice: 0, subtotalPoints: null, items: [] }),
+      );
+    httpMock
+      .match((req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCTPCVEW')
+      .forEach((req) =>
+        req.flush({
+          viewId: 1,
+          programId: 1,
+          categoryCount: 0,
+          menu: { clothing: [], footwear: [], gear: [] },
+        }),
+      );
+    httpMock.verify();
     localStorage.clear();
     sessionStorage.clear();
   });

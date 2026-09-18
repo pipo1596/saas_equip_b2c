@@ -14,6 +14,7 @@ import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
 import { AuthService, EmployeeLocation } from '../../core/auth/auth';
+import { CartService, formatCartItemOptions } from '../../core/cart/cart';
 import { CatalogCategory, CatalogMenu, CatalogViewService } from '../../core/catalog/catalog-view';
 import { LocationSelectionService } from '../../core/location/location-selection';
 import { TenantSettings, TenantSettingsService } from '../../core/tenant/tenant-settings';
@@ -88,14 +89,6 @@ function buildDisplayCategories(
   });
 }
 
-interface CartLine {
-  readonly id: string;
-  readonly name: string;
-  readonly sku: string;
-  readonly price: number;
-  readonly qty: number;
-}
-
 @Component({
   selector: 'app-header',
   imports: [RouterLink, CurrencyPipe, NgOptimizedImage, ReactiveFormsModule, NgTemplateOutlet],
@@ -105,6 +98,7 @@ interface CartLine {
 })
 export class Header implements OnInit {
   private readonly authService = inject(AuthService);
+  private readonly cartService = inject(CartService);
   private readonly catalogViewService = inject(CatalogViewService);
   private readonly locationSelectionService = inject(LocationSelectionService);
   private readonly tenantSettingsService = inject(TenantSettingsService);
@@ -188,7 +182,6 @@ export class Header implements OnInit {
   readonly deptMenuOpen = signal(false);
   readonly rulesMenuOpen = signal(false);
   readonly userMenuOpen = signal(false);
-  readonly cartOpen = signal(false);
 
   // `(ngSubmit)` is an output of `FormGroupDirective` (via `[formGroup]`) —
   // without wrapping the control in a group, a bare `<form>` has no
@@ -198,19 +191,21 @@ export class Header implements OnInit {
     term: new FormControl('', { nonNullable: true }),
   });
 
-  // No cart/product service exists yet, so this starts empty rather than
-  // faking line items — the drawer just shows its empty state for now.
-  readonly cartLines = signal<CartLine[]>([]);
-  readonly cartCount = computed(() =>
-    this.cartLines().reduce((total, line) => total + line.qty, 0),
-  );
-  readonly cartSubtotal = computed(() =>
-    this.cartLines().reduce((total, line) => total + line.price * line.qty, 0),
-  );
+  readonly cart = this.cartService.cart;
+  readonly cartCount = computed(() => this.cart().itemCount);
+  readonly cartSubtotal = computed(() => this.cart().subtotalPrice);
+  readonly cartRemovingSkuId = signal<number | null>(null);
+  readonly cartOpen = this.cartService.drawerOpen;
 
   ngOnInit(): void {
     if (this.isBrowser) {
       this.tenantSettingsService.load().subscribe();
+      // Fire-and-forget: a failed fetch just leaves the badge/drawer
+      // showing whatever the shared `cart` signal already had (typically
+      // the still-empty initial value) rather than anywhere in the header
+      // surfacing an error of its own — an explicit error handler here
+      // just keeps that failure from going fully unhandled.
+      this.cartService.load().subscribe({ error: () => {} });
     }
   }
 
@@ -282,11 +277,32 @@ export class Header implements OnInit {
   }
 
   openCart(): void {
-    this.cartOpen.set(true);
+    this.cartService.openDrawer();
   }
 
   closeCart(): void {
-    this.cartOpen.set(false);
+    this.cartService.closeDrawer();
+  }
+
+  goToCart(): void {
+    if (this.cart().items.length === 0) {
+      return;
+    }
+    this.closeCart();
+    this.router.navigateByUrl('/cart');
+  }
+
+  readonly cartItemOptionsLabel = formatCartItemOptions;
+
+  removeCartItem(skuId: number): void {
+    this.cartRemovingSkuId.set(skuId);
+    this.cartService.removeItem(skuId).subscribe({
+      // Both branches just clear the in-flight flag — the cart signal
+      // itself is already updated by the service on success, and there's
+      // nowhere in this drawer to surface a remove failure beyond that.
+      next: () => this.cartRemovingSkuId.set(null),
+      error: () => this.cartRemovingSkuId.set(null),
+    });
   }
 
   logOut(): void {

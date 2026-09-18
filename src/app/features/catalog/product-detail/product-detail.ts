@@ -17,6 +17,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
+import { CartService } from '../../../core/cart/cart';
 import {
   ProductAttribute,
   ProductDetailData,
@@ -46,6 +47,7 @@ import { Header } from '../../../shared/header/header';
 })
 export class ProductDetail implements OnInit, AfterViewInit {
   private readonly productDetailService = inject(ProductDetailService);
+  private readonly cartService = inject(CartService);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
   private readonly hostElementRef = inject(ElementRef<HTMLElement>);
 
@@ -92,6 +94,8 @@ export class ProductDetail implements OnInit, AfterViewInit {
   readonly availabilityError = signal<string | null>(null);
   readonly quantity = signal(1);
   readonly addedToCart = signal(false);
+  readonly addingToCart = signal(false);
+  readonly addToCartError = signal<string | null>(null);
   // The exact `selections()` object (by reference) that the currently-
   // loaded `resolvedSku` was actually fetched for — `selections.update()`
   // always produces a new object on any change, so comparing by reference
@@ -119,7 +123,11 @@ export class ProductDetail implements OnInit, AfterViewInit {
   // selection) plus a valid quantity — mirrors the same "nothing to act on
   // until *AVAIL/*GET_SKU actually resolve" rule the price display follows.
   readonly canAddToCart = computed(
-    () => this.resolvedSku() !== null && Number.isInteger(this.quantity()) && this.quantity() >= 1,
+    () =>
+      this.resolvedSku() !== null &&
+      Number.isInteger(this.quantity()) &&
+      this.quantity() >= 1 &&
+      !this.addingToCart(),
   );
 
   // Only meaningful when Color is the *first* axis — that's the one
@@ -309,6 +317,7 @@ export class ProductDetail implements OnInit, AfterViewInit {
 
   selectOption(optName: string, optId: number): void {
     this.addedToCart.set(false);
+    this.addToCartError.set(null);
     // Picking any option releases a previous explicit photo pin, so the
     // image goes back to being driven by the resolved SKU/color again —
     // `selectImage` re-pins it right after, when it calls this itself as
@@ -327,18 +336,33 @@ export class ProductDetail implements OnInit, AfterViewInit {
 
   setQuantity(value: number): void {
     this.addedToCart.set(false);
+    this.addToCartError.set(null);
     this.quantity.set(Number.isFinite(value) && value >= 1 ? Math.floor(value) : 1);
   }
 
   addToCart(): void {
-    if (!this.canAddToCart()) {
+    const sku = this.resolvedSku();
+    if (!this.canAddToCart() || !sku) {
       return;
     }
-    // No cart service exists yet (the header's own cart drawer is
-    // similarly shelled out, with no product/cart service behind it) —
-    // this just acknowledges the action locally until there's somewhere
-    // real to send it.
-    this.addedToCart.set(true);
+    this.addingToCart.set(true);
+    this.addToCartError.set(null);
+    this.cartService.addItem(sku.skuId, this.quantity()).subscribe({
+      next: () => {
+        this.addingToCart.set(false);
+        this.addedToCart.set(true);
+        // Pop the header's cart drawer open as the actual confirmation — the
+        // shopper sees the real line they just added (photo, qty, price)
+        // sitting in their cart, not just a text blurb near the button.
+        this.cartService.openDrawer();
+      },
+      error: (err: unknown) => {
+        this.addingToCart.set(false);
+        this.addToCartError.set(
+          err instanceof Error ? err.message : 'We could not add that to your cart.',
+        );
+      },
+    });
   }
 
   selectedValueLabel(axis: ProductOptionAxis): string | null {
@@ -402,6 +426,7 @@ export class ProductDetail implements OnInit, AfterViewInit {
     this.manualImageUrl.set(null);
     this.quantity.set(1);
     this.addedToCart.set(false);
+    this.addToCartError.set(null);
     this.loading.set(false);
   }
 }

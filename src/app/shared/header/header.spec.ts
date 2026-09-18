@@ -29,6 +29,32 @@ describe('Header', () => {
   });
 
   afterEach(() => {
+    // `ngOnInit` always fires tenant-settings and cart `*GET` requests (and,
+    // once a location is set, a catalog-menu one too) — a test that renders
+    // the header without handling every one of these itself leaves a
+    // dangling subscription that can bleed into whichever spec file runs
+    // next in this worker. Flush whatever's left with valid stub shapes as
+    // a blanket safety net, rather than requiring every single test above
+    // to explicitly account for all three.
+    const httpMock = TestBed.inject(HttpTestingController);
+    httpMock
+      .match((req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS')
+      .forEach((req) => req.flush({}));
+    httpMock
+      .match((req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCCART')
+      .forEach((req) =>
+        req.flush({ cartId: null, itemCount: 0, subtotalPrice: 0, subtotalPoints: null, items: [] }),
+      );
+    httpMock
+      .match((req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCTPCVEW')
+      .forEach((req) =>
+        req.flush({
+          viewId: 1,
+          programId: 1,
+          categoryCount: 0,
+          menu: { clothing: [], footwear: [], gear: [] },
+        }),
+      );
     localStorage.clear();
     sessionStorage.clear();
   });
@@ -139,6 +165,9 @@ describe('Header', () => {
     TestBed.tick();
 
     httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS').flush({} as never);
+    httpMock
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART')
+      .flush({ cartId: null, itemCount: 0, subtotalPrice: 0, subtotalPoints: null, items: [] });
 
     const firstReq = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPCVEW');
     expect(firstReq.request.body).toEqual({ locationId: 18, action: '*MENU' });
@@ -563,9 +592,154 @@ describe('Header', () => {
     const fixture = TestBed.createComponent(Header);
     const header = fixture.componentInstance;
 
-    expect(header.cartLines()).toEqual([]);
+    expect(header.cart().items).toEqual([]);
     expect(header.cartCount()).toBe(0);
     expect(header.cartSubtotal()).toBe(0);
+  });
+
+  it('should load the cart on init and reflect it in the badge/subtotal', () => {
+    const fixture = TestBed.createComponent(Header);
+    const header = fixture.componentInstance;
+    fixture.detectChanges();
+
+    const httpMock = TestBed.inject(HttpTestingController);
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS').flush({} as never);
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush({
+      cartId: 501,
+      itemCount: 2,
+      subtotalPrice: 179.98,
+      subtotalPoints: 300,
+      items: [
+        {
+          cartItemId: 9001,
+          skuId: 9001,
+          quantity: 2,
+          priceAtAdd: 89.99,
+          pointsAtAdd: 150,
+          lineTotalPrice: 179.98,
+          lineTotalPoints: 300,
+          productPk: 12345,
+          productTitle: "Men's Trail Jacket",
+          handle: 'mens-trail-jacket',
+          skuCode: 'ABC-100-BLK-M',
+          currentPrice: 89.99,
+          currentPoints: 150,
+          priceChanged: 'N',
+          pointsChanged: 'N',
+          isAvailable: 'Y',
+          imageUrl: 'https://cdn.example.com/black-m.jpg',
+          options: [
+            { optName: 'Color', valueDesc: 'Black' },
+            { optName: 'Size', valueDesc: 'M' },
+          ],
+        },
+      ],
+    });
+    fixture.detectChanges();
+
+    expect(header.cartCount()).toBe(2);
+    expect(header.cartSubtotal()).toBe(179.98);
+    expect(fixture.nativeElement.textContent).toContain("Men's Trail Jacket");
+    expect(fixture.nativeElement.textContent).toContain('Black, M');
+  });
+
+  it('should remove a cart item and update the drawer from the response', () => {
+    const fixture = TestBed.createComponent(Header);
+    const header = fixture.componentInstance;
+    fixture.detectChanges();
+
+    const httpMock = TestBed.inject(HttpTestingController);
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS').flush({} as never);
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush({
+      cartId: 501,
+      itemCount: 1,
+      subtotalPrice: 89.99,
+      subtotalPoints: 150,
+      items: [
+        {
+          cartItemId: 9001,
+          skuId: 9001,
+          quantity: 1,
+          priceAtAdd: 89.99,
+          pointsAtAdd: 150,
+          lineTotalPrice: 89.99,
+          lineTotalPoints: 150,
+          productPk: 12345,
+          productTitle: "Men's Trail Jacket",
+          handle: 'mens-trail-jacket',
+          skuCode: 'ABC-100-BLK-M',
+          currentPrice: 89.99,
+          currentPoints: 150,
+          priceChanged: 'N',
+          pointsChanged: 'N',
+          isAvailable: 'Y',
+          imageUrl: '',
+          options: [],
+        },
+      ],
+    });
+
+    header.removeCartItem(9001);
+    const removeReq = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART');
+    expect(removeReq.request.body).toEqual({ action: '*RMV_ITEM', skuId: 9001 });
+    removeReq.flush({ cartId: 501, itemCount: 0, subtotalPrice: 0, subtotalPoints: null, items: [] });
+
+    expect(header.cart().items).toEqual([]);
+    expect(header.cartCount()).toBe(0);
+    expect(header.cartRemovingSkuId()).toBeNull();
+  });
+
+  it('should navigate to /cart and close the drawer when checking out', () => {
+    const fixture = TestBed.createComponent(Header);
+    const header = fixture.componentInstance;
+    const router = TestBed.inject(Router);
+    const navigateSpy = vi.spyOn(router, 'navigateByUrl');
+
+    header.cart.set({
+      cartId: 501,
+      itemCount: 1,
+      subtotalPrice: 89.99,
+      subtotalPoints: null,
+      items: [
+        {
+          cartItemId: 9001,
+          skuId: 9001,
+          quantity: 1,
+          priceAtAdd: 89.99,
+          pointsAtAdd: null,
+          lineTotalPrice: 89.99,
+          lineTotalPoints: null,
+          productPk: 12345,
+          productTitle: "Men's Trail Jacket",
+          handle: 'mens-trail-jacket',
+          skuCode: 'ABC-100-BLK-M',
+          currentPrice: 89.99,
+          currentPoints: null,
+          priceChanged: 'N',
+          pointsChanged: 'N',
+          isAvailable: 'Y',
+          imageUrl: '',
+          options: [],
+        },
+      ],
+    });
+    header.openCart();
+
+    header.goToCart();
+
+    expect(navigateSpy).toHaveBeenCalledWith('/cart');
+    expect(header.cartOpen()).toBe(false);
+  });
+
+  it('should not navigate to /cart when the cart is empty', () => {
+    const fixture = TestBed.createComponent(Header);
+    const header = fixture.componentInstance;
+    const router = TestBed.inject(Router);
+    const navigateSpy = vi.spyOn(router, 'navigateByUrl');
+
+    header.goToCart();
+
+    expect(navigateSpy).not.toHaveBeenCalled();
   });
 
   it('should show no name/initials when logged out', () => {

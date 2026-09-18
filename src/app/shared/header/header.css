@@ -464,6 +464,22 @@
   background: var(--accent);
   border: 2px solid #fff;
 }
+.badge-count {
+  /* Anchored inside the button's own top-right corner instead of Bootstrap's
+     default top-0/start-100/translate-middle, which centers the badge on
+     the corner itself and leaves half of it sticking up above the button —
+     easy to get visually cropped by whatever sits above the header. */
+  top: 1px;
+  right: 1px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  line-height: 1;
+}
 .avatar {
   width: 38px;
   height: 38px;
@@ -542,6 +558,8 @@
   height: 54px;
   border-radius: 9px;
   background: linear-gradient(160deg, #edf1f6, #dde5ef);
+  background-size: cover;
+  background-position: center;
   flex: none;
 }
 .cart-item__body {
@@ -580,6 +598,30 @@
 .cart-item__price {
   font-weight: 600;
   font-size: 13.5px;
+}
+.cart-item__flag {
+  font-size: 11.5px;
+  color: var(--slate-500);
+  margin: 0 0 8px;
+}
+.cart-item__flag.text-danger {
+  color: var(--bs-danger, #dc3545);
+}
+.cart-item__remove {
+  border: none;
+  background: none;
+  padding: 6px 0 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--slate-500);
+  cursor: pointer;
+}
+.cart-item__remove:hover:not(:disabled) {
+  color: var(--action);
+}
+.cart-item__remove:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .drawer__sub span:first-child {
   font-size: 14px;

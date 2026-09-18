@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideRouter } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 
+import { CartService } from '../../../core/cart/cart';
 import { ProductDetailInfo } from '../../../core/catalog/product-detail';
 import { ProductDetail } from './product-detail';
 
@@ -72,6 +73,18 @@ const WHITE_M_SKU = {
 function expectRequest(httpMock: HttpTestingController, action: string) {
   const matches = httpMock.match(
     (req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCPRDDTL' && req.body?.action === action,
+  );
+  expect(matches.length).toBe(1);
+  return matches[0];
+}
+
+// `<app-header/>` (rendered by this page too) independently fires its own
+// `*GET` against this exact same SEPGM/URL on init, via the shared
+// `CartService` singleton — filter by action, not just URL, to tell it
+// apart from this test's own `*ADD_ITEM`/etc. call.
+function expectCartRequest(httpMock: HttpTestingController, action: string) {
+  const matches = httpMock.match(
+    (req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCCART' && req.body?.action === action,
   );
   expect(matches.length).toBe(1);
   return matches[0];
@@ -540,8 +553,56 @@ describe('ProductDetail', () => {
     button.click();
     fixture.detectChanges();
 
+    expect(detail.addingToCart()).toBe(true);
+    const addReq = expectCartRequest(httpMock, '*ADD_ITEM');
+    expect(addReq.request.body).toEqual({ action: '*ADD_ITEM', skuId: 9002, qty: 1 });
+    addReq.flush({ cartId: 501, itemCount: 1, subtotalPrice: 94.99, subtotalPoints: null, items: [] });
+    fixture.detectChanges();
+
+    expect(detail.addingToCart()).toBe(false);
     expect(detail.addedToCart()).toBe(true);
     expect(fixture.nativeElement.textContent).toContain('Added to cart.');
+    // The header's own cart drawer (rendered as part of this page) pops
+    // open as the real confirmation, showing the line that was just added.
+    expect(TestBed.inject(CartService).drawerOpen()).toBe(true);
+  });
+
+  it('should surface the API message when adding to cart fails', () => {
+    const fixture = TestBed.createComponent(ProductDetail);
+    const detail = fixture.componentInstance;
+    fixture.componentRef.setInput('productPk', '12345');
+    fixture.detectChanges();
+    expectRequest(httpMock, '*GET').flush(RESPONSE);
+    fixture.detectChanges();
+    expectRequest(httpMock, '*AVAIL').flush(AVAIL_EVERYTHING);
+    fixture.detectChanges();
+
+    detail.selectOption('Color', 102);
+    detail.selectOption('Size', 201);
+    fixture.detectChanges();
+    expectRequest(httpMock, '*AVAIL').flush({
+      resolvedSkuId: 9002,
+      axes: [
+        { optName: 'Color', optOrder: 1, availableOptIds: [102] },
+        { optName: 'Size', optOrder: 2, availableOptIds: [201] },
+      ],
+    });
+    fixture.detectChanges();
+    expectRequest(httpMock, '*GET_SKU').flush(WHITE_M_SKU);
+    fixture.detectChanges();
+
+    detail.addToCart();
+    expectCartRequest(httpMock, '*ADD_ITEM').flush({
+      success: false,
+      message: 'That item just sold out.',
+    });
+    fixture.detectChanges();
+
+    expect(detail.addingToCart()).toBe(false);
+    expect(detail.addedToCart()).toBe(false);
+    expect(detail.addToCartError()).toBe('That item just sold out.');
+    expect(TestBed.inject(CartService).drawerOpen()).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain('That item just sold out.');
   });
 
   it('should reset the "added to cart" confirmation once the selection changes again', () => {
@@ -569,6 +630,14 @@ describe('ProductDetail', () => {
     fixture.detectChanges();
 
     detail.addToCart();
+    expectCartRequest(httpMock, '*ADD_ITEM').flush({
+      cartId: 501,
+      itemCount: 1,
+      subtotalPrice: 94.99,
+      subtotalPoints: null,
+      items: [],
+    });
+    fixture.detectChanges();
     expect(detail.addedToCart()).toBe(true);
 
     detail.selectOption('Color', 102);

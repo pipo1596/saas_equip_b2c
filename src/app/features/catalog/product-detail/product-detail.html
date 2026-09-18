@@ -195,11 +195,13 @@
                 [disabled]="!canAddToCart()"
                 (click)="addToCart()"
               >
-                Add to Cart
+                {{ addingToCart() ? 'Adding…' : 'Add to Cart' }}
               </button>
             </div>
             @if (addedToCart()) {
               <p class="text-success small mt-2 mb-0">Added to cart.</p>
+            } @else if (addToCartError(); as message) {
+              <p class="text-danger small mt-2 mb-0">{{ message }}</p>
             }
           </div>
         </div>
