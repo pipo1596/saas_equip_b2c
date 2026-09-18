@@ -7,6 +7,11 @@ import { environment } from '../../../environments/environment';
 export interface ProductColor {
   valueDesc: string;
   valueCode: string;
+  // A CSS-renderable color (hex or a named color like "navy") to use as the
+  // swatch's background. `valueSwtchImage`, when present, takes priority —
+  // e.g. for a patterned/textured option a flat color can't represent.
+  valueSwtchColor: string;
+  valueSwtchImage: string;
 }
 
 export interface Product {
@@ -92,7 +97,11 @@ function normalizeSearchResult(result: ProductSearchResult): ProductSearchResult
     ...result,
     products: (result.products ?? []).map((product) => ({
       ...product,
-      colors: product.colors ?? [],
+      colors: (product.colors ?? []).map((color) => ({
+        ...color,
+        valueSwtchColor: color.valueSwtchColor ?? '',
+        valueSwtchImage: color.valueSwtchImage ?? '',
+      })),
     })),
     categoryFacets: result.categoryFacets ?? [],
     optionFacets: (result.optionFacets ?? []).map((group) => ({

@@ -120,7 +120,11 @@
           <div class="row row-cols-2 row-cols-md-3 g-4">
             @for (product of products(); track product.productPk) {
               <div class="col">
-                <div class="card h-100 border-0 shadow-sm product-card">
+                <a
+                  [routerLink]="['/product', product.productPk]"
+                  [queryParams]="{ name: product.title }"
+                  class="card h-100 border-0 shadow-sm product-card text-decoration-none text-reset"
+                >
                   <div class="ratio ratio-1x1 bg-white">
                     @if (product.imageUrl) {
                       <img
@@ -151,7 +155,7 @@
                         @for (color of product.colors; track color.valueCode) {
                           <span
                             class="swatch swatch--sm"
-                            [style.background]="color.valueCode"
+                            [style.background]="color.valueSwtchImage ? ('url(' + color.valueSwtchImage + ')') : color.valueSwtchColor"
                             [attr.title]="color.valueDesc"
                           ></span>
                         }
@@ -159,7 +163,7 @@
                     }
                     <p class="fw-bold mt-auto mb-0 product-card__price">{{ product.price | currency }}</p>
                   </div>
-                </div>
+                </a>
               </div>
             }
           </div>

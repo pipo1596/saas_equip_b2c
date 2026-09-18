@@ -20,7 +20,9 @@ const SAMPLE: ProductSearchResult = {
       skuCode: 'SFD-SHRT-214-BLK-M',
       price: 54,
       imageUrl: '',
-      colors: [{ valueDesc: 'Black', valueCode: '#0B0B0B' }],
+      colors: [
+        { valueDesc: 'Black', valueCode: 'BLACK', valueSwtchColor: 'black', valueSwtchImage: '' },
+      ],
     },
   ],
   totalCount: 32,
@@ -155,6 +157,75 @@ describe('ProductList', () => {
       pageSize: 24,
     });
     req.flush(SAMPLE);
+  });
+
+  it('should link each product card to its product detail page', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', '5510');
+    auth.session.set({
+      empId: '1',
+      sessionId: 's',
+      firstName: 'P',
+      lastName: 'A',
+      locations: LOCATIONS,
+    });
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush(SAMPLE);
+    fixture.detectChanges();
+
+    const card = fixture.nativeElement.querySelector('.product-card');
+    expect(card.tagName).toBe('A');
+    expect(card.getAttribute('href')).toBe('/product/4021?name=Sworn%20duty%20shirt,%20long%20sleeve');
+  });
+
+  it("should render a color swatch using the color's own swatch color", () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', '5510');
+    auth.session.set({
+      empId: '1',
+      sessionId: 's',
+      firstName: 'P',
+      lastName: 'A',
+      locations: LOCATIONS,
+    });
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush(SAMPLE);
+    fixture.detectChanges();
+
+    const swatch: HTMLElement = fixture.nativeElement.querySelector('.product-card .swatch');
+    expect(swatch.title).toBe('Black');
+    expect(swatch.style.background).toContain('black');
+  });
+
+  it('should render a color swatch as an image when the color has a swatch image', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', '5510');
+    auth.session.set({
+      empId: '1',
+      sessionId: 's',
+      firstName: 'P',
+      lastName: 'A',
+      locations: LOCATIONS,
+    });
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush({
+      ...SAMPLE,
+      products: [
+        {
+          ...SAMPLE.products[0],
+          colors: [
+            { valueDesc: 'Black', valueCode: 'BLACK', valueSwtchColor: 'black', valueSwtchImage: '/black.png' },
+          ],
+        },
+      ],
+    });
+    fixture.detectChanges();
+
+    const swatch: HTMLElement = fixture.nativeElement.querySelector('.product-card .swatch');
+    expect(swatch.style.background).toContain('/black.png');
   });
 
   it('should query by bucket when categoryId is a known bucket slug', () => {

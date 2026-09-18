@@ -70,6 +70,7 @@ export class ProductList implements AfterViewInit {
   private readonly catalogViewService = inject(CatalogViewService);
   private readonly locationSelectionService = inject(LocationSelectionService);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
+  private readonly hostElementRef = inject(ElementRef<HTMLElement>);
 
   @ViewChild('resultsTop') private readonly resultsTop?: ElementRef<HTMLElement>;
 
@@ -235,10 +236,16 @@ export class ProductList implements AfterViewInit {
     // Landing on this route can otherwise leave the browser at whatever
     // scroll position the previous page was at (e.g. the router keeps
     // scroll position, or this is a fresh category coming from a link
-    // further down the home page) — jump to the top of the results on
-    // first render, without the "smooth" animation used for later
-    // filter/page changes.
-    this.scrollResultsIntoView('auto');
+    // further down the home page) — jump all the way to the top of the
+    // page (above even the header, unlike `scrollResultsIntoView`'s
+    // results-anchor used for later filter/page changes) on first render,
+    // without the "smooth" animation used for those later changes. Guarded
+    // the same way as `scrollResultsIntoView`, since jsdom (used in tests)
+    // doesn't implement `scrollIntoView` at all.
+    const target = this.hostElementRef.nativeElement;
+    if (typeof target.scrollIntoView === 'function') {
+      target.scrollIntoView({ behavior: 'auto', block: 'start' });
+    }
   }
 
   toggleGroupCollapsed(optionName: string): void {

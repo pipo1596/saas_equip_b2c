@@ -36,4 +36,10 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/catalog/product-list/product-list').then((m) => m.ProductList),
   },
+  {
+    path: 'product/:productPk',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/catalog/product-detail/product-detail').then((m) => m.ProductDetail),
+  },
 ];

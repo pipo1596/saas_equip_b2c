@@ -13,7 +13,9 @@ const SAMPLE: ProductSearchResult = {
       skuCode: 'SFD-SHRT-214-BLK-M',
       price: 54,
       imageUrl: '',
-      colors: [{ valueDesc: 'Black', valueCode: '#0B0B0B' }],
+      colors: [
+        { valueDesc: 'Black', valueCode: '#0B0B0B', valueSwtchColor: '#0B0B0B', valueSwtchImage: '' },
+      ],
     },
   ],
   totalCount: 32,
@@ -150,6 +152,34 @@ describe('CatalogProductsService', () => {
     expect(result?.products[0].colors).toEqual([]);
     expect(result?.categoryFacets).toEqual([]);
     expect(result?.optionFacets).toEqual([]);
+  });
+
+  it('normalizes a missing valueSwtchColor/valueSwtchImage on a color to empty strings', () => {
+    let result: ProductSearchResult | undefined;
+    service.search({ locationId: 18, categoryId: 5510 }).subscribe((r) => (result = r));
+
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPCVEW').flush({
+      products: [
+        {
+          productPk: 4022,
+          productId: 'SFD-SHRT-215',
+          title: 'Sworn duty shirt',
+          skuCode: 'SFD-SHRT-215-M',
+          price: 54,
+          imageUrl: '',
+          colors: [{ valueDesc: 'White', valueCode: 'WHITE', valueSwtchColor: null, valueSwtchImage: null }],
+        },
+      ],
+      totalCount: 1,
+      page: 1,
+      pageSize: 9,
+      categoryFacets: null,
+      optionFacets: null,
+    } as never);
+
+    expect(result?.products[0].colors).toEqual([
+      { valueDesc: 'White', valueCode: 'WHITE', valueSwtchColor: '', valueSwtchImage: '' },
+    ]);
   });
 
   it('normalizes a null values array within an option facet group to an empty array', () => {

@@ -1,0 +1,242 @@
+<app-header />
+
+<section class="product-detail">
+  <div class="container py-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a routerLink="/home">Home</a></li>
+        <li class="breadcrumb-item"><a routerLink="/products/full-catalog">Products</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{{ pageTitle() }}</li>
+      </ol>
+    </nav>
+
+    <h1 class="product-detail__title mb-3">{{ pageTitle() }}</h1>
+
+    @if (loading()) {
+      <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading product…</span>
+        </div>
+      </div>
+    } @else if (error(); as message) {
+      <div class="alert alert-danger" role="alert">{{ message }}</div>
+    } @else {
+      <div class="row g-4">
+        <div class="col-lg-6">
+          <div class="ratio ratio-1x1 bg-white product-detail__hero">
+            @if (activeImageUrl()) {
+              <img [src]="activeImageUrl()" [alt]="pageTitle()" class="object-fit-contain p-4" />
+            } @else {
+              <div class="d-flex align-items-center justify-content-center text-secondary">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="3" y="5" width="18" height="14" rx="2" />
+                  <circle cx="9" cy="10" r="1.5" />
+                  <path d="M21 16l-5.5-5.5L9 17" />
+                </svg>
+              </div>
+            }
+          </div>
+          @if (images().length > 1) {
+            <div class="thumb-carousel mt-2">
+              @if (thumbsOverflow()) {
+                <button type="button" class="thumb-nav thumb-nav--prev" aria-label="Previous photos" (click)="scrollThumbs(-1)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M15 6l-6 6 6 6" />
+                  </svg>
+                </button>
+              }
+              <div class="thumb-track" #thumbTrack>
+                @for (image of images(); track image.imageId) {
+                  <button
+                    type="button"
+                    class="product-detail__thumb bg-white p-0 border-0"
+                    [class.product-detail__thumb--active]="image.imageUrl === activeImageUrl()"
+                    (click)="selectImage(image)"
+                  >
+                    <img [src]="image.imageUrl" [alt]="image.imageDesc || pageTitle()" class="product-detail__thumb-img" />
+                  </button>
+                }
+              </div>
+              @if (thumbsOverflow()) {
+                <button type="button" class="thumb-nav thumb-nav--next" aria-label="Next photos" (click)="scrollThumbs(1)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M9 6l6 6-6 6" />
+                  </svg>
+                </button>
+              }
+            </div>
+          }
+        </div>
+
+        <div class="col-lg-6">
+          <div class="product-detail__panel">
+            @if (product(); as p) {
+              @if (p.brandLogoUrl || p.vendor) {
+                <div class="d-flex align-items-center gap-2 mb-3">
+                  @if (p.brandLogoUrl) {
+                    <img [src]="p.brandLogoUrl" [alt]="p.brandName || p.vendor" class="product-detail__brand-logo" />
+                  }
+                  @if (p.vendor) {
+                    <span class="text-secondary">{{ p.vendor }}</span>
+                  }
+                </div>
+              }
+              <p class="text-secondary small mb-3">{{ p.productId }}</p>
+            }
+
+            <div class="product-detail__price-block mb-3">
+              @if (resolvedSku(); as sku) {
+                <div class="d-flex align-items-baseline gap-2">
+                  <span class="product-detail__price">{{ sku.basePrice | currency }}</span>
+                  @if (sku.comparePrice > sku.basePrice) {
+                    <span class="text-secondary text-decoration-line-through">
+                      {{ sku.comparePrice | currency }}
+                    </span>
+                  }
+                </div>
+
+                <p class="text-secondary small mb-0">SKU: {{ sku.skuCode }}</p>
+              } @else {
+                @if (priceRange(); as range) {
+                  <span class="product-detail__price">
+                    {{ range.min | currency }}
+                    @if (range.max !== range.min) {
+                      – {{ range.max | currency }}
+                    }
+                  </span>
+                }
+                @if (resolvingSku()) {
+                  <p class="text-secondary small mb-0">Checking price…</p>
+                } @else {
+                  <p class="text-secondary small mb-0">
+                    {{
+                      priceRange()
+                        ? 'Select options to see the exact price.'
+                        : 'Select options to see price and availability.'
+                    }}
+                  </p>
+                }
+              }
+            </div>
+
+            @if (availabilityError(); as message) {
+              <p class="text-danger small mb-3">{{ message }}</p>
+            }
+
+            @for (axis of axes(); track axis.optName) {
+              <div class="product-detail__axis-card mb-3">
+                <p class="product-detail__axis-label mb-3">
+                  <span class="product-detail__axis-name">{{ axis.optName }}:</span>
+                  <span class="product-detail__axis-value">
+                    {{ selectedValueLabel(axis) || ('Select a ' + axis.optName) }}
+                  </span>
+                </p>
+                <div class="d-flex flex-wrap gap-2">
+                  @for (value of axis.values; track value.optId) {
+                    @if (isSwatchValue(axis, value)) {
+                      <button
+                        type="button"
+                        class="color-swatch-btn"
+                        [class.active]="selections()[axis.optName] === value.optId"
+                        [style.background]="value.swatchImg ? ('url(' + value.swatchImg + ')') : value.swatchColor"
+                        [disabled]="!isOptionAvailable(axis, value.optId)"
+                        [attr.title]="value.valueDesc"
+                        [attr.aria-label]="value.valueDesc"
+                        (click)="selectOption(axis.optName, value.optId)"
+                      ></button>
+                    } @else {
+                      <button
+                        type="button"
+                        class="option-chip"
+                        [class.active]="selections()[axis.optName] === value.optId"
+                        [disabled]="!isOptionAvailable(axis, value.optId)"
+                        (click)="selectOption(axis.optName, value.optId)"
+                      >
+                        {{ value.valueDesc }}
+                      </button>
+                    }
+                  }
+                </div>
+              </div>
+            }
+
+            <div class="d-flex align-items-center gap-3 mt-4">
+              <div class="qty-stepper">
+                <button
+                  type="button"
+                  class="qty-stepper__btn"
+                  [disabled]="quantity() <= 1"
+                  (click)="setQuantity(quantity() - 1)"
+                  aria-label="Decrease quantity"
+                >
+                  −
+                </button>
+                <input
+                  type="number"
+                  class="qty-stepper__input"
+                  min="1"
+                  step="1"
+                  [value]="quantity()"
+                  (change)="setQuantity($any($event.target).valueAsNumber)"
+                  aria-label="Quantity"
+                />
+                <button
+                  type="button"
+                  class="qty-stepper__btn"
+                  (click)="setQuantity(quantity() + 1)"
+                  aria-label="Increase quantity"
+                >
+                  +
+                </button>
+              </div>
+              <button
+                type="button"
+                class="btn-add-to-cart"
+                [disabled]="!canAddToCart()"
+                (click)="addToCart()"
+              >
+                Add to Cart
+              </button>
+            </div>
+            @if (addedToCart()) {
+              <p class="text-success small mt-2 mb-0">Added to cart.</p>
+            }
+          </div>
+        </div>
+      </div>
+
+      @if (product(); as p) {
+        @if (p.longDescr || p.construction) {
+          <div class="row mt-4 ">
+            <div class="col-12 bg-white p-4 border rounded-3">
+              @if (p.longDescr) {
+                <h2 class="product-detail__section-title mb-2">Details</h2>
+                <div [innerHTML]="p.longDescr"></div>
+              }
+              @if (p.construction) {
+                <h2 class="product-detail__section-title mb-2" [class.mt-4]="p.longDescr">Construction</h2>
+                <p class="product-detail__construction mb-0">{{ p.construction }}</p>
+              }
+            </div>
+          </div>
+        }
+      }
+
+      @if (attributes().length > 0) {
+        <div class="row mt-4">
+          <div class="col-12 bg-white p-4 border rounded-3">
+            <h2 class="product-detail__section-title mb-2">Specifications</h2>
+            <dl class="product-detail__attributes mb-0">
+              @for (attr of attributes(); track attr.attrId) {
+                <dt>{{ attr.attrName }}</dt>
+                <dd>{{ attr.attrValue }}</dd>
+              }
+            </dl>
+          </div>
+        </div>
+      }
+    }
+  </div>
+</section>
+
+<app-footer />
