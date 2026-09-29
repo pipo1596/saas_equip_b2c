@@ -182,6 +182,11 @@ a.cart-page__thumb-link {
   font-size: 11.5px;
   color: var(--slate-400);
 }
+.cart-page__unit-price {
+  display: block;
+  font-size: 11.5px;
+  color: var(--slate-400);
+}
 .cart-page__split {
   display: block;
   font-size: 11.5px;

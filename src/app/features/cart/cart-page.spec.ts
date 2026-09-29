@@ -129,6 +129,17 @@ describe('CartPage', () => {
     expect(fixture.nativeElement.querySelectorAll('.cart-page__row').length).toBe(2);
   });
 
+  it('should show the unit price for a multi-quantity line, and omit it when quantity is 1', () => {
+    const fixture = TestBed.createComponent(CartPage);
+    fixture.detectChanges();
+    flushInitialCartLoads(httpMock, CART);
+    fixture.detectChanges();
+
+    const rows: HTMLElement[] = fixture.nativeElement.querySelectorAll('.cart-page__row');
+    expect(rows[0].querySelector('.cart-page__unit-price')?.textContent?.trim()).toBe('$89.99 each');
+    expect(rows[1].querySelector('.cart-page__unit-price')).toBeNull();
+  });
+
   it("should link each line's thumbnail and name to a plain (non-edit) product view", () => {
     const fixture = TestBed.createComponent(CartPage);
     fixture.detectChanges();

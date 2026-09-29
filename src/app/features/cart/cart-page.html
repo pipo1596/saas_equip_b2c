@@ -224,6 +224,9 @@
           <span class="cart-page__linetotal">{{ formatAmount(primary.amount, primary.payUnit) }}</span>
           <span class="cart-page__value-note">{{ item.lineTotalPrice | currency }} value</span>
         }
+        @if (item.quantity > 1) {
+          <span class="cart-page__unit-price">{{ item.currentPrice | currency }} each</span>
+        }
         @for (allocation of splitAllocations(item); track allocation.ruleId) {
           <span class="cart-page__split" [class.cart-page__split--fallback]="allocation.ruleId !== primary.ruleId">
             {{ formatAmount(allocation.amount, allocation.payUnit) }} {{ ruleNameFor(allocation.ruleId) }}
@@ -231,6 +234,9 @@
         }
       } @else {
         <span class="cart-page__linetotal">{{ item.lineTotalPrice | currency }}</span>
+        @if (item.quantity > 1) {
+          <span class="cart-page__unit-price">{{ item.currentPrice | currency }} each</span>
+        }
         @if (item.lineTotalPoints !== null) {
           <span class="cart-page__points">{{ item.lineTotalPoints }} pts</span>
         }
