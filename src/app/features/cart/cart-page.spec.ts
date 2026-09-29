@@ -336,4 +336,369 @@ describe('CartPage', () => {
     expect(page.error()).toBe('Out of stock.');
     expect(fixture.nativeElement.textContent).toContain('Out of stock.');
   });
+
+  describe('allotment groups', () => {
+    const UNIFORM_RULE = {
+      ruleId: 21,
+      ruleName: 'Uniform allotment',
+      allotType: 'DOLLAR' as const,
+      primaryUnit: 'DOLLARS' as const,
+      isBarRule: 'Y' as const,
+      dollars: { total: 100, used: 0, inCart: 100, available: 0 },
+      units: null,
+      points: null,
+      cycle: {
+        renewalBasis: 'FIXED' as const,
+        renewalPeriodMonths: 12,
+        cycleStart: '2026-01-01',
+        cycleEnd: '2026-12-31',
+        renewsOn: '2027-01-01',
+        expirationDate: null,
+        onExpiration: 'SUSPEND' as const,
+      },
+      covers: { allAssortments: 'N' as const, categories: [{ progCatId: 1, categoryName: 'Uniform' }], unitGrants: [] },
+      carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
+      quotas: [],
+      requireApproval: 'N' as const,
+      allowCcFallback: 'N' as const,
+      fallbackRuleIds: [22],
+    };
+
+    const FOOTWEAR_RULE = {
+      ...UNIFORM_RULE,
+      ruleId: 22,
+      ruleName: 'Footwear allotment',
+      dollars: { total: 200, used: 0, inCart: 160, available: 40 },
+      covers: { allAssortments: 'N' as const, categories: [{ progCatId: 2, categoryName: 'Footwear' }], unitGrants: [] },
+      fallbackRuleIds: [],
+    };
+
+    const UNIT_RULE = {
+      ...UNIFORM_RULE,
+      ruleId: 31,
+      ruleName: 'Unit Allotment',
+      primaryUnit: 'UNITS' as const,
+      dollars: null,
+      units: { total: 5, used: 2, inCart: 2, available: 1 },
+      cycle: { ...UNIFORM_RULE.cycle, renewsOn: '2027-09-09' },
+      covers: {
+        allAssortments: 'N' as const,
+        categories: [],
+        unitGrants: [{ progCatId: 3, categoryName: 'Tactical', unitQty: 5 }],
+      },
+      fallbackRuleIds: [],
+    };
+
+    const SHIRT = {
+      cartItemId: 1,
+      skuId: 101,
+      quantity: 2,
+      priceAtAdd: 70,
+      pointsAtAdd: null,
+      lineTotalPrice: 140,
+      lineTotalPoints: null,
+      productPk: 201,
+      productTitle: 'Station Shirt',
+      handle: 'station-shirt',
+      skuCode: 'SHIRT-1',
+      currentPrice: 70,
+      currentPoints: null,
+      priceChanged: 'N',
+      pointsChanged: 'N',
+      isAvailable: 'Y',
+      imageUrl: '',
+      options: [],
+    };
+
+    const BOOT = {
+      ...SHIRT,
+      cartItemId: 2,
+      skuId: 102,
+      quantity: 1,
+      lineTotalPrice: 120,
+      productPk: 202,
+      productTitle: 'Station Boot',
+      skuCode: 'BOOT-1',
+    };
+
+    const PANTS = {
+      ...SHIRT,
+      cartItemId: 3,
+      skuId: 103,
+      quantity: 2,
+      lineTotalPrice: 259.98,
+      productPk: 203,
+      productTitle: 'Tactical Pants',
+      skuCode: 'PANTS-1',
+    };
+
+    const GROUPED_CART = {
+      cartId: 501,
+      itemCount: 5,
+      subtotalPrice: 519.98,
+      subtotalPoints: null,
+      items: [SHIRT, BOOT, PANTS],
+      allotment: {
+        programId: 3,
+        allotmentBar: null,
+        ruleCount: 3,
+        rules: [UNIFORM_RULE, FOOTWEAR_RULE, UNIT_RULE],
+        approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+        openOrders: null,
+        lineTags: [
+          {
+            cartItemId: 1,
+            skuId: 101,
+            ruleId: 21,
+            payUnit: 'DOLLARS',
+            tagLabel: '$ allotment',
+            allocations: [
+              { ruleId: 21, payUnit: 'DOLLARS', amount: 100 },
+              { ruleId: 22, payUnit: 'DOLLARS', amount: 40 },
+            ],
+          },
+          {
+            cartItemId: 2,
+            skuId: 102,
+            ruleId: 22,
+            payUnit: 'DOLLARS',
+            tagLabel: '$ allotment',
+            allocations: [{ ruleId: 22, payUnit: 'DOLLARS', amount: 120 }],
+          },
+          {
+            cartItemId: 3,
+            skuId: 103,
+            ruleId: 31,
+            payUnit: 'UNITS',
+            tagLabel: 'uses units',
+            allocations: [{ ruleId: 31, payUnit: 'UNITS', amount: 2 }],
+          },
+        ],
+        productTag: null,
+      },
+    };
+
+    it('groups each line under its own (home) allotment, in the API-supplied rule order', () => {
+      const fixture = TestBed.createComponent(CartPage);
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, GROUPED_CART);
+      fixture.detectChanges();
+
+      const groups: HTMLElement[] = fixture.nativeElement.querySelectorAll('.allotment-group');
+      expect(groups.length).toBe(3);
+      expect(groups[0].querySelector('.allotment-group__name')?.textContent?.trim()).toBe('Uniform allotment');
+      expect(groups[0].querySelectorAll('.cart-page__row').length).toBe(1);
+      expect(groups[0].textContent).toContain('Station Shirt');
+
+      expect(groups[1].querySelector('.allotment-group__name')?.textContent?.trim()).toBe('Footwear allotment');
+      expect(groups[1].textContent).toContain('Station Boot');
+      expect(groups[1].textContent).not.toContain('Station Shirt');
+
+      expect(groups[2].querySelector('.allotment-group__name')?.textContent?.trim()).toBe('Unit Allotment');
+      expect(groups[2].textContent).toContain('Tactical Pants');
+    });
+
+    it("shows a split line's per-allotment breakdown and a fallback note explaining it", () => {
+      const fixture = TestBed.createComponent(CartPage);
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, GROUPED_CART);
+      fixture.detectChanges();
+
+      const shirtRow: HTMLElement = fixture.nativeElement.querySelectorAll('.allotment-group')[0].querySelector('.cart-page__row')!;
+      const splits: NodeListOf<HTMLElement> = shirtRow.querySelectorAll('.cart-page__split');
+      expect(Array.from(splits).map((el) => el.textContent?.trim())).toEqual([
+        '$100.00 Uniform',
+        '$40.00 Footwear',
+      ]);
+      expect(shirtRow.querySelector('.cart-page__split--fallback')?.textContent?.trim()).toBe('$40.00 Footwear');
+      expect(shirtRow.querySelector('.cart-page__fallback-note')?.textContent?.trim()).toBe(
+        '$40.00 of these items is covered by your Footwear allotment, after your Uniform allotment ran out.',
+      );
+    });
+
+    it("shows a plain line total with no split for an item that isn't shared across allotments", () => {
+      const fixture = TestBed.createComponent(CartPage);
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, GROUPED_CART);
+      fixture.detectChanges();
+
+      const bootRow: HTMLElement = fixture.nativeElement.querySelectorAll('.allotment-group')[1].querySelector('.cart-page__row')!;
+      expect(bootRow.querySelector('.cart-page__linetotal')?.textContent?.trim()).toBe('$120.00');
+      expect(bootRow.querySelectorAll('.cart-page__split').length).toBe(0);
+      expect(bootRow.querySelector('.cart-page__fallback-note')).toBeNull();
+    });
+
+    it('shows a units-covered line as a quantity, with its dollar value noted separately', () => {
+      const fixture = TestBed.createComponent(CartPage);
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, GROUPED_CART);
+      fixture.detectChanges();
+
+      const pantsRow: HTMLElement = fixture.nativeElement.querySelectorAll('.allotment-group')[2].querySelector('.cart-page__row')!;
+      expect(pantsRow.querySelector('.cart-page__linetotal')?.textContent?.trim()).toBe('2 units');
+      expect(pantsRow.querySelector('.cart-page__value-note')?.textContent?.trim()).toBe('$259.98 value');
+    });
+
+    it("notes in the lending group's own header how much of its balance covered another group's overflow", () => {
+      const fixture = TestBed.createComponent(CartPage);
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, GROUPED_CART);
+      fixture.detectChanges();
+
+      const footwearGroup: HTMLElement = fixture.nativeElement.querySelectorAll('.allotment-group')[1];
+      expect(footwearGroup.querySelector('.allotment-group__lent-note')?.textContent?.trim()).toBe(
+        'In cart includes $40.00 for Uniform',
+      );
+      const uniformGroup: HTMLElement = fixture.nativeElement.querySelectorAll('.allotment-group')[0];
+      expect(uniformGroup.querySelector('.allotment-group__lent-note')).toBeNull();
+    });
+
+    it('lists what pays for the order and what remains due at checkout', () => {
+      const fixture = TestBed.createComponent(CartPage);
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, GROUPED_CART);
+      fixture.detectChanges();
+
+      const summary: HTMLElement = fixture.nativeElement.querySelector('.cart-page__summary');
+      expect(summary.textContent).toContain('Order value (5 items)');
+      expect(summary.textContent).toContain('$519.98');
+      expect(summary.textContent).toContain('Unit Allotment');
+      expect(summary.textContent).toContain('2 units');
+      expect(summary.textContent).toContain('Uniform allotment');
+      expect(summary.textContent).toContain('$100.00');
+      expect(summary.textContent).toContain('Footwear allotment');
+      expect(summary.textContent).toContain('$160.00');
+      expect(summary.textContent).toContain('To pay at checkout');
+
+      const checkout: HTMLElement = fixture.nativeElement.querySelector('.cart-page__checkout');
+      expect(checkout.querySelector('.cart-page__checkout-sub')?.textContent?.trim()).toBe('Nothing to pay');
+    });
+
+    it("groups and nets correctly from just the simple ruleId/payUnit tag, before the API sends a line's full allocations breakdown", () => {
+      // Regression case: today's real API only tags a line with a single
+      // ruleId/payUnit (no `allocations` array at all yet) — this must
+      // still group correctly and net the checkout total to zero, not
+      // silently fall back to the flat, ungrouped list.
+      const GENERAL_RULE = {
+        ...UNIFORM_RULE,
+        ruleId: 41,
+        ruleName: 'General Allotment',
+        dollars: { total: 1200, used: 0, inCart: 1071.9, available: 128.1 },
+        fallbackRuleIds: [],
+      };
+      const SIMPLE_UNIT_RULE = { ...UNIT_RULE, ruleId: 42, units: { total: 20, used: 0, inCart: 17, available: 3 } };
+
+      const shirt = { ...SHIRT, cartItemId: 11, skuId: 111, quantity: 10, lineTotalPrice: 1289.1, productTitle: 'Shirt' };
+      const cap = { ...SHIRT, cartItemId: 12, skuId: 112, quantity: 7, lineTotalPrice: 175, productTitle: 'Cap' };
+      const boot = { ...SHIRT, cartItemId: 13, skuId: 113, quantity: 6, lineTotalPrice: 1071.9, productTitle: 'Blundstone Boot' };
+
+      const fixture = TestBed.createComponent(CartPage);
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, {
+        cartId: 900,
+        itemCount: 23,
+        subtotalPrice: 2536.0,
+        subtotalPoints: null,
+        items: [shirt, cap, boot],
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 2,
+          rules: [GENERAL_RULE, SIMPLE_UNIT_RULE],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [
+            { cartItemId: 11, skuId: 111, ruleId: 42, payUnit: 'UNITS', tagLabel: 'uses units' },
+            { cartItemId: 12, skuId: 112, ruleId: 42, payUnit: 'UNITS', tagLabel: 'uses units' },
+            { cartItemId: 13, skuId: 113, ruleId: 41, payUnit: 'DOLLARS', tagLabel: '$ allotment' },
+          ],
+          productTag: null,
+        },
+      });
+      fixture.detectChanges();
+
+      const groups: HTMLElement[] = fixture.nativeElement.querySelectorAll('.allotment-group');
+      expect(groups.length).toBe(2);
+      expect(groups[0].textContent).toContain('Blundstone Boot');
+      expect(groups[1].textContent).toContain('Shirt');
+      expect(groups[1].textContent).toContain('Cap');
+      expect(fixture.nativeElement.querySelector('.cart-page__items')).toBeNull();
+
+      const checkout: HTMLElement = fixture.nativeElement.querySelector('.cart-page__checkout');
+      expect(checkout.querySelector('.cart-page__checkout-sub')?.textContent?.trim()).toBe('Nothing to pay');
+    });
+
+    it("still shows a balance due when a rule's own balance is over-drawn, instead of trusting each line's tag blindly", () => {
+      // Both rules here are over-drawn (negative `available`) — a dollar
+      // rule's shortfall is exact; a units rule's shortfall is prorated
+      // across its own lines by their share of the requested units.
+      const OVERDRAWN_GENERAL_RULE = {
+        ...UNIFORM_RULE,
+        ruleId: 51,
+        ruleName: 'General Allotment',
+        dollars: { total: 500, used: -42, inCart: 1071.9, available: -529.9 },
+        fallbackRuleIds: [],
+      };
+      const OVERDRAWN_UNIT_RULE = {
+        ...UNIT_RULE,
+        ruleId: 52,
+        units: { total: 11, used: 7, inCart: 26, available: -22 },
+      };
+
+      const boot = { ...SHIRT, cartItemId: 21, skuId: 211, quantity: 6, lineTotalPrice: 1071.9, productTitle: 'Boot' };
+      const shirt = { ...SHIRT, cartItemId: 22, skuId: 212, quantity: 19, lineTotalPrice: 2449.29, productTitle: 'Shirt' };
+      const cap = { ...SHIRT, cartItemId: 23, skuId: 213, quantity: 7, lineTotalPrice: 175, productTitle: 'Cap' };
+
+      const fixture = TestBed.createComponent(CartPage);
+      const page = fixture.componentInstance;
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, {
+        cartId: 900,
+        itemCount: 32,
+        subtotalPrice: 3696.19,
+        subtotalPoints: null,
+        items: [boot, shirt, cap],
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 2,
+          rules: [OVERDRAWN_GENERAL_RULE, OVERDRAWN_UNIT_RULE],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [
+            { cartItemId: 21, skuId: 211, ruleId: 51, payUnit: 'DOLLARS', tagLabel: '$ allotment' },
+            { cartItemId: 22, skuId: 212, ruleId: 52, payUnit: 'UNITS', tagLabel: 'uses units' },
+            { cartItemId: 23, skuId: 213, ruleId: 52, payUnit: 'UNITS', tagLabel: 'uses units' },
+          ],
+          productTag: null,
+        },
+      });
+      fixture.detectChanges();
+
+      // $529.90 (the dollar rule's exact shortfall) + a prorated share of
+      // the unit rule's 22-unit shortfall across its 26 requested units.
+      expect(page.amountDueAtCheckout()).toBeCloseTo(529.9 + 2624.29 * (22 / 26), 2);
+
+      const checkout: HTMLElement = fixture.nativeElement.querySelector('.cart-page__checkout');
+      expect(checkout.querySelector('.cart-page__checkout-sub')?.textContent?.trim()).not.toBe('Nothing to pay');
+      expect(checkout.querySelector('.cart-page__checkout-sub')?.textContent).toContain('due');
+    });
+
+    it('puts a line with no allotment coverage in a plain, ungrouped section', () => {
+      const fixture = TestBed.createComponent(CartPage);
+      fixture.detectChanges();
+      const uncoveredItem = { ...SHIRT, cartItemId: 4, skuId: 104, productTitle: 'Plain Tee', skuCode: 'TEE-1' };
+      flushInitialCartLoads(httpMock, {
+        ...GROUPED_CART,
+        items: [...GROUPED_CART.items, uncoveredItem],
+      });
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelectorAll('.allotment-group').length).toBe(3);
+      const plainSection: HTMLElement = fixture.nativeElement.querySelector('.cart-page__items');
+      expect(plainSection).not.toBeNull();
+      expect(plainSection.textContent).toContain('Plain Tee');
+      expect(plainSection.textContent).not.toContain('Station Shirt');
+    });
+  });
 });

@@ -77,6 +77,10 @@ export interface AllotmentRule {
   quotas: AllotmentQuota[];
   requireApproval: 'Y' | 'N';
   allowCcFallback: 'Y' | 'N';
+  // Ordered ruleIds this rule falls back to once its own balance runs out
+  // on a given order (e.g. Uniform -> Footwear) — empty when nothing else
+  // picks up the rest.
+  fallbackRuleIds: number[];
 }
 
 export interface PayTag {
@@ -85,9 +89,22 @@ export interface PayTag {
   tagLabel: string | null;
 }
 
+// One allotment actually paying toward this line, and how much of it —
+// dollars, units, or points depending on that rule's own `primaryUnit`.
+export interface LineAllocation {
+  ruleId: number;
+  payUnit: PayUnit;
+  amount: number;
+}
+
 export interface LineTag extends PayTag {
   cartItemId: number;
   skuId: number | null;
+  // Every allotment that actually pays for this line, in the order they
+  // were applied — more than one entry means its own ran out partway
+  // through and a fallback rule picked up the rest. Empty when nothing
+  // covers this line at all (same case `tagLabel` being `null` covers).
+  allocations: LineAllocation[];
 }
 
 export interface ProductTag extends PayTag {
@@ -121,18 +138,23 @@ export interface Allotment {
   productTag: ProductTag | null;
 }
 
-interface RawAllotmentRule extends Omit<AllotmentRule, 'covers' | 'quotas'> {
+interface RawAllotmentRule extends Omit<AllotmentRule, 'covers' | 'quotas' | 'fallbackRuleIds'> {
   covers: {
     allAssortments: 'Y' | 'N';
     categories: AllotmentCategoryRef[] | null;
     unitGrants: AllotmentUnitGrant[] | null;
   };
   quotas: AllotmentQuota[] | null;
+  fallbackRuleIds: number[] | null;
+}
+
+interface RawLineTag extends Omit<LineTag, 'allocations'> {
+  allocations: LineAllocation[] | null;
 }
 
 export interface RawAllotment extends Omit<Allotment, 'rules' | 'lineTags'> {
   rules: RawAllotmentRule[] | null;
-  lineTags: LineTag[] | null;
+  lineTags: RawLineTag[] | null;
 }
 
 // The live API sometimes sends `null` for an array field instead of `[]` —
@@ -154,8 +176,9 @@ export function normalizeAllotment(raw: RawAllotment | null | undefined): Allotm
         unitGrants: rule.covers.unitGrants ?? [],
       },
       quotas: rule.quotas ?? [],
+      fallbackRuleIds: rule.fallbackRuleIds ?? [],
     })),
-    lineTags: raw.lineTags ?? [],
+    lineTags: (raw.lineTags ?? []).map((tag) => ({ ...tag, allocations: tag.allocations ?? [] })),
   };
 }
 
@@ -170,6 +193,16 @@ export function tileBalance(rule: AllotmentRule): Balance | null {
     return rule.points;
   }
   return rule.dollars;
+}
+
+// The ordered rules this one falls back to once exhausted, resolved from
+// `fallbackRuleIds` against the full rule list — e.g. Uniform's own chain
+// resolves to `[Footwear]`. Skips any id that doesn't resolve to an actual
+// rule rather than throwing; that shouldn't happen; only defensive.
+export function fallbackChain(rule: AllotmentRule, rules: AllotmentRule[]): AllotmentRule[] {
+  return rule.fallbackRuleIds
+    .map((id) => rules.find((candidate) => candidate.ruleId === id))
+    .filter((candidate): candidate is AllotmentRule => !!candidate);
 }
 
 // A meter can exceed 100% once the cart pushes a balance over its

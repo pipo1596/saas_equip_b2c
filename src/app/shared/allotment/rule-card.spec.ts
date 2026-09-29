@@ -26,6 +26,7 @@ const BASE_RULE: AllotmentRule = {
   quotas: [],
   requireApproval: 'N',
   allowCcFallback: 'N',
+  fallbackRuleIds: [],
 };
 
 function facts(fixture: { nativeElement: HTMLElement }): string[] {

@@ -31,93 +31,39 @@
         <div class="row g-4">
           <div class="col-lg-8">
             <div class="cart-page__panel">
-              @for (item of cart().items; track item.cartItemId) {
-                <div class="cart-page__row">
-                  <a
-                    class="cart-page__thumb-link"
-                    [routerLink]="['/product', item.productPk]"
-                    [attr.aria-label]="'View ' + item.productTitle"
-                  >
-                    @if (item.imageUrl) {
-                      <div class="cart-page__thumb" [style.backgroundImage]="'url(' + item.imageUrl + ')'" aria-hidden="true"></div>
-                    } @else {
-                      <div class="cart-page__thumb" aria-hidden="true"></div>
-                    }
-                  </a>
-                  <div class="cart-page__body">
-                    <a class="cart-page__name" [routerLink]="['/product', item.productPk]">
-                      {{ item.productTitle }}
-                    </a>
-                    <div class="cart-page__sku">
-                      {{ item.skuCode }}
-                      @if (item.options.length > 0) {
-                        · {{ formatOptions(item) }}
+              @for (group of groups(); track group.rule.ruleId) {
+                <div class="allotment-group" [class.allotment-group--units]="group.rule.primaryUnit !== 'DOLLARS'">
+                  <div class="allotment-group__header">
+                    <div class="allotment-group__heading">
+                      <h2 class="allotment-group__name">{{ group.rule.ruleName }}</h2>
+                      <p class="allotment-group__subtitle">{{ groupSubtitle(group.rule) }}</p>
+                      @for (note of group.lentNotes; track note) {
+                        <p class="allotment-group__lent-note">{{ note }}</p>
+                      }
+                      @if (group.shortfallNote; as note) {
+                        <p class="allotment-group__shortfall-note">{{ note }}</p>
                       }
                     </div>
-                    <app-pay-tag [tag]="lineTag(item.cartItemId)" />
-                    @if (item.isAvailable === 'N') {
-                      <p class="cart-page__flag text-danger">No longer available</p>
-                    } @else if (item.priceChanged === 'Y') {
-                      <p class="cart-page__flag">
-                        Price updated to {{ item.currentPrice | currency }} since you added this.
-                      </p>
+                    @if (tileBalance(group.rule); as balance) {
+                      <app-allotment-balance-box class="allotment-group__balance" [balance]="balance" [unit]="group.rule.primaryUnit" />
                     }
-                    <div class="cart-page__actions">
-                      <a
-                        class="cart-page__edit"
-                        [routerLink]="['/product', item.productPk]"
-                        [queryParams]="{ cartItemId: item.cartItemId }"
-                        [attr.aria-label]="'Edit ' + item.productTitle"
-                      >
-                        Edit
-                      </a>
-                      <span class="cart-page__actions-sep" aria-hidden="true">·</span>
-                      <button
-                        type="button"
-                        class="cart-page__remove"
-                        [disabled]="updatingSkuId() === item.skuId || clearing()"
-                        (click)="removeItem(item)"
-                      >
-                        Remove
-                      </button>
+                  </div>
+
+                  @if (group.items.length > 0) {
+                    <div class="allotment-group__items">
+                      @for (item of group.items; track item.cartItemId) {
+                        <ng-container *ngTemplateOutlet="itemRow; context: { $implicit: item }" />
+                      }
                     </div>
-                  </div>
-                  <div class="qty-stepper">
-                    <button
-                      type="button"
-                      class="qty-stepper__btn"
-                      [disabled]="updatingSkuId() === item.skuId || clearing()"
-                      (click)="setQuantity(item, item.quantity - 1)"
-                      aria-label="Decrease quantity"
-                    >
-                      −
-                    </button>
-                    <input
-                      type="number"
-                      class="qty-stepper__input"
-                      min="0"
-                      step="1"
-                      [value]="item.quantity"
-                      [disabled]="updatingSkuId() === item.skuId || clearing()"
-                      (change)="setQuantity(item, $any($event.target).valueAsNumber)"
-                      [attr.aria-label]="'Quantity for ' + item.productTitle"
-                    />
-                    <button
-                      type="button"
-                      class="qty-stepper__btn"
-                      [disabled]="updatingSkuId() === item.skuId || clearing()"
-                      (click)="setQuantity(item, item.quantity + 1)"
-                      aria-label="Increase quantity"
-                    >
-                      +
-                    </button>
-                  </div>
-                  <div class="cart-page__price">
-                    <span class="cart-page__linetotal">{{ item.lineTotalPrice | currency }}</span>
-                    @if (item.lineTotalPoints !== null) {
-                      <span class="cart-page__points">{{ item.lineTotalPoints }} pts</span>
-                    }
-                  </div>
+                  }
+                </div>
+              }
+
+              @if (ungroupedItems().length > 0) {
+                <div class="cart-page__items">
+                  @for (item of ungroupedItems(); track item.cartItemId) {
+                    <ng-container *ngTemplateOutlet="itemRow; context: { $implicit: item }" />
+                  }
                 </div>
               }
             </div>
@@ -133,18 +79,45 @@
 
           <div class="col-lg-4">
             <div class="cart-page__summary">
-              <h2 class="cart-page__summary-title mb-3">Order Summary</h2>
+              <h2 class="cart-page__summary-title mb-3">Order summary</h2>
               <div class="d-flex justify-content-between align-items-baseline mb-2">
-                <span>Subtotal</span>
+                <span>Order value ({{ cart().itemCount }} items)</span>
                 <b>{{ cart().subtotalPrice | currency }}</b>
               </div>
-              @if (cart().subtotalPoints !== null) {
+
+              @if (paidFromLines().length > 0) {
+                <hr />
+                <p class="cart-page__summary-label">Paid from</p>
+                @for (line of paidFromLines(); track line.ruleName) {
+                  <div class="d-flex justify-content-between align-items-baseline mb-2">
+                    <span>{{ line.ruleName }}</span>
+                    <b
+                      [class.cart-page__summary-amount--dollars]="line.unit === 'DOLLARS'"
+                      [class.cart-page__summary-amount--units]="line.unit !== 'DOLLARS'"
+                    >
+                      {{ formatAmount(line.amount, line.unit) }}
+                    </b>
+                  </div>
+                }
+                <hr />
+                <div class="d-flex justify-content-between align-items-baseline mb-3">
+                  <span>To pay at checkout</span>
+                  <b>{{ amountDueAtCheckout() | currency }}</b>
+                </div>
+              } @else if (cart().subtotalPoints !== null) {
                 <div class="d-flex justify-content-between align-items-baseline mb-2">
                   <span>Points</span>
                   <b>{{ cart().subtotalPoints }} pts</b>
                 </div>
               }
-              <a routerLink="/products/full-catalog" class="btn btn-outline-secondary w-100 mt-3">
+
+              <button type="button" class="cart-page__checkout">
+                <span class="cart-page__checkout-title">Checkout</span>
+                <span class="cart-page__checkout-sub">
+                  {{ amountDueAtCheckout() === 0 ? 'Nothing to pay' : (amountDueAtCheckout() | currency) + ' due' }}
+                </span>
+              </button>
+              <a routerLink="/products/full-catalog" class="btn btn-outline-secondary w-100 mt-2">
                 Continue shopping
               </a>
             </div>
@@ -156,3 +129,112 @@
 </section>
 
 <app-footer />
+
+<ng-template #itemRow let-item>
+  <div class="cart-page__row">
+    <a
+      class="cart-page__thumb-link"
+      [routerLink]="['/product', item.productPk]"
+      [attr.aria-label]="'View ' + item.productTitle"
+    >
+      @if (item.imageUrl) {
+        <div class="cart-page__thumb" [style.backgroundImage]="'url(' + item.imageUrl + ')'" aria-hidden="true"></div>
+      } @else {
+        <div class="cart-page__thumb" aria-hidden="true"></div>
+      }
+    </a>
+    <div class="cart-page__body">
+      <a class="cart-page__name" [routerLink]="['/product', item.productPk]">
+        {{ item.productTitle }}
+      </a>
+      <div class="cart-page__sku">
+        {{ item.skuCode }}
+        @if (item.options.length > 0) {
+          · {{ formatOptions(item) }}
+        }
+      </div>
+      @if (splitAllocations(item).length === 0) {
+        <app-pay-tag [tag]="lineTag(item.cartItemId)" />
+      }
+      @if (item.isAvailable === 'N') {
+        <p class="cart-page__flag text-danger">No longer available</p>
+      } @else if (item.priceChanged === 'Y') {
+        <p class="cart-page__flag">
+          Price updated to {{ item.currentPrice | currency }} since you added this.
+        </p>
+      }
+      @for (note of fallbackNotesFor(item); track note) {
+        <p class="cart-page__fallback-note">{{ note }}</p>
+      }
+      <div class="cart-page__actions">
+        <a
+          class="cart-page__edit"
+          [routerLink]="['/product', item.productPk]"
+          [queryParams]="{ cartItemId: item.cartItemId }"
+          [attr.aria-label]="'Edit ' + item.productTitle"
+        >
+          Edit
+        </a>
+        <span class="cart-page__actions-sep" aria-hidden="true">·</span>
+        <button
+          type="button"
+          class="cart-page__remove"
+          [disabled]="updatingSkuId() === item.skuId || clearing()"
+          (click)="removeItem(item)"
+        >
+          Remove
+        </button>
+      </div>
+    </div>
+    <div class="qty-stepper">
+      <button
+        type="button"
+        class="qty-stepper__btn"
+        [disabled]="updatingSkuId() === item.skuId || clearing()"
+        (click)="setQuantity(item, item.quantity - 1)"
+        aria-label="Decrease quantity"
+      >
+        −
+      </button>
+      <input
+        type="number"
+        class="qty-stepper__input"
+        min="0"
+        step="1"
+        [value]="item.quantity"
+        [disabled]="updatingSkuId() === item.skuId || clearing()"
+        (change)="setQuantity(item, $any($event.target).valueAsNumber)"
+        [attr.aria-label]="'Quantity for ' + item.productTitle"
+      />
+      <button
+        type="button"
+        class="qty-stepper__btn"
+        [disabled]="updatingSkuId() === item.skuId || clearing()"
+        (click)="setQuantity(item, item.quantity + 1)"
+        aria-label="Increase quantity"
+      >
+        +
+      </button>
+    </div>
+    <div class="cart-page__price">
+      @if (primaryAllocation(item); as primary) {
+        @if (primary.payUnit === 'DOLLARS') {
+          <span class="cart-page__linetotal">{{ item.lineTotalPrice | currency }}</span>
+        } @else {
+          <span class="cart-page__linetotal">{{ formatAmount(primary.amount, primary.payUnit) }}</span>
+          <span class="cart-page__value-note">{{ item.lineTotalPrice | currency }} value</span>
+        }
+        @for (allocation of splitAllocations(item); track allocation.ruleId) {
+          <span class="cart-page__split" [class.cart-page__split--fallback]="allocation.ruleId !== primary.ruleId">
+            {{ formatAmount(allocation.amount, allocation.payUnit) }} {{ ruleNameFor(allocation.ruleId) }}
+          </span>
+        }
+      } @else {
+        <span class="cart-page__linetotal">{{ item.lineTotalPrice | currency }}</span>
+        @if (item.lineTotalPoints !== null) {
+          <span class="cart-page__points">{{ item.lineTotalPoints }} pts</span>
+        }
+      }
+    </div>
+  </div>
+</ng-template>

@@ -16,12 +16,13 @@ export type {
   AllotmentRule,
   AllotmentUnitGrant,
   Balance,
+  LineAllocation,
   LineTag,
   PayTag,
   PayUnit,
   ProductTag,
 } from './allotment';
-export { meterPct, tileBalance } from './allotment';
+export { coverageLabel, fallbackChain, formatBalanceAmount, meterPct, tileBalance } from './allotment';
 
 // Just the display labels for this line's variant (Color/Size/etc.) — for
 // building an actual selector UI for this sku, that's the product detail

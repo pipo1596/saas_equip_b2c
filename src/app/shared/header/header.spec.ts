@@ -944,6 +944,7 @@ describe('Header', () => {
       quotas: [],
       requireApproval: 'N' as const,
       allowCcFallback: 'N' as const,
+      fallbackRuleIds: [],
     };
 
     it("shows the bar's figures, Renews date (from the bar rule's own cycle), and Rules(N)", () => {

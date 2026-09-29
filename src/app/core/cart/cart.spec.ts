@@ -270,7 +270,14 @@ describe('CartService', () => {
         });
 
         expect(result?.allotment?.lineTags).toEqual([
-          { cartItemId: 501, skuId: 9001, ruleId: 11, payUnit: 'DOLLARS', tagLabel: '$ allotment' },
+          {
+            cartItemId: 501,
+            skuId: 9001,
+            ruleId: 11,
+            payUnit: 'DOLLARS',
+            tagLabel: '$ allotment',
+            allocations: [],
+          },
         ]);
         expect(result?.allotment?.productTag).toEqual({
           productPk: 123,
@@ -278,6 +285,67 @@ describe('CartService', () => {
           payUnit: 'UNITS',
           tagLabel: 'uses units',
         });
+      });
+
+      it('normalizes a missing fallbackRuleIds on a rule to []', () => {
+        let result: Cart | undefined;
+        service.load(LOCATION_ID).subscribe((cart) => (result = cart));
+
+        httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush({
+          ...CART,
+          allotment: {
+            programId: 3,
+            allotmentBar: ALLOTMENT_BAR,
+            ruleCount: 1,
+            rules: [DOLLAR_RULE],
+            approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+            openOrders: null,
+            lineTags: null,
+            productTag: null,
+          },
+        });
+
+        expect(result?.allotment?.rules[0].fallbackRuleIds).toEqual([]);
+      });
+
+      it('passes through a fallback chain and a split line allocation as-is', () => {
+        let result: Cart | undefined;
+        service.load(LOCATION_ID).subscribe((cart) => (result = cart));
+
+        httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush({
+          ...CART,
+          allotment: {
+            programId: 3,
+            allotmentBar: ALLOTMENT_BAR,
+            ruleCount: 2,
+            rules: [
+              { ...DOLLAR_RULE, ruleId: 21, ruleName: 'Uniform allotment', fallbackRuleIds: [22] },
+              { ...DOLLAR_RULE, ruleId: 22, ruleName: 'Footwear allotment', fallbackRuleIds: [] },
+            ],
+            approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+            openOrders: null,
+            lineTags: [
+              {
+                cartItemId: 501,
+                skuId: 9001,
+                ruleId: 21,
+                payUnit: 'DOLLARS',
+                tagLabel: '$ allotment',
+                allocations: [
+                  { ruleId: 21, payUnit: 'DOLLARS', amount: 100 },
+                  { ruleId: 22, payUnit: 'DOLLARS', amount: 40 },
+                ],
+              },
+            ],
+            productTag: null,
+          },
+        });
+
+        expect(result?.allotment?.rules[0].fallbackRuleIds).toEqual([22]);
+        expect(result?.allotment?.lineTags[0].allocations).toEqual([
+          { ruleId: 21, payUnit: 'DOLLARS', amount: 100 },
+          { ruleId: 22, payUnit: 'DOLLARS', amount: 40 },
+        ]);
       });
     });
   });

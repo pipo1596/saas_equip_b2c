@@ -30,6 +30,7 @@ const BASE_RULE: AllotmentRule = {
   quotas: [],
   requireApproval: 'N',
   allowCcFallback: 'N',
+  fallbackRuleIds: [],
 };
 
 describe('AllotmentCoverageCard', () => {
