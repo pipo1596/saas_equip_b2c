@@ -125,42 +125,50 @@
         <a class="text-decoration-none" routerLink="/products/full-catalog" [queryParams]="{ name: 'Full Catalog' }">Full catalog</a>
       </nav>
     </div>
-    <div class="allot-fields">
-      <span class="af"><i>Amount</i><b>$600.00</b></span>
-      <span class="af"><i>Used</i><b>$54.47</b></span>
-      <span class="af"><i>In cart</i><b>$0.00</b></span>
-      <span class="af"><i>Available</i><b class="good">$545.53</b></span>
-      <span class="af"><i>Renews</i><b>Sep 19</b></span>
-      <div class="allot-rules-wrap dropdown">
-        <button
-          class="allot-rules-btn"
-          type="button"
-          aria-label="Additional allotment rules"
-          aria-haspopup="menu"
-          [attr.aria-expanded]="rulesMenuOpen()"
-          (click)="toggleRulesMenu()"
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 11v5" />
-            <circle cx="12" cy="7.6" r="0.6" fill="currentColor" />
-          </svg>
-          Rules
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </button>
-        <div class="allot-rules-menu dropdown-menu dropdown-menu-end shadow-lg p-3" data-bs-popper [class.show]="rulesMenuOpen()">
-          <div class="arm-head">Additional allotment rules</div>
-          <ul class="arm-list">
-            <li><b>Footwear</b> — 1 pair per benefit year</li>
-            <li><b>Outerwear</b> — $200 sub-limit</li>
-            <li>Orders over $150 require supervisor approval</li>
-            <li>Unused balance does not roll over</li>
-          </ul>
+    @if (ruleCount() > 0) {
+      <div class="allot-fields">
+        @if (allotmentBar(); as bar) {
+          <span class="af af--heading"><b>{{ bar.label }}</b></span>
+          <span class="tb-sep" aria-hidden="true"></span>
+          <span class="af"><i>Total</i><b>{{ bar.total | currency }}</b></span>
+          <span class="af"><i>Used</i><b>{{ bar.used | currency }}</b></span>
+          <span class="af"><i>In cart</i><b>{{ bar.inCart | currency }}</b></span>
+          <span class="af">
+            <i>Available</i>
+            <b [class.good]="bar.available >= 0" [class.warn]="bar.available < 0">{{ bar.available | currency }}</b>
+          </span>
+          @if (allotmentBarRenewsOn(); as renewsOn) {
+            <span class="af"><i>Renews</i><b>{{ renewsOn | date: 'MMM d' }}</b></span>
+          }
+        }
+        <div class="allot-rules-wrap dropdown">
+          <button
+            class="allot-rules-btn"
+            type="button"
+            aria-label="Allotment rules"
+            aria-haspopup="menu"
+            [attr.aria-expanded]="rulesMenuOpen()"
+            (click)="toggleRulesMenu()"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 11v5" />
+              <circle cx="12" cy="7.6" r="0.6" fill="currentColor" />
+            </svg>
+            Rules ({{ ruleCount() }})
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+          <div class="allot-rules-menu dropdown-menu dropdown-menu-end shadow-lg p-3" data-bs-popper [class.show]="rulesMenuOpen()">
+            <div class="arm-head">Allotment rules</div>
+            @for (rule of allotmentRules(); track rule.ruleId) {
+              <app-allotment-rule-card [rule]="rule" />
+            }
+          </div>
         </div>
       </div>
-    </div>
+    }
     </div>
 
     @if (activeCatalogNavItem(); as item) {
@@ -246,19 +254,29 @@
       } @else {
         @for (item of cart().items; track item.cartItemId) {
           <div class="cart-item">
-            @if (item.imageUrl) {
-              <div class="cart-item__thumb" [style.backgroundImage]="'url(' + item.imageUrl + ')'" aria-hidden="true"></div>
-            } @else {
-              <div class="cart-item__thumb" aria-hidden="true"></div>
-            }
+            <a
+              class="cart-item__thumb-link"
+              [routerLink]="['/product', item.productPk]"
+              [attr.aria-label]="'View ' + item.productTitle"
+              (click)="closeCart()"
+            >
+              @if (item.imageUrl) {
+                <div class="cart-item__thumb" [style.backgroundImage]="'url(' + item.imageUrl + ')'" aria-hidden="true"></div>
+              } @else {
+                <div class="cart-item__thumb" aria-hidden="true"></div>
+              }
+            </a>
             <div class="cart-item__body">
-              <div class="cart-item__name">{{ item.productTitle }}</div>
+              <a class="cart-item__name" [routerLink]="['/product', item.productPk]" (click)="closeCart()">
+                {{ item.productTitle }}
+              </a>
               <div class="cart-item__sku">
                 {{ item.skuCode }}
                 @if (item.options.length > 0) {
                   · {{ cartItemOptionsLabel(item) }}
                 }
               </div>
+              <app-pay-tag [tag]="lineTag(item.cartItemId)" />
               @if (item.isAvailable === 'N') {
                 <p class="cart-item__flag text-danger">No longer available</p>
               } @else if (item.priceChanged === 'Y') {
@@ -270,14 +288,26 @@
                 </span>
                 <span class="cart-item__price">{{ item.lineTotalPrice | currency }}</span>
               </div>
-              <button
-                type="button"
-                class="cart-item__remove"
-                [disabled]="cartRemovingSkuId() === item.skuId"
-                (click)="removeCartItem(item.skuId)"
-              >
-                Remove
-              </button>
+              <div class="cart-item__actions">
+                <a
+                  class="cart-item__edit"
+                  [routerLink]="['/product', item.productPk]"
+                  [queryParams]="{ cartItemId: item.cartItemId }"
+                  [attr.aria-label]="'Edit ' + item.productTitle"
+                  (click)="closeCart()"
+                >
+                  Edit
+                </a>
+                <span class="cart-item__actions-sep" aria-hidden="true">·</span>
+                <button
+                  type="button"
+                  class="cart-item__remove"
+                  [disabled]="cartRemovingSkuId() === item.skuId"
+                  (click)="removeCartItem(item)"
+                >
+                  Remove
+                </button>
+              </div>
             </div>
           </div>
         }
@@ -288,7 +318,6 @@
         <span>Subtotal</span>
         <b>{{ cartSubtotal() | currency }}</b>
       </div>
-      <p class="drawer__note">Applies against your $600 annual allotment.</p>
       <button
         type="button"
         class="btn btn-primary w-100"

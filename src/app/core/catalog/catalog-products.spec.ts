@@ -5,6 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { CatalogProductsService, ProductSearchResult } from './catalog-products';
 
 const SAMPLE: ProductSearchResult = {
+  breadcrumb: null,
   products: [
     {
       productPk: 4021,
@@ -196,5 +197,56 @@ describe('CatalogProductsService', () => {
     } as never);
 
     expect(result?.optionFacets).toEqual([{ optionName: 'Size', values: [] }]);
+  });
+
+  it('passes through the breadcrumb, normalizing a missing inner trail to []', () => {
+    let result: ProductSearchResult | undefined;
+    service.search({ locationId: 18, categoryId: 45 }).subscribe((r) => (result = r));
+
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPCVEW').flush({
+      ...SAMPLE,
+      breadcrumb: { programId: 3, programName: 'ANB Standard Program', progCatId: 45, breadcrumb: null },
+    } as never);
+
+    expect(result?.breadcrumb).toEqual({
+      programId: 3,
+      programName: 'ANB Standard Program',
+      progCatId: 45,
+      breadcrumb: [],
+    });
+  });
+
+  it('passes through a real breadcrumb trail as-is', () => {
+    let result: ProductSearchResult | undefined;
+    service.search({ locationId: 18, categoryId: 45 }).subscribe((r) => (result = r));
+
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPCVEW').flush({
+      ...SAMPLE,
+      breadcrumb: {
+        programId: 3,
+        programName: 'ANB Standard Program',
+        progCatId: 45,
+        breadcrumb: [
+          { progCatId: 40, categoryName: 'Clothing' },
+          { progCatId: 45, categoryName: 'Shirts' },
+        ],
+      },
+    });
+
+    expect(result?.breadcrumb?.breadcrumb).toEqual([
+      { progCatId: 40, categoryName: 'Clothing' },
+      { progCatId: 45, categoryName: 'Shirts' },
+    ]);
+  });
+
+  it('normalizes a missing breadcrumb to null (bucket/unscoped scopes never return one)', () => {
+    let result: ProductSearchResult | undefined;
+    service.search({ locationId: 18, bucket: 'CLOTHING' }).subscribe((r) => (result = r));
+
+    httpMock
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPCVEW')
+      .flush({ products: [], totalCount: 0, page: 1, pageSize: 9, categoryFacets: [], optionFacets: [] } as never);
+
+    expect(result?.breadcrumb).toBeNull();
   });
 });

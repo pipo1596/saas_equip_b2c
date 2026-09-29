@@ -6,6 +6,7 @@ import { TestBed } from '@angular/core/testing';
 import { AuthService } from '../../core/auth/auth';
 import { CatalogView } from '../../core/catalog/catalog-view';
 import { TenantSettings, TenantSettingsService } from '../../core/tenant/tenant-settings';
+import { ConfirmService } from '../confirm/confirm';
 import { Header } from './header';
 
 const CATEGORY = {
@@ -195,6 +196,13 @@ describe('Header', () => {
 
     fixture.componentInstance.selectLocation(locations[1]);
     TestBed.tick();
+
+    // The cart's own allotment breakdown is location-scoped too (see
+    // `loadCartOnLocationChange`), so switching location reloads it right
+    // alongside the catalog menu.
+    httpMock
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART')
+      .flush({ cartId: null, itemCount: 0, subtotalPrice: 0, subtotalPoints: null, items: [] });
 
     const secondReq = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPCVEW');
     expect(secondReq.request.body).toEqual({ locationId: 15, action: '*MENU' });
@@ -641,6 +649,64 @@ describe('Header', () => {
     expect(header.cartSubtotal()).toBe(179.98);
     expect(fixture.nativeElement.textContent).toContain("Men's Trail Jacket");
     expect(fixture.nativeElement.textContent).toContain('Black, M');
+
+    const viewHref = '/product/12345';
+    expect(fixture.nativeElement.querySelector('.cart-item__thumb-link')?.getAttribute('href')).toBe(
+      viewHref,
+    );
+    expect(fixture.nativeElement.querySelector('.cart-item__name')?.getAttribute('href')).toBe(
+      viewHref,
+    );
+    const editLink = fixture.nativeElement.querySelector('.cart-item__edit');
+    expect(editLink?.getAttribute('href')).toBe('/product/12345?cartItemId=9001');
+    expect(editLink?.textContent?.trim()).toBe('Edit');
+  });
+
+  it('should close the drawer when a cart line is clicked to edit it', () => {
+    const fixture = TestBed.createComponent(Header);
+    const header = fixture.componentInstance;
+    header.openCart();
+    header.cart.set({
+      cartId: 501,
+      itemCount: 1,
+      subtotalPrice: 89.99,
+      subtotalPoints: null,
+      allotment: null,
+      items: [
+        {
+          cartItemId: 9001,
+          skuId: 9001,
+          quantity: 1,
+          priceAtAdd: 89.99,
+          pointsAtAdd: null,
+          lineTotalPrice: 89.99,
+          lineTotalPoints: null,
+          productPk: 12345,
+          productTitle: "Men's Trail Jacket",
+          handle: 'mens-trail-jacket',
+          skuCode: 'ABC-100-BLK-M',
+          currentPrice: 89.99,
+          currentPoints: null,
+          priceChanged: 'N',
+          pointsChanged: 'N',
+          isAvailable: 'Y',
+          imageUrl: '',
+          options: [],
+        },
+      ],
+    });
+    fixture.detectChanges();
+
+    // A plain `ctrlKey`-modified click is what `RouterLink`'s own handler
+    // treats as "let the browser handle it" and skips navigating itself
+    // (see its `onClick`) — this test only cares that *this* component's
+    // own `(click)="closeCart()"` binding fires regardless, without also
+    // triggering a real (in this test's empty route table, unroutable)
+    // navigation attempt.
+    const editLink: HTMLAnchorElement = fixture.nativeElement.querySelector('.cart-item__edit');
+    editLink.dispatchEvent(new MouseEvent('click', { bubbles: true, ctrlKey: true }));
+
+    expect(header.cartOpen()).toBe(false);
   });
 
   it('should remove a cart item and update the drawer from the response', () => {
@@ -679,14 +745,66 @@ describe('Header', () => {
       ],
     });
 
-    header.removeCartItem(9001);
+    const confirmService = TestBed.inject(ConfirmService);
+    header.removeCartItem(header.cart().items[0]);
+    expect(confirmService.request()).toEqual({
+      title: 'Remove item',
+      message: "Remove Men's Trail Jacket from your cart?",
+      confirmLabel: 'Remove',
+      cancelLabel: 'Cancel',
+      danger: true,
+    });
+    confirmService.respond(true);
     const removeReq = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART');
-    expect(removeReq.request.body).toEqual({ action: '*RMV_ITEM', skuId: 9001 });
+    expect(removeReq.request.body).toEqual({ action: '*RMV_ITEM', skuId: 9001, locationId: null });
     removeReq.flush({ cartId: 501, itemCount: 0, subtotalPrice: 0, subtotalPoints: null, items: [] });
 
     expect(header.cart().items).toEqual([]);
     expect(header.cartCount()).toBe(0);
     expect(header.cartRemovingSkuId()).toBeNull();
+  });
+
+  it('should not remove a cart item when the confirmation is declined', () => {
+    const fixture = TestBed.createComponent(Header);
+    const header = fixture.componentInstance;
+    fixture.detectChanges();
+
+    const httpMock = TestBed.inject(HttpTestingController);
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS').flush({} as never);
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush({
+      cartId: 501,
+      itemCount: 1,
+      subtotalPrice: 89.99,
+      subtotalPoints: 150,
+      items: [
+        {
+          cartItemId: 9001,
+          skuId: 9001,
+          quantity: 1,
+          priceAtAdd: 89.99,
+          pointsAtAdd: 150,
+          lineTotalPrice: 89.99,
+          lineTotalPoints: 150,
+          productPk: 12345,
+          productTitle: "Men's Trail Jacket",
+          handle: 'mens-trail-jacket',
+          skuCode: 'ABC-100-BLK-M',
+          currentPrice: 89.99,
+          currentPoints: 150,
+          priceChanged: 'N',
+          pointsChanged: 'N',
+          isAvailable: 'Y',
+          imageUrl: '',
+          options: [],
+        },
+      ],
+    });
+
+    header.removeCartItem(header.cart().items[0]);
+    TestBed.inject(ConfirmService).respond(false);
+
+    httpMock.expectNone('/cgi/APPSCDSPCH?SEPGM=APCCART');
+    expect(header.cart().items).toHaveLength(1);
   });
 
   it('should navigate to /cart and close the drawer when checking out', () => {
@@ -700,6 +818,7 @@ describe('Header', () => {
       itemCount: 1,
       subtotalPrice: 89.99,
       subtotalPoints: null,
+      allotment: null,
       items: [
         {
           cartItemId: 9001,
@@ -791,5 +910,194 @@ describe('Header', () => {
     expect(header.userMenuOpen()).toBe(false);
     expect(auth.session()).toBeNull();
     expect(navigateSpy).toHaveBeenCalledWith('/');
+  });
+
+  describe('allotment', () => {
+    const EMPTY_ALLOTMENT_CART = {
+      cartId: null,
+      itemCount: 0,
+      subtotalPrice: 0,
+      subtotalPoints: null,
+      items: [],
+    };
+
+    const DOLLAR_RULE = {
+      ruleId: 11,
+      ruleName: 'ANB Employee Allowance',
+      allotType: 'DOLLAR' as const,
+      primaryUnit: 'DOLLARS' as const,
+      isBarRule: 'Y' as const,
+      dollars: { total: 600, used: 180, inCart: 95, available: 325 },
+      units: null,
+      points: null,
+      cycle: {
+        renewalBasis: 'FIXED' as const,
+        renewalPeriodMonths: 12,
+        cycleStart: '2026-01-01',
+        cycleEnd: '2026-12-31',
+        renewsOn: '2027-01-01',
+        expirationDate: null,
+        onExpiration: 'SUSPEND' as const,
+      },
+      covers: { allAssortments: 'Y' as const, categories: [], unitGrants: [] },
+      carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
+      quotas: [],
+      requireApproval: 'N' as const,
+      allowCcFallback: 'N' as const,
+    };
+
+    it("shows the bar's figures, Renews date (from the bar rule's own cycle), and Rules(N)", () => {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+      header.cart.set({
+        ...EMPTY_ALLOTMENT_CART,
+        allotment: {
+          programId: 3,
+          allotmentBar: {
+            ruleId: 11,
+            label: 'Allotment',
+            unit: 'DOLLARS',
+            total: 600,
+            used: 180,
+            inCart: 95,
+            available: 325,
+          },
+          ruleCount: 1,
+          rules: [DOLLAR_RULE],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [],
+          productTag: null,
+        },
+      });
+      fixture.detectChanges();
+
+      const text = fixture.nativeElement.textContent;
+      expect(text).toContain('$600.00');
+      expect(text).toContain('$180.00');
+      expect(text).toContain('$95.00');
+      expect(text).toContain('$325.00');
+      expect(text).toContain('Renews');
+      expect(text).toContain('Rules (1)');
+    });
+
+    it('flags a negative available balance with the warning class', () => {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+      header.cart.set({
+        ...EMPTY_ALLOTMENT_CART,
+        allotment: {
+          programId: 3,
+          allotmentBar: {
+            ruleId: 11,
+            label: 'Allotment',
+            unit: 'DOLLARS',
+            total: 600,
+            used: 580,
+            inCart: 95,
+            available: -75,
+          },
+          ruleCount: 1,
+          rules: [DOLLAR_RULE],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [],
+          productTag: null,
+        },
+      });
+      fixture.detectChanges();
+
+      const afEls: HTMLElement[] = fixture.nativeElement.querySelectorAll('.af');
+      const available = Array.from(afEls).find((el) => el.textContent?.includes('Available'));
+      expect(available?.querySelector('b')?.classList.contains('warn')).toBe(true);
+    });
+
+    it('hides the bar but still shows Rules(N) when there is no dollar rule', () => {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+      header.cart.set({
+        ...EMPTY_ALLOTMENT_CART,
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 1,
+          rules: [{ ...DOLLAR_RULE, allotType: 'UNITS', primaryUnit: 'UNITS', isBarRule: 'N' }],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [],
+          productTag: null,
+        },
+      });
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.af')).toBeNull();
+      expect(fixture.nativeElement.textContent).toContain('Rules (1)');
+    });
+
+    it('hides the whole allotment section when there are no rules at all', () => {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+      header.cart.set({
+        ...EMPTY_ALLOTMENT_CART,
+        allotment: {
+          programId: null,
+          allotmentBar: null,
+          ruleCount: 0,
+          rules: [],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [],
+          productTag: null,
+        },
+      });
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.allot-fields')).toBeNull();
+    });
+
+    it("lists each rule in the Rules panel, using the rule's own name", () => {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+      header.cart.set({
+        ...EMPTY_ALLOTMENT_CART,
+        allotment: {
+          programId: 3,
+          allotmentBar: {
+            ruleId: 11,
+            label: 'Allotment',
+            unit: 'DOLLARS',
+            total: 600,
+            used: 180,
+            inCart: 95,
+            available: 325,
+          },
+          ruleCount: 2,
+          rules: [
+            DOLLAR_RULE,
+            {
+              ...DOLLAR_RULE,
+              ruleId: 12,
+              ruleName: 'Tactical Gear',
+              allotType: 'UNITS',
+              primaryUnit: 'UNITS',
+              isBarRule: 'N',
+              dollars: null,
+              units: { total: 4, used: 1, inCart: 1, available: 2 },
+            },
+          ],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [],
+          productTag: null,
+        },
+      });
+      fixture.detectChanges();
+      header.toggleRulesMenu();
+      fixture.detectChanges();
+
+      const nameEls: HTMLElement[] = fixture.nativeElement.querySelectorAll('.rule-card__name');
+      const names = Array.from(nameEls).map((el) => el.textContent?.trim());
+      expect(names).toEqual(['ANB Employee Allowance', 'Tactical Gear']);
+    });
   });
 });

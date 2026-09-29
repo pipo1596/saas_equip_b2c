@@ -1,8 +1,9 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 
+import { AuthService } from '../../../core/auth/auth';
 import { CartService } from '../../../core/cart/cart';
 import { ProductDetailInfo } from '../../../core/catalog/product-detail';
 import { ProductDetail } from './product-detail';
@@ -70,6 +71,32 @@ const WHITE_M_SKU = {
   variantImageUrl: '',
 };
 
+// The line an "edit mode" test puts in the cart ahead of time — its
+// `options` (Black, M) match `optId`s 101/201 in `RESPONSE` above.
+const CART_ITEM_TO_EDIT = {
+  cartItemId: 9001,
+  skuId: 9001,
+  quantity: 3,
+  priceAtAdd: 89.99,
+  pointsAtAdd: null,
+  lineTotalPrice: 269.97,
+  lineTotalPoints: null,
+  productPk: 12345,
+  productTitle: "Men's Trail Jacket",
+  handle: 'mens-trail-jacket',
+  skuCode: 'ABC-100-BLK-M',
+  currentPrice: 89.99,
+  currentPoints: null,
+  priceChanged: 'N',
+  pointsChanged: 'N',
+  isAvailable: 'Y',
+  imageUrl: '',
+  options: [
+    { optName: 'Color', valueDesc: 'Black' },
+    { optName: 'Size', valueDesc: 'M' },
+  ],
+};
+
 function expectRequest(httpMock: HttpTestingController, action: string) {
   const matches = httpMock.match(
     (req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCPRDDTL' && req.body?.action === action,
@@ -85,6 +112,20 @@ function expectRequest(httpMock: HttpTestingController, action: string) {
 function expectCartRequest(httpMock: HttpTestingController, action: string) {
   const matches = httpMock.match(
     (req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCCART' && req.body?.action === action,
+  );
+  expect(matches.length).toBe(1);
+  return matches[0];
+}
+
+// The page's own `*GET` (piggybacking on the cart load for `allotment.
+// productTag`) carries `productPk` in its body, unlike the header's own
+// incidental `*GET` — that's what tells the two apart.
+function expectProductTagCartRequest(httpMock: HttpTestingController) {
+  const matches = httpMock.match(
+    (req) =>
+      req.url === '/cgi/APPSCDSPCH?SEPGM=APCCART' &&
+      req.body?.action === '*GET' &&
+      req.body?.productPk !== undefined,
   );
   expect(matches.length).toBe(1);
   return matches[0];
@@ -153,6 +194,127 @@ describe('ProductDetail', () => {
 
     expect(fixture.nativeElement.querySelector('h1').textContent.trim()).toBe("Men's Trail Jacket");
     expectRequest(httpMock, '*GET').flush(RESPONSE);
+  });
+
+  it('sends a null locationId while no location is active yet', () => {
+    const fixture = TestBed.createComponent(ProductDetail);
+    fixture.componentRef.setInput('productPk', '12345');
+    fixture.detectChanges();
+
+    const req = expectRequest(httpMock, '*GET');
+    expect(req.request.body).toEqual({ action: '*GET', productPk: 12345, locationId: null });
+  });
+
+  it('sends the shopper\'s active locationId once one is known', () => {
+    TestBed.inject(AuthService).session.set({
+      empId: '1',
+      sessionId: 's1',
+      firstName: 'Pat',
+      lastName: 'Achkar',
+      locations: [
+        { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Edmonton Fire Dept Chief' },
+      ],
+    });
+    const fixture = TestBed.createComponent(ProductDetail);
+    fixture.componentRef.setInput('productPk', '12345');
+    fixture.detectChanges();
+
+    const req = expectRequest(httpMock, '*GET');
+    expect(req.request.body).toEqual({ action: '*GET', productPk: 12345, locationId: 18 });
+  });
+
+  it('omits categoryId from the request when the product was not reached from a listing', () => {
+    const fixture = TestBed.createComponent(ProductDetail);
+    fixture.componentRef.setInput('productPk', '12345');
+    fixture.detectChanges();
+
+    const req = expectRequest(httpMock, '*GET');
+    expect(req.request.body).not.toHaveProperty('categoryId');
+  });
+
+  it("sends the listing's categoryId when the product was reached from a category page", () => {
+    const fixture = TestBed.createComponent(ProductDetail);
+    fixture.componentRef.setInput('productPk', '12345');
+    fixture.componentRef.setInput('categoryId', '45');
+    fixture.detectChanges();
+
+    const req = expectRequest(httpMock, '*GET');
+    expect(req.request.body).toEqual({ action: '*GET', productPk: 12345, locationId: null, categoryId: 45 });
+  });
+
+  it('should show a fallback Home > Products breadcrumb when the API returns none', () => {
+    const fixture = TestBed.createComponent(ProductDetail);
+    fixture.componentRef.setInput('productPk', '12345');
+    fixture.detectChanges();
+    expectRequest(httpMock, '*GET').flush(RESPONSE);
+    fixture.detectChanges();
+
+    const crumbs: HTMLLIElement[] = fixture.nativeElement.querySelectorAll('.breadcrumb-item');
+    expect(Array.from(crumbs).map((li) => li.textContent?.trim())).toEqual([
+      'Home',
+      'Products',
+      "Men's Trail Jacket",
+    ]);
+  });
+
+  it("should render the API's breadcrumb trail as links, ending with the product title", () => {
+    const fixture = TestBed.createComponent(ProductDetail);
+    fixture.componentRef.setInput('productPk', '12345');
+    fixture.detectChanges();
+    expectRequest(httpMock, '*GET').flush({
+      ...RESPONSE,
+      breadcrumb: {
+        programId: 3,
+        programName: 'ANB Standard Program',
+        progCatId: 52,
+        breadcrumb: [
+          { progCatId: 40, categoryName: 'Clothing' },
+          { progCatId: 45, categoryName: 'Shirts' },
+          { progCatId: 52, categoryName: 'Polos' },
+        ],
+      },
+    });
+    fixture.detectChanges();
+
+    const crumbs: HTMLLIElement[] = fixture.nativeElement.querySelectorAll('.breadcrumb-item');
+    expect(Array.from(crumbs).map((li) => li.textContent?.trim())).toEqual([
+      'Home',
+      'Clothing',
+      // The mobile-only "…" collapses everything but the first entry
+      // (hidden at md+ via CSS, still present in the DOM) — its own
+      // middle-dot text still shows up in a plain `.textContent` read
+      // regardless of viewport.
+      '…',
+      'Shirts',
+      'Polos',
+      "Men's Trail Jacket",
+    ]);
+    const categoryLinks: HTMLAnchorElement[] = fixture.nativeElement.querySelectorAll(
+      '.breadcrumb-item a[href^="/products/"]',
+    );
+    expect(Array.from(categoryLinks).map((a) => a.getAttribute('href'))).toEqual([
+      '/products/40',
+      '/products/45',
+      '/products/52',
+    ]);
+  });
+
+  it('should collapse to Home and the product title when the breadcrumb trail is empty', () => {
+    const fixture = TestBed.createComponent(ProductDetail);
+    fixture.componentRef.setInput('productPk', '12345');
+    fixture.detectChanges();
+    expectRequest(httpMock, '*GET').flush({
+      ...RESPONSE,
+      breadcrumb: { programId: 3, programName: 'ANB Standard Program', progCatId: null, breadcrumb: [] },
+    });
+    fixture.detectChanges();
+
+    const crumbs: HTMLLIElement[] = fixture.nativeElement.querySelectorAll('.breadcrumb-item');
+    expect(Array.from(crumbs).map((li) => li.textContent?.trim())).toEqual([
+      'Home',
+      'Products',
+      "Men's Trail Jacket",
+    ]);
   });
 
   it('should show the vendor name but no logo image when brandLogoUrl is empty', () => {
@@ -292,7 +454,12 @@ describe('ProductDetail', () => {
     expect(detail.selections()).toEqual({});
 
     const availReq = expectRequest(httpMock, '*AVAIL');
-    expect(availReq.request.body).toEqual({ action: '*AVAIL', productPk: 12345, selections: [] });
+    expect(availReq.request.body).toEqual({
+      action: '*AVAIL',
+      productPk: 12345,
+      selections: [],
+      locationId: null,
+    });
     availReq.flush(AVAIL_EVERYTHING);
     fixture.detectChanges();
 
@@ -349,13 +516,18 @@ describe('ProductDetail', () => {
     expect(detail.axes()).toEqual([]);
 
     const availReq = expectRequest(httpMock, '*AVAIL');
-    expect(availReq.request.body).toEqual({ action: '*AVAIL', productPk: 12345, selections: [] });
+    expect(availReq.request.body).toEqual({
+      action: '*AVAIL',
+      productPk: 12345,
+      selections: [],
+      locationId: null,
+    });
     availReq.flush({ resolvedSkuId: 9001, axes: [] });
     fixture.detectChanges();
 
     expect(detail.resolvedSkuId()).toBe(9001);
     const skuReq = expectRequest(httpMock, '*GET_SKU');
-    expect(skuReq.request.body).toEqual({ action: '*GET_SKU', skuId: 9001 });
+    expect(skuReq.request.body).toEqual({ action: '*GET_SKU', skuId: 9001, locationId: null });
     skuReq.flush({ ...WHITE_M_SKU, skuId: 9001, skuCode: 'ABC-100-ONLY' });
     fixture.detectChanges();
 
@@ -382,6 +554,7 @@ describe('ProductDetail', () => {
       action: '*AVAIL',
       productPk: 12345,
       selections: [{ optId: 102 }, { optId: 201 }],
+      locationId: null,
     });
     availReq.flush({
       resolvedSkuId: 9002,
@@ -394,7 +567,7 @@ describe('ProductDetail', () => {
 
     expect(detail.resolvedSkuId()).toBe(9002);
     const skuReq = expectRequest(httpMock, '*GET_SKU');
-    expect(skuReq.request.body).toEqual({ action: '*GET_SKU', skuId: 9002 });
+    expect(skuReq.request.body).toEqual({ action: '*GET_SKU', skuId: 9002, locationId: null });
     skuReq.flush(WHITE_M_SKU);
     fixture.detectChanges();
 
@@ -555,7 +728,12 @@ describe('ProductDetail', () => {
 
     expect(detail.addingToCart()).toBe(true);
     const addReq = expectCartRequest(httpMock, '*ADD_ITEM');
-    expect(addReq.request.body).toEqual({ action: '*ADD_ITEM', skuId: 9002, qty: 1 });
+    expect(addReq.request.body).toEqual({
+      action: '*ADD_ITEM',
+      skuId: 9002,
+      locationId: null,
+      qty: 1,
+    });
     addReq.flush({ cartId: 501, itemCount: 1, subtotalPrice: 94.99, subtotalPoints: null, items: [] });
     fixture.detectChanges();
 
@@ -565,6 +743,410 @@ describe('ProductDetail', () => {
     // The header's own cart drawer (rendered as part of this page) pops
     // open as the real confirmation, showing the line that was just added.
     expect(TestBed.inject(CartService).drawerOpen()).toBe(true);
+  });
+
+  describe('editing an existing cart line', () => {
+    it('pre-selects the matching options/quantity and shows an editing banner', () => {
+      const fixture = TestBed.createComponent(ProductDetail);
+      const detail = fixture.componentInstance;
+      fixture.componentRef.setInput('productPk', '12345');
+      fixture.componentRef.setInput('cartItemId', '9001');
+      fixture.detectChanges();
+      expectRequest(httpMock, '*GET').flush(RESPONSE);
+      expectProductTagCartRequest(httpMock).flush({
+        cartId: 501,
+        itemCount: 1,
+        subtotalPrice: 269.97,
+        subtotalPoints: null,
+        items: [CART_ITEM_TO_EDIT],
+        allotment: null,
+      });
+      fixture.detectChanges();
+
+      expect(detail.selections()).toEqual({ Color: 101, Size: 201 });
+      expect(detail.quantity()).toBe(3);
+      expect(fixture.nativeElement.textContent).toContain('Editing this item in your cart.');
+      const cancelLink: HTMLAnchorElement = fixture.nativeElement.querySelector('.alert-link');
+      expect(cancelLink.getAttribute('href')).toBe('/cart');
+    });
+
+    it('saves via *UPDATE_QT when the selection still resolves to the same sku, then returns to the cart', () => {
+      const fixture = TestBed.createComponent(ProductDetail);
+      const router = TestBed.inject(Router);
+      const navigateSpy = vi.spyOn(router, 'navigateByUrl');
+      fixture.componentRef.setInput('productPk', '12345');
+      fixture.componentRef.setInput('cartItemId', '9001');
+      fixture.detectChanges();
+      expectRequest(httpMock, '*GET').flush(RESPONSE);
+      fixture.detectChanges();
+      // The very first `*AVAIL` fires off the initial (still-empty)
+      // selection, same as any other page load, before the prefill below
+      // has had a chance to pick anything.
+      expectRequest(httpMock, '*AVAIL').flush(AVAIL_EVERYTHING);
+      expectProductTagCartRequest(httpMock).flush({
+        cartId: 501,
+        itemCount: 1,
+        subtotalPrice: 269.97,
+        subtotalPoints: null,
+        items: [CART_ITEM_TO_EDIT],
+        allotment: null,
+      });
+      fixture.detectChanges();
+      // The pre-selected options resolve right back to the same sku already
+      // sitting in the cart.
+      expectRequest(httpMock, '*AVAIL').flush({
+        resolvedSkuId: 9001,
+        axes: [
+          { optName: 'Color', optOrder: 1, availableOptIds: [101, 102] },
+          { optName: 'Size', optOrder: 2, availableOptIds: [201, 202] },
+        ],
+      });
+      fixture.detectChanges();
+      expectRequest(httpMock, '*GET_SKU').flush({ ...WHITE_M_SKU, skuId: 9001, skuCode: 'ABC-100-BLK-M' });
+      fixture.detectChanges();
+
+      const button: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-add-to-cart');
+      expect(button.textContent?.trim()).toBe('Update Cart');
+      button.click();
+      fixture.detectChanges();
+
+      const updateReq = expectCartRequest(httpMock, '*UPDATE_QT');
+      expect(updateReq.request.body).toEqual({
+        action: '*UPDATE_QT',
+        skuId: 9001,
+        qty: 3,
+        locationId: null,
+      });
+      updateReq.flush({
+        cartId: 501,
+        itemCount: 1,
+        subtotalPrice: 269.97,
+        subtotalPoints: null,
+        items: [],
+        allotment: null,
+      });
+      fixture.detectChanges();
+
+      expect(navigateSpy).toHaveBeenCalledWith('/cart');
+    });
+
+    it('removes the old sku and adds the new one when the selection changes to a different sku', () => {
+      const fixture = TestBed.createComponent(ProductDetail);
+      const detail = fixture.componentInstance;
+      const router = TestBed.inject(Router);
+      const navigateSpy = vi.spyOn(router, 'navigateByUrl');
+      fixture.componentRef.setInput('productPk', '12345');
+      fixture.componentRef.setInput('cartItemId', '9001');
+      fixture.detectChanges();
+      expectRequest(httpMock, '*GET').flush(RESPONSE);
+      fixture.detectChanges();
+      expectRequest(httpMock, '*AVAIL').flush(AVAIL_EVERYTHING);
+      expectProductTagCartRequest(httpMock).flush({
+        cartId: 501,
+        itemCount: 1,
+        subtotalPrice: 269.97,
+        subtotalPoints: null,
+        items: [CART_ITEM_TO_EDIT],
+        allotment: null,
+      });
+      fixture.detectChanges();
+      expectRequest(httpMock, '*AVAIL').flush({
+        resolvedSkuId: 9001,
+        axes: [
+          { optName: 'Color', optOrder: 1, availableOptIds: [101, 102] },
+          { optName: 'Size', optOrder: 2, availableOptIds: [201, 202] },
+        ],
+      });
+      fixture.detectChanges();
+      expectRequest(httpMock, '*GET_SKU').flush({ ...WHITE_M_SKU, skuId: 9001, skuCode: 'ABC-100-BLK-M' });
+      fixture.detectChanges();
+
+      // Switch color to White — a genuinely different sku from the one
+      // already in the cart.
+      detail.selectOption('Color', 102);
+      fixture.detectChanges();
+      expectRequest(httpMock, '*AVAIL').flush({
+        resolvedSkuId: 9002,
+        axes: [
+          { optName: 'Color', optOrder: 1, availableOptIds: [102] },
+          { optName: 'Size', optOrder: 2, availableOptIds: [201] },
+        ],
+      });
+      fixture.detectChanges();
+      expectRequest(httpMock, '*GET_SKU').flush(WHITE_M_SKU);
+      fixture.detectChanges();
+
+      const button: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-add-to-cart');
+      button.click();
+      fixture.detectChanges();
+
+      const removeReq = expectCartRequest(httpMock, '*RMV_ITEM');
+      expect(removeReq.request.body).toEqual({ action: '*RMV_ITEM', skuId: 9001, locationId: null });
+      removeReq.flush({
+        cartId: 501,
+        itemCount: 0,
+        subtotalPrice: 0,
+        subtotalPoints: null,
+        items: [],
+        allotment: null,
+      });
+      fixture.detectChanges();
+
+      const addReq = expectCartRequest(httpMock, '*ADD_ITEM');
+      expect(addReq.request.body).toEqual({
+        action: '*ADD_ITEM',
+        skuId: 9002,
+        locationId: null,
+        qty: 3,
+      });
+      addReq.flush({
+        cartId: 501,
+        itemCount: 1,
+        subtotalPrice: 94.99,
+        subtotalPoints: null,
+        items: [],
+        allotment: null,
+      });
+      fixture.detectChanges();
+
+      expect(navigateSpy).toHaveBeenCalledWith('/cart');
+    });
+
+    it('surfaces the API message when saving the edit fails', () => {
+      const fixture = TestBed.createComponent(ProductDetail);
+      const detail = fixture.componentInstance;
+      fixture.componentRef.setInput('productPk', '12345');
+      fixture.componentRef.setInput('cartItemId', '9001');
+      fixture.detectChanges();
+      expectRequest(httpMock, '*GET').flush(RESPONSE);
+      fixture.detectChanges();
+      expectRequest(httpMock, '*AVAIL').flush(AVAIL_EVERYTHING);
+      expectProductTagCartRequest(httpMock).flush({
+        cartId: 501,
+        itemCount: 1,
+        subtotalPrice: 269.97,
+        subtotalPoints: null,
+        items: [CART_ITEM_TO_EDIT],
+        allotment: null,
+      });
+      fixture.detectChanges();
+      expectRequest(httpMock, '*AVAIL').flush({
+        resolvedSkuId: 9001,
+        axes: [
+          { optName: 'Color', optOrder: 1, availableOptIds: [101, 102] },
+          { optName: 'Size', optOrder: 2, availableOptIds: [201, 202] },
+        ],
+      });
+      fixture.detectChanges();
+      expectRequest(httpMock, '*GET_SKU').flush({ ...WHITE_M_SKU, skuId: 9001, skuCode: 'ABC-100-BLK-M' });
+      fixture.detectChanges();
+
+      detail.addToCart();
+      expectCartRequest(httpMock, '*UPDATE_QT').flush({
+        success: false,
+        message: 'That quantity is no longer available.',
+      });
+      fixture.detectChanges();
+
+      expect(detail.addingToCart()).toBe(false);
+      expect(detail.addToCartError()).toBe('That quantity is no longer available.');
+      expect(fixture.nativeElement.textContent).toContain('That quantity is no longer available.');
+    });
+  });
+
+  it("should show the product's pay-with tag from the cart's own *GET", () => {
+    const fixture = TestBed.createComponent(ProductDetail);
+    const detail = fixture.componentInstance;
+    fixture.componentRef.setInput('productPk', '12345');
+    fixture.detectChanges();
+
+    expectRequest(httpMock, '*GET').flush(RESPONSE);
+    const tagReq = expectProductTagCartRequest(httpMock);
+    expect(tagReq.request.body).toEqual({ action: '*GET', locationId: null, productPk: 12345 });
+    tagReq.flush({
+      cartId: null,
+      itemCount: 0,
+      subtotalPrice: 0,
+      subtotalPoints: null,
+      items: [],
+      allotment: {
+        programId: 3,
+        allotmentBar: null,
+        ruleCount: 1,
+        rules: [],
+        approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+        openOrders: null,
+        lineTags: [],
+        productTag: { productPk: 12345, ruleId: 12, payUnit: 'UNITS', tagLabel: 'uses units' },
+      },
+    });
+    fixture.detectChanges();
+
+    expect(detail.productTag()).toEqual({
+      productPk: 12345,
+      ruleId: 12,
+      payUnit: 'UNITS',
+      tagLabel: 'uses units',
+    });
+    expect(fixture.nativeElement.querySelector('.pay-tag')?.textContent?.trim()).toBe('uses units');
+  });
+
+  it('should keep showing the product tag after adding to cart, even though that response has none', () => {
+    const fixture = TestBed.createComponent(ProductDetail);
+    const detail = fixture.componentInstance;
+    fixture.componentRef.setInput('productPk', '12345');
+    fixture.detectChanges();
+    expectRequest(httpMock, '*GET').flush(RESPONSE);
+    expectProductTagCartRequest(httpMock).flush({
+      cartId: null,
+      itemCount: 0,
+      subtotalPrice: 0,
+      subtotalPoints: null,
+      items: [],
+      allotment: {
+        programId: 3,
+        allotmentBar: null,
+        ruleCount: 1,
+        rules: [],
+        approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+        openOrders: null,
+        lineTags: [],
+        productTag: { productPk: 12345, ruleId: 12, payUnit: 'UNITS', tagLabel: 'uses units' },
+      },
+    });
+    fixture.detectChanges();
+    expectRequest(httpMock, '*AVAIL').flush(AVAIL_EVERYTHING);
+    fixture.detectChanges();
+
+    detail.selectOption('Color', 102);
+    detail.selectOption('Size', 201);
+    fixture.detectChanges();
+    expectRequest(httpMock, '*AVAIL').flush({
+      resolvedSkuId: 9002,
+      axes: [
+        { optName: 'Color', optOrder: 1, availableOptIds: [102] },
+        { optName: 'Size', optOrder: 2, availableOptIds: [201] },
+      ],
+    });
+    fixture.detectChanges();
+    expectRequest(httpMock, '*GET_SKU').flush(WHITE_M_SKU);
+    fixture.detectChanges();
+
+    detail.addToCart();
+    // The *ADD_ITEM* response has no productPk in its own request, so its
+    // allotment (if any) always comes back with `productTag: null` — this
+    // page keeps showing the value from its own earlier, dedicated fetch.
+    expectCartRequest(httpMock, '*ADD_ITEM').flush({
+      cartId: 501,
+      itemCount: 1,
+      subtotalPrice: 94.99,
+      subtotalPoints: null,
+      items: [],
+      allotment: {
+        programId: 3,
+        allotmentBar: null,
+        ruleCount: 1,
+        rules: [],
+        approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+        openOrders: null,
+        lineTags: [],
+        productTag: null,
+      },
+    });
+    fixture.detectChanges();
+
+    expect(detail.productTag()).toEqual({
+      productPk: 12345,
+      ruleId: 12,
+      payUnit: 'UNITS',
+      tagLabel: 'uses units',
+    });
+  });
+
+  it("should show the coverage card for the rule matching the product tag, and expand the header's rules panel from its View rule link", () => {
+    const fixture = TestBed.createComponent(ProductDetail);
+    const detail = fixture.componentInstance;
+    const cartService = TestBed.inject(CartService);
+    fixture.componentRef.setInput('productPk', '12345');
+    fixture.detectChanges();
+
+    expectRequest(httpMock, '*GET').flush(RESPONSE);
+    expectProductTagCartRequest(httpMock).flush({
+      cartId: null,
+      itemCount: 0,
+      subtotalPrice: 0,
+      subtotalPoints: null,
+      items: [],
+      allotment: {
+        programId: 3,
+        allotmentBar: null,
+        ruleCount: 1,
+        rules: [
+          {
+            ruleId: 12,
+            ruleName: 'Unit Allotment',
+            allotType: 'UNITS',
+            primaryUnit: 'UNITS',
+            isBarRule: 'N',
+            dollars: null,
+            units: { total: 5, used: 2, inCart: 0, available: 3 },
+            points: null,
+            cycle: {
+              renewalBasis: 'FIXED',
+              renewalPeriodMonths: 12,
+              cycleStart: '2026-09-09',
+              cycleEnd: '2027-09-08',
+              renewsOn: '2027-09-09',
+              expirationDate: null,
+              onExpiration: 'SUSPEND',
+            },
+            covers: {
+              allAssortments: 'N',
+              categories: [],
+              unitGrants: [{ progCatId: 60, categoryName: 'Tactical', unitQty: 5 }],
+            },
+            carryover: { type: 'FORFEIT', pct: null, capAmount: null, carriedIn: null },
+            quotas: [],
+            requireApproval: 'N',
+            allowCcFallback: 'N',
+          },
+        ],
+        approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+        openOrders: null,
+        lineTags: [],
+        productTag: { productPk: 12345, ruleId: 12, payUnit: 'UNITS', tagLabel: 'uses units' },
+      },
+    });
+    fixture.detectChanges();
+
+    const card = fixture.nativeElement.querySelector('app-allotment-coverage-card');
+    expect(card).not.toBeNull();
+    expect(card.querySelector('.coverage-card__title')?.textContent?.trim()).toBe(
+      'Covered by your Unit Allotment',
+    );
+
+    expect(cartService.rulesMenuOpen()).toBe(false);
+    card.querySelector('.coverage-card__view-rule').click();
+    expect(cartService.rulesMenuOpen()).toBe(true);
+  });
+
+  it('should not show the coverage card when there is no product tag', () => {
+    const fixture = TestBed.createComponent(ProductDetail);
+    fixture.componentRef.setInput('productPk', '12345');
+    fixture.detectChanges();
+
+    expectRequest(httpMock, '*GET').flush(RESPONSE);
+    expectProductTagCartRequest(httpMock).flush({
+      cartId: null,
+      itemCount: 0,
+      subtotalPrice: 0,
+      subtotalPoints: null,
+      items: [],
+      allotment: null,
+    });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-allotment-coverage-card')).toBeNull();
   });
 
   it('should surface the API message when adding to cart fails', () => {

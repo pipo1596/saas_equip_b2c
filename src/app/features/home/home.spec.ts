@@ -167,4 +167,135 @@ describe('Home', () => {
 
     expect(home.firstName()).toBe('Aaron');
   });
+
+  describe('allotment hero tiles', () => {
+    const DOLLAR_RULE = {
+      ruleId: 11,
+      ruleName: 'ANB Employee Allowance',
+      allotType: 'DOLLAR' as const,
+      primaryUnit: 'DOLLARS' as const,
+      isBarRule: 'Y' as const,
+      dollars: { total: 600, used: 180, inCart: 95, available: 325 },
+      units: null,
+      points: null,
+      cycle: {
+        renewalBasis: 'FIXED' as const,
+        renewalPeriodMonths: 12,
+        cycleStart: '2026-01-01',
+        cycleEnd: '2026-12-31',
+        renewsOn: '2027-01-01',
+        expirationDate: null,
+        onExpiration: 'SUSPEND' as const,
+      },
+      covers: { allAssortments: 'Y' as const, categories: [], unitGrants: [] },
+      carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
+      quotas: [],
+      requireApproval: 'N' as const,
+      allowCcFallback: 'N' as const,
+    };
+
+    function flushCartWithAllotment(allotment: object) {
+      const httpMock = TestBed.inject(HttpTestingController);
+      httpMock.match((req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS').forEach((req) => req.flush({}));
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART')
+        .flush({ cartId: null, itemCount: 0, subtotalPrice: 0, subtotalPoints: null, items: [], allotment });
+    }
+
+    it('renders one hero tile per rule, each in its own unit, with a renewal date', () => {
+      const fixture = TestBed.createComponent(Home);
+      fixture.detectChanges();
+      flushCartWithAllotment({
+        programId: 3,
+        allotmentBar: null,
+        ruleCount: 2,
+        rules: [
+          DOLLAR_RULE,
+          {
+            ...DOLLAR_RULE,
+            ruleId: 12,
+            ruleName: 'Tactical Gear',
+            allotType: 'UNITS',
+            primaryUnit: 'UNITS',
+            isBarRule: 'N',
+            dollars: null,
+            units: { total: 4, used: 1, inCart: 1, available: 2 },
+            cycle: { ...DOLLAR_RULE.cycle, renewsOn: null },
+          },
+        ],
+        approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+        openOrders: null,
+        lineTags: [],
+        productTag: null,
+      });
+      fixture.detectChanges();
+
+      const stats: HTMLElement[] = fixture.nativeElement.querySelectorAll('.stat');
+      expect(stats[0].querySelector('.stat__label')?.textContent).toContain('ANB Employee Allowance');
+      expect(stats[0].querySelector('.stat__value')?.textContent?.trim()).toBe('$325.00');
+      expect(stats[0].querySelector('.stat__meta')?.textContent).toContain('Renews');
+
+      expect(stats[1].querySelector('.stat__label')?.textContent).toContain('Tactical Gear');
+      expect(stats[1].querySelector('.stat__value')?.textContent?.trim()).toBe('2 units');
+      // No renewsOn on this one — the renewal line is omitted entirely.
+      expect(stats[1].querySelector('.stat__meta')).toBeNull();
+    });
+
+    it('shows Open orders as "—" (always null until there is a real orders table)', () => {
+      const fixture = TestBed.createComponent(Home);
+      fixture.detectChanges();
+      flushCartWithAllotment({
+        programId: 3,
+        allotmentBar: null,
+        ruleCount: 0,
+        rules: [],
+        approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+        openOrders: null,
+        lineTags: [],
+        productTag: null,
+      });
+      fixture.detectChanges();
+
+      const stats: HTMLElement[] = fixture.nativeElement.querySelectorAll('.stat');
+      const openOrdersStat = Array.from(stats).find((el) => el.textContent?.includes('Open orders'));
+      expect(openOrdersStat?.querySelector('.stat__value')?.textContent?.trim()).toBe('—');
+    });
+
+    it('shows an Approvals tile (with a "—" count) when the shopper can approve orders', () => {
+      const fixture = TestBed.createComponent(Home);
+      fixture.detectChanges();
+      flushCartWithAllotment({
+        programId: 3,
+        allotmentBar: null,
+        ruleCount: 0,
+        rules: [],
+        approvals: { canApprove: 'Y', pendingApprovals: null, awaitingApproval: null },
+        openOrders: null,
+        lineTags: [],
+        productTag: null,
+      });
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.textContent).toContain('Approvals');
+      expect(fixture.nativeElement.textContent).not.toContain('Awaiting approval');
+    });
+
+    it("shows an Awaiting approval tile when the shopper's own orders wait on someone else", () => {
+      const fixture = TestBed.createComponent(Home);
+      fixture.detectChanges();
+      flushCartWithAllotment({
+        programId: 3,
+        allotmentBar: null,
+        ruleCount: 0,
+        rules: [],
+        approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+        openOrders: null,
+        lineTags: [],
+        productTag: null,
+      });
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.textContent).toContain('Awaiting approval');
+    });
+  });
 });

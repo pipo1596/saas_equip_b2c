@@ -3,6 +3,9 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
+import { Breadcrumb, RawBreadcrumb, normalizeBreadcrumb } from './breadcrumb';
+
+export type { Breadcrumb, BreadcrumbCategory } from './breadcrumb';
 
 export interface ProductColor {
   valueDesc: string;
@@ -47,12 +50,21 @@ export interface OptionFacetGroup {
 }
 
 export interface ProductSearchResult {
+  // Only present when `categoryId` was sent and it resolves to a real
+  // category in this location's program — `null` for a bucket scope, the
+  // unscoped full catalog, or a search, and also `null` if the lookup
+  // itself just failed. Never blocks `products`/the facets from loading.
+  breadcrumb: Breadcrumb | null;
   products: Product[];
   totalCount: number;
   page: number;
   pageSize: number;
   categoryFacets: CategoryFacet[];
   optionFacets: OptionFacetGroup[];
+}
+
+interface RawProductSearchResult extends Omit<ProductSearchResult, 'breadcrumb'> {
+  breadcrumb: RawBreadcrumb | null;
 }
 
 export interface ProductSearchParams {
@@ -92,9 +104,10 @@ function buildOptionFiltersString(
 // The live API sometimes sends `null` for an array field (e.g. a product
 // with no color variants) instead of `[]` — normalize once here so nothing
 // downstream has to defensively null-check every list.
-function normalizeSearchResult(result: ProductSearchResult): ProductSearchResult {
+function normalizeSearchResult(result: RawProductSearchResult): ProductSearchResult {
   return {
     ...result,
+    breadcrumb: normalizeBreadcrumb(result.breadcrumb),
     products: (result.products ?? []).map((product) => ({
       ...product,
       colors: (product.colors ?? []).map((color) => ({
@@ -120,7 +133,7 @@ export class CatalogProductsService {
     const { locationId, categoryId, bucket, search, optionFilters, page, pageSize } = params;
     const optionFiltersString = buildOptionFiltersString(optionFilters);
     return this.http
-      .post<ProductSearchResult>(this.dispatchUrl, {
+      .post<RawProductSearchResult>(this.dispatchUrl, {
         action: '*PRODUCTS',
         locationId,
         ...(categoryId !== undefined ? { categoryId } : {}),

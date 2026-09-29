@@ -24,17 +24,24 @@
         current with your department.
       </p>
       <div class="stats row row-cols-1 row-cols-sm-3 g-3">
-        <div class="stat">
-          <div class="stat__label">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M12 1v22" />
-              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-            </svg>
-            Allotment balance
-          </div>
-          <div class="stat__value">$545.53<small> / $600</small></div>
-          <div class="track"><i [style.width.%]="91"></i></div>
-        </div>
+        @for (rule of allotmentRules(); track rule.ruleId) {
+          @if (tileBalance(rule); as balance) {
+            <div class="stat">
+              <div class="stat__label">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 1v22" />
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                </svg>
+                {{ rule.ruleName }}
+              </div>
+              <div class="stat__value">{{ formatBalanceAmount(balance.available, rule.primaryUnit) }}</div>
+              <div class="track"><i [style.width.%]="meterPct(balance)"></i></div>
+              @if (rule.cycle.renewsOn) {
+                <div class="stat__meta">Renews {{ rule.cycle.renewsOn | date: 'MMM d' }}</div>
+              }
+            </div>
+          }
+        }
         <div class="stat">
           <div class="stat__label">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -45,20 +52,35 @@
             </svg>
             Open orders
           </div>
-          <div class="stat__value">2</div>
-          <div class="stat__meta">1 in transit · 1 processing</div>
+          <div class="stat__value">{{ openOrders() ?? '—' }}</div>
         </div>
-        <div class="stat">
-          <div class="stat__label">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M9 12l2 2 4-4" />
-              <circle cx="12" cy="12" r="9" />
-            </svg>
-            Approvals
-          </div>
-          <div class="stat__value">1</div>
-          <div class="stat__meta warn">Waiting on your review</div>
-        </div>
+        @if (approvals(); as approvals) {
+          @if (approvals.canApprove === 'Y') {
+            <div class="stat">
+              <div class="stat__label">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M9 12l2 2 4-4" />
+                  <circle cx="12" cy="12" r="9" />
+                </svg>
+                Approvals
+              </div>
+              <div class="stat__value">{{ approvals.pendingApprovals ?? '—' }}</div>
+              <div class="stat__meta">Orders waiting on your review</div>
+            </div>
+          } @else {
+            <div class="stat">
+              <div class="stat__label">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M9 12l2 2 4-4" />
+                  <circle cx="12" cy="12" r="9" />
+                </svg>
+                Awaiting approval
+              </div>
+              <div class="stat__value">{{ approvals.awaitingApproval ?? '—' }}</div>
+              <div class="stat__meta warn">Your own orders waiting on someone else</div>
+            </div>
+          }
+        }
       </div>
       <div class="hero__cta d-flex gap-3 flex-wrap">
         <a class="btn btn-primary" href="#">Shop your allotment</a>

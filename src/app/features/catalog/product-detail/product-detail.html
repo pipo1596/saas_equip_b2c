@@ -2,15 +2,26 @@
 
 <section class="product-detail">
   <div class="container py-3">
-    <nav aria-label="breadcrumb">
-      <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a routerLink="/home">Home</a></li>
-        <li class="breadcrumb-item"><a routerLink="/products/full-catalog">Products</a></li>
-        <li class="breadcrumb-item active" aria-current="page">{{ pageTitle() }}</li>
-      </ol>
-    </nav>
+    @if (hasBreadcrumb()) {
+      <app-breadcrumb [items]="breadcrumb()!.breadcrumb" [currentLabel]="pageTitle()" />
+    } @else {
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a routerLink="/home">Home</a></li>
+          <li class="breadcrumb-item"><a routerLink="/products/full-catalog">Products</a></li>
+          <li class="breadcrumb-item active" aria-current="page">{{ pageTitle() }}</li>
+        </ol>
+      </nav>
+    }
 
-    <h1 class="product-detail__title mb-3">{{ pageTitle() }}</h1>
+    <h1 class="product-detail__title my-3 fs-4">{{ pageTitle() }}</h1>
+
+    @if (isEditing()) {
+      <div class="alert alert-info d-flex justify-content-between align-items-center mb-3" role="status">
+        <span>Editing this item in your cart.</span>
+        <a routerLink="/cart" class="alert-link">Cancel</a>
+      </div>
+    }
 
     @if (loading()) {
       <div class="d-flex justify-content-center py-5">
@@ -71,14 +82,17 @@
         <div class="col-lg-6">
           <div class="product-detail__panel">
             @if (product(); as p) {
-              @if (p.brandLogoUrl || p.vendor) {
-                <div class="d-flex align-items-center gap-2 mb-3">
-                  @if (p.brandLogoUrl) {
-                    <img [src]="p.brandLogoUrl" [alt]="p.brandName || p.vendor" class="product-detail__brand-logo" />
-                  }
-                  @if (p.vendor) {
-                    <span class="text-secondary">{{ p.vendor }}</span>
-                  }
+              @if (p.brandLogoUrl || p.vendor || productTag()) {
+                <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+                  <div class="d-flex align-items-center gap-2">
+                    @if (p.brandLogoUrl) {
+                      <img [src]="p.brandLogoUrl" [alt]="p.brandName || p.vendor" class="product-detail__brand-logo" />
+                    }
+                    @if (p.vendor) {
+                      <span class="text-secondary">{{ p.vendor }}</span>
+                    }
+                  </div>
+                  <app-pay-tag [tag]="productTag()" />
                 </div>
               }
               <p class="text-secondary small mb-3">{{ p.productId }}</p>
@@ -160,6 +174,10 @@
               </div>
             }
 
+            @if (coveringRule(); as rule) {
+              <app-allotment-coverage-card [rule]="rule" (viewRule)="viewRule()" />
+            }
+
             <div class="d-flex align-items-center gap-3 mt-4">
               <div class="qty-stepper">
                 <button
@@ -195,7 +213,7 @@
                 [disabled]="!canAddToCart()"
                 (click)="addToCart()"
               >
-                {{ addingToCart() ? 'Adding…' : 'Add to Cart' }}
+                {{ isEditing() ? (addingToCart() ? 'Saving…' : 'Update Cart') : (addingToCart() ? 'Adding…' : 'Add to Cart') }}
               </button>
             </div>
             @if (addedToCart()) {

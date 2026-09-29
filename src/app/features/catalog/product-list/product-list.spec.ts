@@ -12,6 +12,7 @@ const LOCATIONS = [
 ];
 
 const SAMPLE: ProductSearchResult = {
+  breadcrumb: null,
   products: [
     {
       productPk: 4021,
@@ -176,7 +177,69 @@ describe('ProductList', () => {
 
     const card = fixture.nativeElement.querySelector('.product-card');
     expect(card.tagName).toBe('A');
+    expect(card.getAttribute('href')).toBe(
+      '/product/4021?name=Sworn%20duty%20shirt,%20long%20sleeve&categoryId=5510',
+    );
+  });
+
+  it('should omit categoryId from the product link on a bucket/full-catalog page (no real category)', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', 'full-catalog');
+    auth.session.set({
+      empId: '1',
+      sessionId: 's',
+      firstName: 'P',
+      lastName: 'A',
+      locations: LOCATIONS,
+    });
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush(SAMPLE);
+    fixture.detectChanges();
+
+    const card = fixture.nativeElement.querySelector('.product-card');
     expect(card.getAttribute('href')).toBe('/product/4021?name=Sworn%20duty%20shirt,%20long%20sleeve');
+  });
+
+  it('should render the API breadcrumb trail when browsing a real category', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', '45');
+    auth.session.set({ empId: '1', sessionId: 's', firstName: 'P', lastName: 'A', locations: LOCATIONS });
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush({
+      ...SAMPLE,
+      breadcrumb: {
+        programId: 3,
+        programName: 'ANB Standard Program',
+        progCatId: 45,
+        breadcrumb: [
+          { progCatId: 40, categoryName: 'Clothing' },
+          { progCatId: 45, categoryName: 'Shirts' },
+        ],
+      },
+    });
+    fixture.detectChanges();
+
+    const crumbs: HTMLLIElement[] = fixture.nativeElement.querySelectorAll('.breadcrumb-item');
+    expect(Array.from(crumbs).map((li) => li.textContent?.trim())).toEqual(['Home', 'Clothing', 'Shirts']);
+    // The current category is the trail's own active crumb, not a link.
+    expect(fixture.nativeElement.querySelector('.breadcrumb-item.active')?.textContent?.trim()).toBe(
+      'Shirts',
+    );
+  });
+
+  it('should fall back to Home > {pageTitle} when the API returns no breadcrumb (bucket/full-catalog/search)', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', 'full-catalog');
+    auth.session.set({ empId: '1', sessionId: 's', firstName: 'P', lastName: 'A', locations: LOCATIONS });
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush(SAMPLE);
+    fixture.detectChanges();
+
+    const crumbs: HTMLLIElement[] = fixture.nativeElement.querySelectorAll('.breadcrumb-item');
+    expect(Array.from(crumbs).map((li) => li.textContent?.trim())).toEqual(['Home', 'Category']);
   });
 
   it("should render a color swatch using the color's own swatch color", () => {

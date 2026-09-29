@@ -35,6 +35,18 @@ describe('Footer', () => {
     expect(footer.tenantSettings()?.copyrg_txt).toBe('Copyright test');
   });
 
+  it('should render without a logo (and without crashing NgOptimizedImage) when logo_url is empty', () => {
+    const fixture = TestBed.createComponent(Footer);
+    fixture.detectChanges();
+
+    TestBed.inject(HttpTestingController)
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS')
+      .flush({ copyrg_txt: 'Copyright test' } as never);
+
+    expect(() => fixture.detectChanges()).not.toThrow();
+    expect(fixture.nativeElement.querySelector('.foot__logo')).toBeNull();
+  });
+
   it('should grow the footer logo box taller for a squarer logo, capped at the max height', () => {
     const fixture = TestBed.createComponent(Footer);
     const footer = fixture.componentInstance;

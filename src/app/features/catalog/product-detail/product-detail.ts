@@ -15,9 +15,11 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
+import { switchMap } from 'rxjs';
 
-import { CartService } from '../../../core/cart/cart';
+import { Allotment, AllotmentRule, CartService, PayTag } from '../../../core/cart/cart';
+import { Breadcrumb, hasCrumbs } from '../../../core/catalog/breadcrumb';
 import {
   ProductAttribute,
   ProductDetailData,
@@ -28,12 +30,16 @@ import {
   ProductOptionValue,
   ProductSkuDetail,
 } from '../../../core/catalog/product-detail';
+import { LocationSelectionService } from '../../../core/location/location-selection';
+import { AllotmentCoverageCard } from '../../../shared/allotment/coverage-card';
+import { PayTagBadge } from '../../../shared/allotment/pay-tag';
+import { BreadcrumbNav } from '../../../shared/breadcrumb/breadcrumb-nav';
 import { Footer } from '../../../shared/footer/footer';
 import { Header } from '../../../shared/header/header';
 
 @Component({
   selector: 'app-product-detail',
-  imports: [Header, Footer, RouterLink, CurrencyPipe],
+  imports: [Header, Footer, RouterLink, CurrencyPipe, BreadcrumbNav, PayTagBadge, AllotmentCoverageCard],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './product-detail.html',
   styleUrls: ['../../../shared/shared.css', './product-detail.css'],
@@ -48,6 +54,8 @@ import { Header } from '../../../shared/header/header';
 export class ProductDetail implements OnInit, AfterViewInit {
   private readonly productDetailService = inject(ProductDetailService);
   private readonly cartService = inject(CartService);
+  private readonly locationSelectionService = inject(LocationSelectionService);
+  private readonly router = inject(Router);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
   private readonly hostElementRef = inject(ElementRef<HTMLElement>);
 
@@ -56,8 +64,32 @@ export class ProductDetail implements OnInit, AfterViewInit {
   // Bound from the route: `productPk` is the path param, `name` an optional
   // `?name=` query param passed along from the listing page so a title can
   // show immediately while the real product data is still loading.
+  // `categoryId` is the listing's own category id, passed along the same
+  // way, so the breadcrumb can match the exact path the shopper actually
+  // took — absent for a deep link, search result, or bucket page.
+  // `cartItemId`, passed when a shopper clicks an existing line in their
+  // cart, puts the page in edit mode: the matching line's options/quantity
+  // are pre-selected, and "Add to Cart" becomes "Update Cart" instead.
   readonly productPk = input('');
   readonly name = input('');
+  readonly categoryId = input('');
+  readonly cartItemId = input('');
+
+  // Stable for the page's whole lifetime (the route input never changes
+  // without the whole component being recreated) — unlike looking the line
+  // up in the live cart signal, this doesn't flip back to `false` partway
+  // through saving an edit, once the original line has already been
+  // removed as part of that save.
+  readonly isEditing = computed(() => {
+    const id = Number(this.cartItemId());
+    return !!this.cartItemId() && Number.isFinite(id);
+  });
+  // Captured once, the first time the cart line this page is editing is
+  // found — needed for the rest of the edit's lifetime even after the
+  // line itself stops existing (e.g. it's already been removed as the
+  // first half of a sku-changing update).
+  private readonly editedLineSkuId = signal<number | null>(null);
+  private readonly editPrefillApplied = signal(false);
 
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
@@ -65,6 +97,8 @@ export class ProductDetail implements OnInit, AfterViewInit {
   readonly images = signal<ProductImage[]>([]);
   readonly axes = signal<ProductOptionAxis[]>([]);
   readonly attributes = signal<ProductAttribute[]>([]);
+  readonly breadcrumb = signal<Breadcrumb | null>(null);
+  readonly hasBreadcrumb = computed(() => hasCrumbs(this.breadcrumb()));
   // Keyed by `optName` (e.g. "Color", "Size") — one optId picked per axis.
   readonly selections = signal<Partial<Record<string, number>>>({});
   readonly activeImageUrl = signal<string | null>(null);
@@ -96,6 +130,24 @@ export class ProductDetail implements OnInit, AfterViewInit {
   readonly addedToCart = signal(false);
   readonly addingToCart = signal(false);
   readonly addToCartError = signal<string | null>(null);
+  // From the cart's own `*GET` (called alongside the product load, with
+  // `productPk`) — which allotment, if any, pays for this product. Kept in
+  // its own signal rather than read off the shared cart signal directly,
+  // since a later cart action (e.g. this same "Add to Cart") re-fetches the
+  // cart *without* `productPk` and would otherwise null this back out.
+  readonly productTag = signal<PayTag | null>(null);
+  // The same call's full allotment payload, held onto for the same reason as
+  // `productTag` above — used only to look up the rule that tag points to.
+  private readonly allotmentForProductTag = signal<Allotment | null>(null);
+  // The one rule that actually pays for this product, if any — matched by
+  // id against the allotment snapshot from that same productPk-scoped load.
+  readonly coveringRule = computed<AllotmentRule | null>(() => {
+    const ruleId = this.productTag()?.ruleId;
+    if (ruleId == null) {
+      return null;
+    }
+    return this.allotmentForProductTag()?.rules.find((rule) => rule.ruleId === ruleId) ?? null;
+  });
   // The exact `selections()` object (by reference) that the currently-
   // loaded `resolvedSku` was actually fetched for — `selections.update()`
   // always produces a new object on any change, so comparing by reference
@@ -105,7 +157,22 @@ export class ProductDetail implements OnInit, AfterViewInit {
   // a still-loading resolution apart from a settled one in the meantime.
   private readonly resolvedSkuSelections = signal<Partial<Record<string, number>> | null>(null);
 
-  readonly pageTitle = computed(() => this.product()?.title || this.name() || 'Product');
+  // Editing a cart line already implies knowing that line's own product
+  // title (it's sitting right there in the shared cart signal) — so an
+  // edit link doesn't need to also carry `?name=` the way a listing page's
+  // link does; this is what lets the title still show immediately even
+  // when it's absent.
+  private readonly editingCartItemTitle = computed(() => {
+    if (!this.isEditing()) {
+      return null;
+    }
+    const id = Number(this.cartItemId());
+    return this.cartService.cart().items.find((line) => line.cartItemId === id)?.productTitle ?? null;
+  });
+
+  readonly pageTitle = computed(
+    () => this.product()?.title || this.editingCartItemTitle() || this.name() || 'Product',
+  );
 
   // Shown as a starting "$79.99–$94.99" (or just "$79.99" when every SKU
   // shares one price) before a selection resolves to an exact SKU — `null`
@@ -215,7 +282,8 @@ export class ProductDetail implements OnInit, AfterViewInit {
     const selectedOptIds = Object.values(selections).filter(
       (optId): optId is number => optId !== undefined,
     );
-    this.productDetailService.checkAvailability(productPk, selectedOptIds).subscribe({
+    const locationId = this.locationSelectionService.activeLocation()?.locationId ?? null;
+    this.productDetailService.checkAvailability(productPk, selectedOptIds, locationId).subscribe({
       next: (result) => {
         const availableByAxis: Record<string, ReadonlySet<number>> = {};
         for (const axis of result.axes) {
@@ -263,8 +331,14 @@ export class ProductDetail implements OnInit, AfterViewInit {
     // the selection again before this resolves, `selections()` will be a
     // different object by then, correctly marking this response stale.
     const selectionsAtRequestTime = untracked(() => this.selections());
+    // Read untracked — a location change alone shouldn't retrigger this
+    // effect (it isn't accounted for by the resolved-sku dedup check right
+    // above), only ever picked up on a genuine new-sku fetch like this one.
+    const locationId = untracked(
+      () => this.locationSelectionService.activeLocation()?.locationId ?? null,
+    );
     this.resolvingSku.set(true);
-    this.productDetailService.getSku(skuId).subscribe({
+    this.productDetailService.getSku(skuId, locationId).subscribe({
       next: (sku) => {
         this.availabilityError.set(null);
         this.resolvedSku.set(sku);
@@ -282,6 +356,42 @@ export class ProductDetail implements OnInit, AfterViewInit {
     });
   });
 
+  // Pre-selects the edited line's own options/quantity as soon as both the
+  // product's axes (from its own load) and a matching cart line (from the
+  // shared cart signal — already populated by the time a shopper gets here
+  // by clicking a line on the cart page) are available. Runs once per page
+  // load, guarded by `editPrefillApplied`, since the cart signal keeps
+  // changing over the rest of this edit (the line disappearing partway
+  // through a sku-changing save shouldn't wipe the shopper's own picks).
+  private readonly prefillEditSelectionsOnLoad = effect(() => {
+    const axes = this.axes();
+    const cartItemId = Number(this.cartItemId());
+    if (
+      axes.length === 0 ||
+      !this.isEditing() ||
+      untracked(() => this.editPrefillApplied())
+    ) {
+      return;
+    }
+    const item = this.cartService.cart().items.find((line) => line.cartItemId === cartItemId);
+    if (!item) {
+      return;
+    }
+
+    const selections: Partial<Record<string, number>> = {};
+    for (const axis of axes) {
+      const match = item.options.find((option) => option.optName === axis.optName);
+      const value = match && axis.values.find((v) => v.valueDesc === match.valueDesc);
+      if (value) {
+        selections[axis.optName] = value.optId;
+      }
+    }
+    this.selections.set(selections);
+    this.quantity.set(item.quantity);
+    this.editedLineSkuId.set(item.skuId);
+    this.editPrefillApplied.set(true);
+  });
+
   ngOnInit(): void {
     const productPk = Number(this.productPk());
     if (!this.isBrowser || !this.productPk() || !Number.isFinite(productPk)) {
@@ -290,7 +400,11 @@ export class ProductDetail implements OnInit, AfterViewInit {
 
     this.loading.set(true);
     this.error.set(null);
-    this.productDetailService.load(productPk).subscribe({
+    const locationId = this.locationSelectionService.activeLocation()?.locationId ?? null;
+    const parsedCategoryId = Number(this.categoryId());
+    const categoryId =
+      this.categoryId() && Number.isFinite(parsedCategoryId) ? parsedCategoryId : undefined;
+    this.productDetailService.load(productPk, locationId, categoryId).subscribe({
       next: (data) => this.applyProductDetailData(data),
       error: (err: unknown) => {
         this.loading.set(false);
@@ -301,6 +415,24 @@ export class ProductDetail implements OnInit, AfterViewInit {
         );
       },
     });
+    // Piggybacks on the cart's own `*GET` (which already refreshes the
+    // shared cart signal) purely to read `allotment.productTag` for this
+    // specific product — fire-and-forget, same as the header's own cart
+    // load, since there's nowhere on this page to surface a failure beyond
+    // just not showing a tag.
+    this.cartService.load(locationId, productPk).subscribe({
+      next: (cart) => {
+        this.productTag.set(cart.allotment?.productTag ?? null);
+        this.allotmentForProductTag.set(cart.allotment);
+      },
+      error: () => {},
+    });
+  }
+
+  // The card's "View rule" link expands the header's own Rules panel rather
+  // than duplicating the full breakdown on this page.
+  viewRule(): void {
+    this.cartService.openRulesMenu();
   }
 
   ngAfterViewInit(): void {
@@ -347,7 +479,14 @@ export class ProductDetail implements OnInit, AfterViewInit {
     }
     this.addingToCart.set(true);
     this.addToCartError.set(null);
-    this.cartService.addItem(sku.skuId, this.quantity()).subscribe({
+    const locationId = this.locationSelectionService.activeLocation()?.locationId ?? null;
+
+    if (this.isEditing()) {
+      this.saveCartEdit(sku.skuId, locationId);
+      return;
+    }
+
+    this.cartService.addItem(sku.skuId, locationId, this.quantity()).subscribe({
       next: () => {
         this.addingToCart.set(false);
         this.addedToCart.set(true);
@@ -360,6 +499,37 @@ export class ProductDetail implements OnInit, AfterViewInit {
         this.addingToCart.set(false);
         this.addToCartError.set(
           err instanceof Error ? err.message : 'We could not add that to your cart.',
+        );
+      },
+    });
+  }
+
+  // The API has no "replace this exact line" action — `*UPDATE_QT`/
+  // `*RMV_ITEM`/`*ADD_ITEM` all key off `skuId`, not `cartItemId`. Picking
+  // the *same* sku (only the quantity changed) is a plain quantity update;
+  // picking a *different* one (a new color/size) has to remove the old
+  // line and add the new one as two calls. Either way, success returns to
+  // the cart rather than staying on this page — there's nothing left here
+  // to "add" once an edit is saved.
+  private saveCartEdit(skuId: number, locationId: number | null): void {
+    const originalSkuId = this.editedLineSkuId();
+    const qty = this.quantity();
+    const request$ =
+      originalSkuId !== null && originalSkuId !== skuId
+        ? this.cartService
+            .removeItem(originalSkuId, locationId)
+            .pipe(switchMap(() => this.cartService.addItem(skuId, locationId, qty)))
+        : this.cartService.setQuantity(skuId, qty, locationId);
+
+    request$.subscribe({
+      next: () => {
+        this.addingToCart.set(false);
+        this.router.navigateByUrl('/cart');
+      },
+      error: (err: unknown) => {
+        this.addingToCart.set(false);
+        this.addToCartError.set(
+          err instanceof Error ? err.message : 'We could not update your cart.',
         );
       },
     });
@@ -419,6 +589,7 @@ export class ProductDetail implements OnInit, AfterViewInit {
     this.images.set(data.images);
     this.axes.set(data.axes);
     this.attributes.set(data.attributes);
+    this.breadcrumb.set(data.breadcrumb);
     // Nothing pre-picked — the shopper chooses every axis themselves.
     this.selections.set({});
     this.availableOptionIds.set({});

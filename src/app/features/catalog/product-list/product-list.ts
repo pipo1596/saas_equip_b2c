@@ -14,6 +14,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
+import { Breadcrumb, hasCrumbs } from '../../../core/catalog/breadcrumb';
 import {
   CatalogProductsService,
   CategoryFacet,
@@ -22,6 +23,7 @@ import {
 } from '../../../core/catalog/catalog-products';
 import { CatalogViewService } from '../../../core/catalog/catalog-view';
 import { LocationSelectionService } from '../../../core/location/location-selection';
+import { BreadcrumbNav } from '../../../shared/breadcrumb/breadcrumb-nav';
 import { Footer } from '../../../shared/footer/footer';
 import { Header } from '../../../shared/header/header';
 
@@ -60,7 +62,7 @@ type CatalogScope =
 
 @Component({
   selector: 'app-product-list',
-  imports: [Header, Footer, RouterLink, CurrencyPipe],
+  imports: [Header, Footer, RouterLink, CurrencyPipe, BreadcrumbNav],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './product-list.html',
   styleUrls: ['../../../shared/shared.css', './product-list.css'],
@@ -118,6 +120,11 @@ export class ProductList implements AfterViewInit {
 
   readonly products = signal<Product[]>([]);
   readonly totalCount = signal(0);
+  // Only ever present for a real `categoryId` scope — `null` for a bucket
+  // page, search, or the full catalog, same as the API itself only returns
+  // one when `categoryId` was sent.
+  readonly breadcrumb = signal<Breadcrumb | null>(null);
+  readonly hasBreadcrumb = computed(() => hasCrumbs(this.breadcrumb()));
   readonly categoryFacets = signal<CategoryFacet[]>([]);
   // Categories with zero matches in the current scope aren't worth showing
   // as a filter option at all, and this list should only ever offer the
@@ -206,6 +213,7 @@ export class ProductList implements AfterViewInit {
         next: (result) => {
           this.products.set(result.products);
           this.totalCount.set(result.totalCount);
+          this.breadcrumb.set(result.breadcrumb);
           this.categoryFacets.set(result.categoryFacets);
           // Only refresh the option facet groups themselves from an
           // unfiltered response — once a value is selected, the backend

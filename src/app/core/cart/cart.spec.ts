@@ -4,11 +4,14 @@ import { TestBed } from '@angular/core/testing';
 
 import { Cart, CartService } from './cart';
 
+const LOCATION_ID = 18;
+
 const CART: Cart = {
   cartId: 501,
   itemCount: 3,
   subtotalPrice: 259.97,
   subtotalPoints: 450,
+  allotment: null,
   items: [
     {
       cartItemId: 9001,
@@ -34,6 +37,51 @@ const CART: Cart = {
       ],
     },
   ],
+};
+
+const ALLOTMENT_BAR = {
+  ruleId: 11,
+  label: 'Allotment',
+  unit: 'DOLLARS' as const,
+  total: 600,
+  used: 180,
+  inCart: 95,
+  available: 325,
+};
+
+const DOLLAR_RULE = {
+  ruleId: 11,
+  ruleName: 'ANB Employee Allowance',
+  allotType: 'DOLLAR' as const,
+  primaryUnit: 'DOLLARS' as const,
+  isBarRule: 'Y' as const,
+  dollars: { total: 600, used: 180, inCart: 95, available: 325 },
+  units: null,
+  points: null,
+  cycle: {
+    renewalBasis: 'FIXED' as const,
+    renewalPeriodMonths: 12,
+    cycleStart: '2026-01-01',
+    cycleEnd: '2026-12-31',
+    renewsOn: '2027-01-01',
+    expirationDate: null,
+    onExpiration: 'SUSPEND' as const,
+  },
+  covers: { allAssortments: 'Y' as const, categories: [], unitGrants: [] },
+  carryover: { type: 'PARTIAL' as const, pct: 25, capAmount: 150, carriedIn: 0 },
+  quotas: [
+    {
+      quotaId: 4,
+      programId: 3,
+      programName: 'ANB Standard Program',
+      progCatId: 45,
+      categoryName: 'Shirts',
+      limitType: 'UNITS' as const,
+      limitValue: 6,
+    },
+  ],
+  requireApproval: 'N' as const,
+  allowCcFallback: 'Y' as const,
 };
 
 describe('CartService', () => {
@@ -69,17 +117,18 @@ describe('CartService', () => {
       subtotalPrice: 0,
       subtotalPoints: null,
       items: [],
+      allotment: null,
     });
   });
 
   describe('load', () => {
-    it('posts *GET and updates the cart signal', () => {
+    it('posts *GET with the locationId and updates the cart signal', () => {
       let result: Cart | undefined;
-      service.load().subscribe((cart) => (result = cart));
+      service.load(LOCATION_ID).subscribe((cart) => (result = cart));
 
       expect(service.loading()).toBe(true);
       const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART');
-      expect(req.request.body).toEqual({ action: '*GET' });
+      expect(req.request.body).toEqual({ action: '*GET', locationId: LOCATION_ID });
       req.flush(CART);
 
       expect(service.loading()).toBe(false);
@@ -87,20 +136,45 @@ describe('CartService', () => {
       expect(service.cart()).toEqual(CART);
     });
 
+    it('sends a null locationId when none is known yet', () => {
+      service.load(null).subscribe();
+
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART');
+      expect(req.request.body).toEqual({ action: '*GET', locationId: null });
+      req.flush(CART);
+    });
+
+    it('includes productPk only when given (product detail page)', () => {
+      service.load(LOCATION_ID, 12345).subscribe();
+
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART');
+      expect(req.request.body).toEqual({
+        action: '*GET',
+        locationId: LOCATION_ID,
+        productPk: 12345,
+      });
+      req.flush(CART);
+    });
+
     it('normalizes a null items list to []', () => {
       let result: Cart | undefined;
-      service.load().subscribe((cart) => (result = cart));
+      service.load(LOCATION_ID).subscribe((cart) => (result = cart));
 
-      httpMock
-        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART')
-        .flush({ cartId: null, itemCount: 0, subtotalPrice: 0, subtotalPoints: null, items: null });
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush({
+        cartId: null,
+        itemCount: 0,
+        subtotalPrice: 0,
+        subtotalPoints: null,
+        items: null,
+        allotment: null,
+      });
 
       expect(result?.items).toEqual([]);
     });
 
     it('normalizes a missing options array on a line to []', () => {
       let result: Cart | undefined;
-      service.load().subscribe((cart) => (result = cart));
+      service.load(LOCATION_ID).subscribe((cart) => (result = cart));
 
       httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush({
         ...CART,
@@ -112,7 +186,7 @@ describe('CartService', () => {
 
     it('errors with the API message when the response carries no items key', () => {
       let error: unknown;
-      service.load().subscribe({ error: (err) => (error = err) });
+      service.load(LOCATION_ID).subscribe({ error: (err) => (error = err) });
 
       httpMock
         .expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART')
@@ -124,33 +198,119 @@ describe('CartService', () => {
 
     it('falls back to a generic message when the API omits one', () => {
       let error: unknown;
-      service.load().subscribe({ error: (err) => (error = err) });
+      service.load(LOCATION_ID).subscribe({ error: (err) => (error = err) });
 
       httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush({ success: false, message: null });
 
       expect((error as Error).message).toBe('We could not load your cart.');
     });
+
+    describe('allotment', () => {
+      it('normalizes a null allotment to null', () => {
+        let result: Cart | undefined;
+        service.load(LOCATION_ID).subscribe((cart) => (result = cart));
+
+        httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush({ ...CART, allotment: null });
+
+        expect(result?.allotment).toBeNull();
+      });
+
+      it('passes through a full allotment block, normalizing missing inner arrays to []', () => {
+        let result: Cart | undefined;
+        service.load(LOCATION_ID).subscribe((cart) => (result = cart));
+
+        httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush({
+          ...CART,
+          allotment: {
+            programId: 3,
+            allotmentBar: ALLOTMENT_BAR,
+            ruleCount: 1,
+            rules: [
+              {
+                ...DOLLAR_RULE,
+                covers: { allAssortments: 'N', categories: null, unitGrants: null },
+                quotas: null,
+              },
+            ],
+            approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+            openOrders: null,
+            lineTags: null,
+            productTag: null,
+          },
+        });
+
+        expect(result?.allotment?.allotmentBar).toEqual(ALLOTMENT_BAR);
+        expect(result?.allotment?.rules[0].covers).toEqual({
+          allAssortments: 'N',
+          categories: [],
+          unitGrants: [],
+        });
+        expect(result?.allotment?.rules[0].quotas).toEqual([]);
+        expect(result?.allotment?.lineTags).toEqual([]);
+      });
+
+      it('passes through lineTags and productTag as-is', () => {
+        let result: Cart | undefined;
+        service.load(LOCATION_ID, 123).subscribe((cart) => (result = cart));
+
+        httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush({
+          ...CART,
+          allotment: {
+            programId: 3,
+            allotmentBar: ALLOTMENT_BAR,
+            ruleCount: 1,
+            rules: [DOLLAR_RULE],
+            approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+            openOrders: null,
+            lineTags: [
+              { cartItemId: 501, skuId: 9001, ruleId: 11, payUnit: 'DOLLARS', tagLabel: '$ allotment' },
+            ],
+            productTag: { productPk: 123, ruleId: 12, payUnit: 'UNITS', tagLabel: 'uses units' },
+          },
+        });
+
+        expect(result?.allotment?.lineTags).toEqual([
+          { cartItemId: 501, skuId: 9001, ruleId: 11, payUnit: 'DOLLARS', tagLabel: '$ allotment' },
+        ]);
+        expect(result?.allotment?.productTag).toEqual({
+          productPk: 123,
+          ruleId: 12,
+          payUnit: 'UNITS',
+          tagLabel: 'uses units',
+        });
+      });
+    });
   });
 
   describe('addItem', () => {
-    it('posts *ADD_ITEM with skuId and qty, defaulting qty to 1', () => {
-      service.addItem(9001).subscribe();
+    it('posts *ADD_ITEM with skuId, locationId and qty, defaulting qty to 1', () => {
+      service.addItem(9001, LOCATION_ID).subscribe();
 
       const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART');
-      expect(req.request.body).toEqual({ action: '*ADD_ITEM', skuId: 9001, qty: 1 });
+      expect(req.request.body).toEqual({
+        action: '*ADD_ITEM',
+        skuId: 9001,
+        locationId: LOCATION_ID,
+        qty: 1,
+      });
       req.flush(CART);
     });
 
     it('passes through an explicit qty', () => {
-      service.addItem(9001, 3).subscribe();
+      service.addItem(9001, LOCATION_ID, 3).subscribe();
 
       const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART');
-      expect(req.request.body).toEqual({ action: '*ADD_ITEM', skuId: 9001, qty: 3 });
+      expect(req.request.body).toEqual({
+        action: '*ADD_ITEM',
+        skuId: 9001,
+        locationId: LOCATION_ID,
+        qty: 3,
+      });
       req.flush(CART);
     });
 
     it('updates the shared cart signal on success', () => {
-      service.addItem(9001).subscribe();
+      service.addItem(9001, LOCATION_ID).subscribe();
 
       httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush(CART);
 
@@ -160,24 +320,36 @@ describe('CartService', () => {
 
   describe('removeItem', () => {
     it('omits qty entirely when not given, to remove the whole line', () => {
-      service.removeItem(9001).subscribe();
+      service.removeItem(9001, LOCATION_ID).subscribe();
 
       const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART');
-      expect(req.request.body).toEqual({ action: '*RMV_ITEM', skuId: 9001 });
+      expect(req.request.body).toEqual({ action: '*RMV_ITEM', skuId: 9001, locationId: LOCATION_ID });
       req.flush({ ...CART, items: [] });
     });
 
     it('passes through an explicit qty to decrement by', () => {
-      service.removeItem(9001, 1).subscribe();
+      service.removeItem(9001, LOCATION_ID, 1).subscribe();
 
       const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART');
-      expect(req.request.body).toEqual({ action: '*RMV_ITEM', skuId: 9001, qty: 1 });
+      expect(req.request.body).toEqual({
+        action: '*RMV_ITEM',
+        skuId: 9001,
+        locationId: LOCATION_ID,
+        qty: 1,
+      });
       req.flush(CART);
     });
 
     it('updates the shared cart signal on success', () => {
-      const emptied: Cart = { cartId: 501, itemCount: 0, subtotalPrice: 0, subtotalPoints: null, items: [] };
-      service.removeItem(9001).subscribe();
+      const emptied: Cart = {
+        cartId: 501,
+        itemCount: 0,
+        subtotalPrice: 0,
+        subtotalPoints: null,
+        items: [],
+        allotment: null,
+      };
+      service.removeItem(9001, LOCATION_ID).subscribe();
 
       httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush(emptied);
 
@@ -186,16 +358,21 @@ describe('CartService', () => {
   });
 
   describe('setQuantity', () => {
-    it('posts *UPDATE_QT with the exact new quantity', () => {
-      service.setQuantity(9001, 5).subscribe();
+    it('posts *UPDATE_QT with the exact new quantity and locationId', () => {
+      service.setQuantity(9001, 5, LOCATION_ID).subscribe();
 
       const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART');
-      expect(req.request.body).toEqual({ action: '*UPDATE_QT', skuId: 9001, qty: 5 });
+      expect(req.request.body).toEqual({
+        action: '*UPDATE_QT',
+        skuId: 9001,
+        qty: 5,
+        locationId: LOCATION_ID,
+      });
       req.flush(CART);
     });
 
     it('updates the shared cart signal on success', () => {
-      service.setQuantity(9001, 5).subscribe();
+      service.setQuantity(9001, 5, LOCATION_ID).subscribe();
 
       httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush(CART);
 
@@ -204,17 +381,31 @@ describe('CartService', () => {
   });
 
   describe('clear', () => {
-    it('posts *CLEAR with no skuId or qty', () => {
-      service.clear().subscribe();
+    it('posts *CLEAR with the locationId and no skuId/qty', () => {
+      service.clear(LOCATION_ID).subscribe();
 
       const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART');
-      expect(req.request.body).toEqual({ action: '*CLEAR' });
-      req.flush({ cartId: 501, itemCount: 0, subtotalPrice: 0, subtotalPoints: null, items: [] });
+      expect(req.request.body).toEqual({ action: '*CLEAR', locationId: LOCATION_ID });
+      req.flush({
+        cartId: 501,
+        itemCount: 0,
+        subtotalPrice: 0,
+        subtotalPoints: null,
+        items: [],
+        allotment: null,
+      });
     });
 
     it('updates the shared cart signal on success', () => {
-      const emptied: Cart = { cartId: 501, itemCount: 0, subtotalPrice: 0, subtotalPoints: null, items: [] };
-      service.clear().subscribe();
+      const emptied: Cart = {
+        cartId: 501,
+        itemCount: 0,
+        subtotalPrice: 0,
+        subtotalPoints: null,
+        items: [],
+        allotment: null,
+      };
+      service.clear(LOCATION_ID).subscribe();
 
       httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush(emptied);
 

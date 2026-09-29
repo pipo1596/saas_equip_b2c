@@ -3,6 +3,9 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
+import { Breadcrumb, RawBreadcrumb, normalizeBreadcrumb } from './breadcrumb';
+
+export type { Breadcrumb, BreadcrumbCategory } from './breadcrumb';
 
 export interface ProductDetailInfo {
   productPk: number;
@@ -86,6 +89,10 @@ export interface ProductDetailData {
   images: ProductImage[];
   axes: ProductOptionAxis[];
   attributes: ProductAttribute[];
+  // `null` when no locationId was sent, the location has no view, or the
+  // lookup otherwise failed — never blocks the rest of the page from
+  // loading, just means there's nothing to show for it.
+  breadcrumb: Breadcrumb | null;
 }
 
 interface RawProductDetailData {
@@ -93,6 +100,7 @@ interface RawProductDetailData {
   images: ProductImage[] | null;
   options: ProductOptionValue[] | null;
   attributes: ProductAttribute[] | null;
+  breadcrumb: RawBreadcrumb | null;
 }
 
 // One axis's worth of availability given everything picked on the *other*
@@ -182,6 +190,7 @@ function normalizeProductDetailData(raw: RawProductDetailData): ProductDetailDat
     ),
     axes: groupOptionsByAxis(raw.options ?? []),
     attributes: raw.attributes ?? [],
+    breadcrumb: normalizeBreadcrumb(raw.breadcrumb),
   };
 }
 
@@ -192,12 +201,21 @@ export class ProductDetailService {
 
   // The product header, images, and full option list — every value starts
   // enabled; there's no SKU matrix here anymore, so availability has to be
-  // asked for separately (see `checkAvailability`).
-  load(productPk: number): Observable<ProductDetailData> {
+  // asked for separately (see `checkAvailability`). `locationId` scopes
+  // pricing/availability to the shopper's active location — `null` only in
+  // the narrow window before one's known yet (e.g. right after login,
+  // before the employee's locations have loaded). `categoryId` is the
+  // listing the shopper clicked the product from — it disambiguates which
+  // of a product's several category placements the returned `breadcrumb`
+  // should follow; omit it entirely for a deep link, search result, or
+  // bucket page, where there's no such listing to match.
+  load(productPk: number, locationId: number | null, categoryId?: number): Observable<ProductDetailData> {
     return this.http
       .post<RawProductDetailData | ApiFailure>(this.dispatchUrl, {
         action: '*GET',
         productPk,
+        locationId,
+        ...(categoryId !== undefined ? { categoryId } : {}),
       })
       .pipe(
         map((response) => {
@@ -216,12 +234,14 @@ export class ProductDetailService {
   checkAvailability(
     productPk: number,
     selectedOptIds: readonly number[],
+    locationId: number | null,
   ): Observable<ProductAvailabilityResult> {
     return this.http
       .post<RawProductAvailabilityResult | ApiFailure>(this.dispatchUrl, {
         action: '*AVAIL',
         productPk,
         selections: selectedOptIds.map((optId) => ({ optId })),
+        locationId,
       })
       .pipe(
         map((response) => {
@@ -237,9 +257,9 @@ export class ProductDetailService {
 
   // Only call once `checkAvailability` resolves to a non-null skuId —
   // there's nothing to fetch before that.
-  getSku(skuId: number): Observable<ProductSkuDetail> {
+  getSku(skuId: number, locationId: number | null): Observable<ProductSkuDetail> {
     return this.http
-      .post<ProductSkuDetail | ApiFailure>(this.dispatchUrl, { action: '*GET_SKU', skuId })
+      .post<ProductSkuDetail | ApiFailure>(this.dispatchUrl, { action: '*GET_SKU', skuId, locationId })
       .pipe(
         map((response) => {
           if (!('skuId' in response) || !response.skuId) {

@@ -1,4 +1,4 @@
-import { CurrencyPipe, NgOptimizedImage, NgTemplateOutlet, isPlatformBrowser } from '@angular/common';
+import { CurrencyPipe, DatePipe, NgOptimizedImage, NgTemplateOutlet, isPlatformBrowser } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -14,10 +14,13 @@ import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
 import { AuthService, EmployeeLocation } from '../../core/auth/auth';
-import { CartService, formatCartItemOptions } from '../../core/cart/cart';
+import { CartItem, CartService, PayTag, formatCartItemOptions } from '../../core/cart/cart';
 import { CatalogCategory, CatalogMenu, CatalogViewService } from '../../core/catalog/catalog-view';
 import { LocationSelectionService } from '../../core/location/location-selection';
 import { TenantSettings, TenantSettingsService } from '../../core/tenant/tenant-settings';
+import { AllotmentRuleCard } from '../allotment/rule-card';
+import { PayTagBadge } from '../allotment/pay-tag';
+import { ConfirmService } from '../confirm/confirm';
 import { computeAdaptiveLogoHeight } from '../logo-sizing';
 
 type CatalogImageField = keyof Pick<TenantSettings, 'men_clth_im' | 'men_ftw_im' | 'men_gear_im'>;
@@ -91,7 +94,16 @@ function buildDisplayCategories(
 
 @Component({
   selector: 'app-header',
-  imports: [RouterLink, CurrencyPipe, NgOptimizedImage, ReactiveFormsModule, NgTemplateOutlet],
+  imports: [
+    RouterLink,
+    CurrencyPipe,
+    DatePipe,
+    NgOptimizedImage,
+    ReactiveFormsModule,
+    NgTemplateOutlet,
+    AllotmentRuleCard,
+    PayTagBadge,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './header.html',
   styleUrls: ['../shared.css', './header.css'],
@@ -99,6 +111,7 @@ function buildDisplayCategories(
 export class Header implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly cartService = inject(CartService);
+  private readonly confirmService = inject(ConfirmService);
   private readonly catalogViewService = inject(CatalogViewService);
   private readonly locationSelectionService = inject(LocationSelectionService);
   private readonly tenantSettingsService = inject(TenantSettingsService);
@@ -126,6 +139,23 @@ export class Header implements OnInit {
     if (location && this.isBrowser) {
       this.catalogViewService.load(location.locationId).subscribe();
     }
+  });
+
+  // The cart's own contents aren't location-scoped, so this loads
+  // immediately even before a location is known (unlike the catalog menu
+  // above) — but the allotment breakdown that comes back with it *is*, so
+  // it still needs to reload once `activeLocation` settles or changes.
+  private readonly loadCartOnLocationChange = effect(() => {
+    const locationId = this.activeLocation()?.locationId ?? null;
+    if (!this.isBrowser) {
+      return;
+    }
+    // Fire-and-forget: a failed fetch just leaves the badge/drawer showing
+    // whatever the shared `cart` signal already had (typically the still-
+    // empty initial value) rather than anywhere in the header surfacing an
+    // error of its own — an explicit error handler here just keeps that
+    // failure from going fully unhandled.
+    this.cartService.load(locationId).subscribe({ error: () => {} });
   });
 
   // Only the buckets with categories for this location's menu show up —
@@ -180,7 +210,10 @@ export class Header implements OnInit {
 
   private closeCatalogNavTimeoutId: ReturnType<typeof setTimeout> | null = null;
   readonly deptMenuOpen = signal(false);
-  readonly rulesMenuOpen = signal(false);
+  // Shared via `CartService` (like `cartOpen` below) so a page like product
+  // detail can expand this same panel — e.g. its "View rule" link — without
+  // reaching into the header component itself.
+  readonly rulesMenuOpen = this.cartService.rulesMenuOpen;
   readonly userMenuOpen = signal(false);
 
   // `(ngSubmit)` is an output of `FormGroupDirective` (via `[formGroup]`) —
@@ -197,15 +230,30 @@ export class Header implements OnInit {
   readonly cartRemovingSkuId = signal<number | null>(null);
   readonly cartOpen = this.cartService.drawerOpen;
 
+  readonly allotment = computed(() => this.cart().allotment);
+  // `null` here means "no dollar rule" (units/points only, or none at all)
+  // — the bar itself hides, but the Rules link/panel stays if there's at
+  // least one rule to show.
+  readonly allotmentBar = computed(() => this.allotment()?.allotmentBar ?? null);
+  readonly ruleCount = computed(() => this.allotment()?.ruleCount ?? 0);
+  readonly allotmentRules = computed(() => this.allotment()?.rules ?? []);
+  // The bar itself carries no renewal date — that lives on whichever rule
+  // is flagged as the bar rule, matched by `allotmentBar.ruleId`.
+  readonly allotmentBarRenewsOn = computed(() => {
+    const bar = this.allotmentBar();
+    if (!bar) {
+      return null;
+    }
+    return this.allotmentRules().find((rule) => rule.ruleId === bar.ruleId)?.cycle.renewsOn ?? null;
+  });
+
+  lineTag(cartItemId: number): PayTag | null {
+    return this.allotment()?.lineTags.find((tag) => tag.cartItemId === cartItemId) ?? null;
+  }
+
   ngOnInit(): void {
     if (this.isBrowser) {
       this.tenantSettingsService.load().subscribe();
-      // Fire-and-forget: a failed fetch just leaves the badge/drawer
-      // showing whatever the shared `cart` signal already had (typically
-      // the still-empty initial value) rather than anywhere in the header
-      // surfacing an error of its own — an explicit error handler here
-      // just keeps that failure from going fully unhandled.
-      this.cartService.load().subscribe({ error: () => {} });
     }
   }
 
@@ -294,15 +342,29 @@ export class Header implements OnInit {
 
   readonly cartItemOptionsLabel = formatCartItemOptions;
 
-  removeCartItem(skuId: number): void {
-    this.cartRemovingSkuId.set(skuId);
-    this.cartService.removeItem(skuId).subscribe({
-      // Both branches just clear the in-flight flag — the cart signal
-      // itself is already updated by the service on success, and there's
-      // nowhere in this drawer to surface a remove failure beyond that.
-      next: () => this.cartRemovingSkuId.set(null),
-      error: () => this.cartRemovingSkuId.set(null),
-    });
+  removeCartItem(item: CartItem): void {
+    this.confirmService
+      .ask({
+        title: 'Remove item',
+        message: `Remove ${item.productTitle} from your cart?`,
+        confirmLabel: 'Remove',
+        danger: true,
+      })
+      .subscribe((confirmed) => {
+        if (!confirmed) {
+          return;
+        }
+        this.cartRemovingSkuId.set(item.skuId);
+        const locationId = this.activeLocation()?.locationId ?? null;
+        this.cartService.removeItem(item.skuId, locationId).subscribe({
+          // Both branches just clear the in-flight flag — the cart signal
+          // itself is already updated by the service on success, and
+          // there's nowhere in this drawer to surface a remove failure
+          // beyond that.
+          next: () => this.cartRemovingSkuId.set(null),
+          error: () => this.cartRemovingSkuId.set(null),
+        });
+      });
   }
 
   logOut(): void {

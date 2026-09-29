@@ -4,6 +4,7 @@ import { provideRouter } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 
 import { Cart } from '../../core/cart/cart';
+import { ConfirmService } from '../../shared/confirm/confirm';
 import { CartPage } from './cart-page';
 
 const CART: Cart = {
@@ -11,6 +12,7 @@ const CART: Cart = {
   itemCount: 3,
   subtotalPrice: 269.97,
   subtotalPoints: 450,
+  allotment: null,
   items: [
     {
       cartItemId: 9001,
@@ -127,6 +129,57 @@ describe('CartPage', () => {
     expect(fixture.nativeElement.querySelectorAll('.cart-page__row').length).toBe(2);
   });
 
+  it("should link each line's thumbnail and name to a plain (non-edit) product view", () => {
+    const fixture = TestBed.createComponent(CartPage);
+    fixture.detectChanges();
+    flushInitialCartLoads(httpMock, CART);
+    fixture.detectChanges();
+
+    const row: HTMLElement = fixture.nativeElement.querySelectorAll('.cart-page__row')[0];
+    const expectedHref = '/product/12345';
+    expect(row.querySelector('.cart-page__thumb-link')?.getAttribute('href')).toBe(expectedHref);
+    expect(row.querySelector('.cart-page__name')?.getAttribute('href')).toBe(expectedHref);
+  });
+
+  it('should link the explicit Edit action to the product page in edit mode', () => {
+    const fixture = TestBed.createComponent(CartPage);
+    fixture.detectChanges();
+    flushInitialCartLoads(httpMock, CART);
+    fixture.detectChanges();
+
+    const row: HTMLElement = fixture.nativeElement.querySelectorAll('.cart-page__row')[0];
+    const editLink = row.querySelector('.cart-page__edit');
+    expect(editLink?.getAttribute('href')).toBe('/product/12345?cartItemId=9001');
+    expect(editLink?.textContent?.trim()).toBe('Edit');
+  });
+
+  it("should show each line's pay-with tag, matched by cartItemId", () => {
+    const fixture = TestBed.createComponent(CartPage);
+    fixture.detectChanges();
+
+    flushInitialCartLoads(httpMock, {
+      ...CART,
+      allotment: {
+        programId: 3,
+        allotmentBar: null,
+        ruleCount: 1,
+        rules: [],
+        approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+        openOrders: null,
+        lineTags: [
+          { cartItemId: 9001, skuId: 9001, ruleId: 11, payUnit: 'DOLLARS', tagLabel: '$ allotment' },
+        ],
+        productTag: null,
+      },
+    });
+    fixture.detectChanges();
+
+    const rows: HTMLElement[] = fixture.nativeElement.querySelectorAll('.cart-page__row');
+    expect(rows[0].querySelector('.pay-tag')?.textContent?.trim()).toBe('$ allotment');
+    // The second line has no matching tag — nothing covers it.
+    expect(rows[1].querySelector('.pay-tag')).toBeNull();
+  });
+
   it('should show the empty state and no rows when the cart has nothing in it', () => {
     const fixture = TestBed.createComponent(CartPage);
     fixture.detectChanges();
@@ -169,7 +222,7 @@ describe('CartPage', () => {
 
     expect(page.updatingSkuId()).toBe(9001);
     const req = expectCartRequest(httpMock, '*UPDATE_QT');
-    expect(req.request.body).toEqual({ action: '*UPDATE_QT', skuId: 9001, qty: 3 });
+    expect(req.request.body).toEqual({ action: '*UPDATE_QT', skuId: 9001, qty: 3, locationId: null });
     req.flush({ ...CART, items: [{ ...CART.items[0], quantity: 3 }, CART.items[1]] });
     fixture.detectChanges();
 
@@ -188,7 +241,32 @@ describe('CartPage', () => {
     expect(httpMock.match((req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCCART')).toHaveLength(0);
   });
 
-  it('should remove a line', () => {
+  it('should remove a line once the confirmation is accepted', () => {
+    const fixture = TestBed.createComponent(CartPage);
+    const page = fixture.componentInstance;
+    fixture.detectChanges();
+    flushInitialCartLoads(httpMock, CART);
+    fixture.detectChanges();
+
+    const confirmService = TestBed.inject(ConfirmService);
+    page.removeItem(CART.items[1]);
+    expect(confirmService.request()).toEqual({
+      title: 'Remove item',
+      message: 'Remove Duty Belt from your cart?',
+      confirmLabel: 'Remove',
+      cancelLabel: 'Cancel',
+      danger: true,
+    });
+    confirmService.respond(true);
+    const req = expectCartRequest(httpMock, '*RMV_ITEM');
+    expect(req.request.body).toEqual({ action: '*RMV_ITEM', skuId: 9002, locationId: null });
+    req.flush({ ...CART, items: [CART.items[0]] });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.cart-page__row').length).toBe(1);
+  });
+
+  it('should not remove a line when the confirmation is declined', () => {
     const fixture = TestBed.createComponent(CartPage);
     const page = fixture.componentInstance;
     fixture.detectChanges();
@@ -196,15 +274,40 @@ describe('CartPage', () => {
     fixture.detectChanges();
 
     page.removeItem(CART.items[1]);
-    const req = expectCartRequest(httpMock, '*RMV_ITEM');
-    expect(req.request.body).toEqual({ action: '*RMV_ITEM', skuId: 9002 });
-    req.flush({ ...CART, items: [CART.items[0]] });
-    fixture.detectChanges();
+    TestBed.inject(ConfirmService).respond(false);
 
-    expect(fixture.nativeElement.querySelectorAll('.cart-page__row').length).toBe(1);
+    httpMock.expectNone((req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCCART' && req.body?.action === '*RMV_ITEM');
+    expect(fixture.nativeElement.querySelectorAll('.cart-page__row').length).toBe(2);
   });
 
-  it('should clear the whole cart', () => {
+  it('should clear the whole cart once the confirmation is accepted', () => {
+    const fixture = TestBed.createComponent(CartPage);
+    const page = fixture.componentInstance;
+    fixture.detectChanges();
+    flushInitialCartLoads(httpMock, CART);
+    fixture.detectChanges();
+
+    const confirmService = TestBed.inject(ConfirmService);
+    page.clearCart();
+    expect(confirmService.request()).toEqual({
+      title: 'Clear cart',
+      message: 'Remove all items from your cart?',
+      confirmLabel: 'Clear cart',
+      cancelLabel: 'Cancel',
+      danger: true,
+    });
+    confirmService.respond(true);
+    expect(page.clearing()).toBe(true);
+    const req = expectCartRequest(httpMock, '*CLEAR');
+    expect(req.request.body).toEqual({ action: '*CLEAR', locationId: null });
+    req.flush({ cartId: 501, itemCount: 0, subtotalPrice: 0, subtotalPoints: null, items: [] });
+    fixture.detectChanges();
+
+    expect(page.clearing()).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain('Your cart is empty.');
+  });
+
+  it('should not clear the cart when the confirmation is declined', () => {
     const fixture = TestBed.createComponent(CartPage);
     const page = fixture.componentInstance;
     fixture.detectChanges();
@@ -212,14 +315,10 @@ describe('CartPage', () => {
     fixture.detectChanges();
 
     page.clearCart();
-    expect(page.clearing()).toBe(true);
-    const req = expectCartRequest(httpMock, '*CLEAR');
-    expect(req.request.body).toEqual({ action: '*CLEAR' });
-    req.flush({ cartId: 501, itemCount: 0, subtotalPrice: 0, subtotalPoints: null, items: [] });
-    fixture.detectChanges();
+    TestBed.inject(ConfirmService).respond(false);
 
     expect(page.clearing()).toBe(false);
-    expect(fixture.nativeElement.textContent).toContain('Your cart is empty.');
+    httpMock.expectNone((req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCCART' && req.body?.action === '*CLEAR');
   });
 
   it('should surface the API message when a quantity update fails', () => {

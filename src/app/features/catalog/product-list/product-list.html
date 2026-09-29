@@ -2,12 +2,16 @@
 
 <section class="product-list">
   <div class="container py-3">
-    <nav aria-label="breadcrumb">
-      <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a routerLink="/home">Home</a></li>
-        <li class="breadcrumb-item active" aria-current="page">{{ pageTitle() }}</li>
-      </ol>
-    </nav>
+    @if (hasBreadcrumb()) {
+      <app-breadcrumb [items]="breadcrumb()!.breadcrumb" />
+    } @else {
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a routerLink="/home">Home</a></li>
+          <li class="breadcrumb-item active" aria-current="page">{{ pageTitle() }}</li>
+        </ol>
+      </nav>
+    }
 
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
       <h1 class="product-list__title mb-0">{{ pageTitle() }}</h1>
@@ -122,7 +126,7 @@
               <div class="col">
                 <a
                   [routerLink]="['/product', product.productPk]"
-                  [queryParams]="{ name: product.title }"
+                  [queryParams]="{ name: product.title, categoryId: activeCategoryId() }"
                   class="card h-100 border-0 shadow-sm product-card text-decoration-none text-reset"
                 >
                   <div class="ratio ratio-1x1 bg-white">

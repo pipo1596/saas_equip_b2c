@@ -37,6 +37,8 @@ const PRODUCT: ProductDetailInfo = {
   maxPrice: 94.99,
 };
 
+const LOCATION_ID = 18;
+
 describe('ProductDetailService', () => {
   let service: ProductDetailService;
   let httpMock: HttpTestingController;
@@ -54,10 +56,10 @@ describe('ProductDetailService', () => {
   describe('load', () => {
     it('posts *GET with the productPk and groups the flat options list into axes', () => {
       let result: ProductDetailData | undefined;
-      service.load(12345).subscribe((data) => (result = data));
+      service.load(12345, LOCATION_ID).subscribe((data) => (result = data));
 
       const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCPRDDTL');
-      expect(req.request.body).toEqual({ action: '*GET', productPk: 12345 });
+      expect(req.request.body).toEqual({ action: '*GET', productPk: 12345, locationId: LOCATION_ID });
       req.flush({
         product: PRODUCT,
         images: null,
@@ -74,9 +76,84 @@ describe('ProductDetailService', () => {
       expect(result?.axes.map((axis) => axis.optName)).toEqual(['Color', 'Size']);
     });
 
+    it('includes categoryId in the body when the shopper came from a listing', () => {
+      service.load(12345, LOCATION_ID, 45).subscribe();
+
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCPRDDTL');
+      expect(req.request.body).toEqual({
+        action: '*GET',
+        productPk: 12345,
+        locationId: LOCATION_ID,
+        categoryId: 45,
+      });
+      req.flush({ product: PRODUCT, images: null, options: null });
+    });
+
+    it('passes through the breadcrumb, normalizing a missing inner trail to []', () => {
+      let result: ProductDetailData | undefined;
+      service.load(12345, LOCATION_ID).subscribe((data) => (result = data));
+
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCPRDDTL').flush({
+        product: PRODUCT,
+        images: null,
+        options: null,
+        breadcrumb: {
+          programId: 3,
+          programName: 'ANB Standard Program',
+          progCatId: 52,
+          breadcrumb: null,
+        },
+      });
+
+      expect(result?.breadcrumb).toEqual({
+        programId: 3,
+        programName: 'ANB Standard Program',
+        progCatId: 52,
+        breadcrumb: [],
+      });
+    });
+
+    it('passes through a real breadcrumb trail as-is', () => {
+      let result: ProductDetailData | undefined;
+      service.load(12345, LOCATION_ID).subscribe((data) => (result = data));
+
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCPRDDTL').flush({
+        product: PRODUCT,
+        images: null,
+        options: null,
+        breadcrumb: {
+          programId: 3,
+          programName: 'ANB Standard Program',
+          progCatId: 52,
+          breadcrumb: [
+            { progCatId: 40, categoryName: 'Clothing' },
+            { progCatId: 45, categoryName: 'Shirts' },
+            { progCatId: 52, categoryName: 'Polos' },
+          ],
+        },
+      });
+
+      expect(result?.breadcrumb?.breadcrumb).toEqual([
+        { progCatId: 40, categoryName: 'Clothing' },
+        { progCatId: 45, categoryName: 'Shirts' },
+        { progCatId: 52, categoryName: 'Polos' },
+      ]);
+    });
+
+    it('normalizes a missing breadcrumb to null', () => {
+      let result: ProductDetailData | undefined;
+      service.load(12345, LOCATION_ID).subscribe((data) => (result = data));
+
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCPRDDTL')
+        .flush({ product: PRODUCT, images: null, options: null });
+
+      expect(result?.breadcrumb).toBeNull();
+    });
+
     it('normalizes a null options/images list to empty arrays', () => {
       let result: ProductDetailData | undefined;
-      service.load(12345).subscribe((data) => (result = data));
+      service.load(12345, LOCATION_ID).subscribe((data) => (result = data));
 
       httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCPRDDTL').flush({
         product: PRODUCT,
@@ -90,7 +167,7 @@ describe('ProductDetailService', () => {
 
     it('passes through the attributes array, and normalizes a missing one to []', () => {
       let result: ProductDetailData | undefined;
-      service.load(12345).subscribe((data) => (result = data));
+      service.load(12345, LOCATION_ID).subscribe((data) => (result = data));
 
       httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCPRDDTL').flush({
         product: PRODUCT,
@@ -110,7 +187,7 @@ describe('ProductDetailService', () => {
 
     it('normalizes a missing attributes field to []', () => {
       let result: ProductDetailData | undefined;
-      service.load(12345).subscribe((data) => (result = data));
+      service.load(12345, LOCATION_ID).subscribe((data) => (result = data));
 
       httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCPRDDTL').flush({
         product: PRODUCT,
@@ -123,7 +200,7 @@ describe('ProductDetailService', () => {
 
     it('drops duplicate images that share the same imageUrl', () => {
       let result: ProductDetailData | undefined;
-      service.load(12345).subscribe((data) => (result = data));
+      service.load(12345, LOCATION_ID).subscribe((data) => (result = data));
 
       httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCPRDDTL').flush({
         product: PRODUCT,
@@ -147,7 +224,7 @@ describe('ProductDetailService', () => {
       // exact same handful of photos. Deduping by URL is what keeps the
       // gallery to just those distinct photos instead of one entry per SKU.
       let result: ProductDetailData | undefined;
-      service.load(12345).subscribe((data) => (result = data));
+      service.load(12345, LOCATION_ID).subscribe((data) => (result = data));
 
       httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCPRDDTL').flush({
         product: PRODUCT,
@@ -165,7 +242,7 @@ describe('ProductDetailService', () => {
 
     it('passes through each image\'s own optionIds, and normalizes a missing one to []', () => {
       let result: ProductDetailData | undefined;
-      service.load(12345).subscribe((data) => (result = data));
+      service.load(12345, LOCATION_ID).subscribe((data) => (result = data));
 
       httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCPRDDTL').flush({
         product: PRODUCT,
@@ -184,7 +261,7 @@ describe('ProductDetailService', () => {
 
     it('errors with the API message when the response carries no product', () => {
       let error: unknown;
-      service.load(12345).subscribe({ error: (err) => (error = err) });
+      service.load(12345, LOCATION_ID).subscribe({ error: (err) => (error = err) });
 
       httpMock
         .expectOne('/cgi/APPSCDSPCH?SEPGM=APCPRDDTL')
@@ -195,7 +272,7 @@ describe('ProductDetailService', () => {
 
     it('falls back to a generic message when the API omits one', () => {
       let error: unknown;
-      service.load(12345).subscribe({ error: (err) => (error = err) });
+      service.load(12345, LOCATION_ID).subscribe({ error: (err) => (error = err) });
 
       httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCPRDDTL').flush({ success: false, message: null });
 
@@ -206,13 +283,14 @@ describe('ProductDetailService', () => {
   describe('checkAvailability', () => {
     it('posts *AVAIL with the productPk and one {optId} entry per selection', () => {
       let result: ProductAvailabilityResult | undefined;
-      service.checkAvailability(12345, [101]).subscribe((data) => (result = data));
+      service.checkAvailability(12345, [101], LOCATION_ID).subscribe((data) => (result = data));
 
       const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCPRDDTL');
       expect(req.request.body).toEqual({
         action: '*AVAIL',
         productPk: 12345,
         selections: [{ optId: 101 }],
+        locationId: LOCATION_ID,
       });
       req.flush({
         resolvedSkuId: null,
@@ -230,16 +308,21 @@ describe('ProductDetailService', () => {
     });
 
     it('sends an empty selections array for the very first, unfiltered check', () => {
-      service.checkAvailability(12345, []).subscribe();
+      service.checkAvailability(12345, [], LOCATION_ID).subscribe();
 
       const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCPRDDTL');
-      expect(req.request.body).toEqual({ action: '*AVAIL', productPk: 12345, selections: [] });
+      expect(req.request.body).toEqual({
+        action: '*AVAIL',
+        productPk: 12345,
+        selections: [],
+        locationId: LOCATION_ID,
+      });
       req.flush({ resolvedSkuId: null, axes: [] });
     });
 
     it('passes through a resolved skuId once the selection is complete', () => {
       let result: ProductAvailabilityResult | undefined;
-      service.checkAvailability(12345, [101, 201]).subscribe((data) => (result = data));
+      service.checkAvailability(12345, [101, 201], LOCATION_ID).subscribe((data) => (result = data));
 
       httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCPRDDTL').flush({
         resolvedSkuId: 9001,
@@ -254,7 +337,7 @@ describe('ProductDetailService', () => {
 
     it('errors with the API message when the response carries no axes', () => {
       let error: unknown;
-      service.checkAvailability(12345, []).subscribe({ error: (err) => (error = err) });
+      service.checkAvailability(12345, [], LOCATION_ID).subscribe({ error: (err) => (error = err) });
 
       httpMock
         .expectOne('/cgi/APPSCDSPCH?SEPGM=APCPRDDTL')
@@ -267,10 +350,10 @@ describe('ProductDetailService', () => {
   describe('getSku', () => {
     it('posts *GET_SKU with the skuId and returns the sku record', () => {
       let result: ProductSkuDetail | undefined;
-      service.getSku(9001).subscribe((data) => (result = data));
+      service.getSku(9001, LOCATION_ID).subscribe((data) => (result = data));
 
       const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCPRDDTL');
-      expect(req.request.body).toEqual({ action: '*GET_SKU', skuId: 9001 });
+      expect(req.request.body).toEqual({ action: '*GET_SKU', skuId: 9001, locationId: LOCATION_ID });
       req.flush({
         skuId: 9001,
         productPk: 12345,
@@ -292,7 +375,7 @@ describe('ProductDetailService', () => {
 
     it('errors with the API message when the response carries no skuId', () => {
       let error: unknown;
-      service.getSku(9001).subscribe({ error: (err) => (error = err) });
+      service.getSku(9001, LOCATION_ID).subscribe({ error: (err) => (error = err) });
 
       httpMock
         .expectOne('/cgi/APPSCDSPCH?SEPGM=APCPRDDTL')

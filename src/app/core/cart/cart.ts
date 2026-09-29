@@ -3,6 +3,25 @@ import { Injectable, inject, signal } from '@angular/core';
 import { Observable, finalize, map, tap } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
+import { Allotment, RawAllotment, normalizeAllotment } from './allotment';
+
+export type {
+  Allotment,
+  AllotmentBar,
+  AllotmentCarryover,
+  AllotmentCategoryRef,
+  AllotmentCovers,
+  AllotmentCycle,
+  AllotmentQuota,
+  AllotmentRule,
+  AllotmentUnitGrant,
+  Balance,
+  LineTag,
+  PayTag,
+  PayUnit,
+  ProductTag,
+} from './allotment';
+export { meterPct, tileBalance } from './allotment';
 
 // Just the display labels for this line's variant (Color/Size/etc.) — for
 // building an actual selector UI for this sku, that's the product detail
@@ -46,6 +65,9 @@ export interface Cart {
   // items at all — treat that as "not applicable", not as zero.
   subtotalPoints: number | null;
   items: CartItem[];
+  // `null` only when the allotment lookup itself failed — never blocks the
+  // rest of the cart from loading.
+  allotment: Allotment | null;
 }
 
 // What an employee who's never added anything gets back from `*GET` — not
@@ -58,6 +80,7 @@ const EMPTY_CART: Cart = {
   subtotalPrice: 0,
   subtotalPoints: null,
   items: [],
+  allotment: null,
 };
 
 interface RawCart {
@@ -66,6 +89,7 @@ interface RawCart {
   subtotalPrice: number;
   subtotalPoints: number | null;
   items: CartItem[] | null;
+  allotment: RawAllotment | null;
 }
 
 interface ApiFailure {
@@ -77,6 +101,7 @@ function normalizeCart(raw: RawCart): Cart {
   return {
     ...raw,
     items: (raw.items ?? []).map((item) => ({ ...item, options: item.options ?? [] })),
+    allotment: normalizeAllotment(raw.allotment),
   };
 }
 
@@ -102,19 +127,37 @@ export class CartService {
     this.drawerOpen.set(false);
   }
 
-  load(): Observable<Cart> {
+  // Same reasoning as `drawerOpen` — owned here so e.g. product detail's
+  // "View rule" link can expand the header's own Rules panel without
+  // reaching into the header component itself.
+  readonly rulesMenuOpen = signal(false);
+
+  openRulesMenu(): void {
+    this.rulesMenuOpen.set(true);
+  }
+
+  closeRulesMenu(): void {
+    this.rulesMenuOpen.set(false);
+  }
+
+  // `locationId` scopes the allotment breakdown to the shopper's active
+  // location (the same value passed to `APCTPCVEW`) — `null` only in the
+  // narrow window before one's known yet. `productPk`, product detail page
+  // only, also returns `allotment.productTag` for that specific product.
+  load(locationId: number | null, productPk?: number): Observable<Cart> {
     this.loading.set(true);
-    return this.request({ action: '*GET' }, 'We could not load your cart.').pipe(
-      finalize(() => this.loading.set(false)),
-    );
+    return this.request(
+      { action: '*GET', locationId, ...(productPk !== undefined ? { productPk } : {}) },
+      'We could not load your cart.',
+    ).pipe(finalize(() => this.loading.set(false)));
   }
 
   // `qty` is how many to add *on top of* whatever's already there, not a
   // "set exact quantity" — adding a sku already in the cart just bumps it,
   // never creates a second row.
-  addItem(skuId: number, qty = 1): Observable<Cart> {
+  addItem(skuId: number, locationId: number | null, qty = 1): Observable<Cart> {
     return this.request(
-      { action: '*ADD_ITEM', skuId, qty },
+      { action: '*ADD_ITEM', skuId, locationId, qty },
       'We could not add that to your cart.',
     );
   }
@@ -125,9 +168,9 @@ export class CartService {
   // just to zero a line out. Removing a sku that isn't in the cart at all
   // is safe too (returns the current, unchanged cart, not an error) — fine
   // to fire off without guarding against double-clicks or stale state.
-  removeItem(skuId: number, qty?: number): Observable<Cart> {
+  removeItem(skuId: number, locationId: number | null, qty?: number): Observable<Cart> {
     return this.request(
-      { action: '*RMV_ITEM', skuId, ...(qty !== undefined ? { qty } : {}) },
+      { action: '*RMV_ITEM', skuId, locationId, ...(qty !== undefined ? { qty } : {}) },
       'We could not remove that from your cart.',
     );
   }
@@ -136,16 +179,16 @@ export class CartService {
   // exact new quantity for the line — what an actual quantity stepper/input
   // should call. `qty <= 0` deletes the line (a stepper naturally reaches
   // 0); a skuId not currently in the cart is a no-op, not an implicit add.
-  setQuantity(skuId: number, qty: number): Observable<Cart> {
+  setQuantity(skuId: number, qty: number, locationId: number | null): Observable<Cart> {
     return this.request(
-      { action: '*UPDATE_QT', skuId, qty },
+      { action: '*UPDATE_QT', skuId, qty, locationId },
       'We could not update that quantity.',
     );
   }
 
   // Removes every line. A no-op (not an error) on an already-empty cart.
-  clear(): Observable<Cart> {
-    return this.request({ action: '*CLEAR' }, 'We could not clear your cart.');
+  clear(locationId: number | null): Observable<Cart> {
+    return this.request({ action: '*CLEAR', locationId }, 'We could not clear your cart.');
   }
 
   // All five actions return the exact same full-cart shape (including all

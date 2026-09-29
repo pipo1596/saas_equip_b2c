@@ -33,19 +33,28 @@
             <div class="cart-page__panel">
               @for (item of cart().items; track item.cartItemId) {
                 <div class="cart-page__row">
-                  @if (item.imageUrl) {
-                    <div class="cart-page__thumb" [style.backgroundImage]="'url(' + item.imageUrl + ')'" aria-hidden="true"></div>
-                  } @else {
-                    <div class="cart-page__thumb" aria-hidden="true"></div>
-                  }
+                  <a
+                    class="cart-page__thumb-link"
+                    [routerLink]="['/product', item.productPk]"
+                    [attr.aria-label]="'View ' + item.productTitle"
+                  >
+                    @if (item.imageUrl) {
+                      <div class="cart-page__thumb" [style.backgroundImage]="'url(' + item.imageUrl + ')'" aria-hidden="true"></div>
+                    } @else {
+                      <div class="cart-page__thumb" aria-hidden="true"></div>
+                    }
+                  </a>
                   <div class="cart-page__body">
-                    <div class="cart-page__name">{{ item.productTitle }}</div>
+                    <a class="cart-page__name" [routerLink]="['/product', item.productPk]">
+                      {{ item.productTitle }}
+                    </a>
                     <div class="cart-page__sku">
                       {{ item.skuCode }}
                       @if (item.options.length > 0) {
                         · {{ formatOptions(item) }}
                       }
                     </div>
+                    <app-pay-tag [tag]="lineTag(item.cartItemId)" />
                     @if (item.isAvailable === 'N') {
                       <p class="cart-page__flag text-danger">No longer available</p>
                     } @else if (item.priceChanged === 'Y') {
@@ -53,14 +62,25 @@
                         Price updated to {{ item.currentPrice | currency }} since you added this.
                       </p>
                     }
-                    <button
-                      type="button"
-                      class="cart-page__remove"
-                      [disabled]="updatingSkuId() === item.skuId || clearing()"
-                      (click)="removeItem(item)"
-                    >
-                      Remove
-                    </button>
+                    <div class="cart-page__actions">
+                      <a
+                        class="cart-page__edit"
+                        [routerLink]="['/product', item.productPk]"
+                        [queryParams]="{ cartItemId: item.cartItemId }"
+                        [attr.aria-label]="'Edit ' + item.productTitle"
+                      >
+                        Edit
+                      </a>
+                      <span class="cart-page__actions-sep" aria-hidden="true">·</span>
+                      <button
+                        type="button"
+                        class="cart-page__remove"
+                        [disabled]="updatingSkuId() === item.skuId || clearing()"
+                        (click)="removeItem(item)"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
                   <div class="qty-stepper">
                     <button

@@ -10,14 +10,16 @@
     <div class="row g-4">
     <div class="col-12 col-sm-6 col-lg-4">
       @if (tenantSettings(); as tenant) {
-        <span class="foot__logo" [style.height.px]="footLogoHeight()">
-          <img
-            [ngSrc]="tenant.logo_url"
-            fill
-            alt="{{ tenant.comp_name }}"
-            (load)="onFootLogoLoad($event)"
-          />
-        </span>
+        @if (tenant.logo_url) {
+          <span class="foot__logo" [style.height.px]="footLogoHeight()">
+            <img
+              [ngSrc]="tenant.logo_url"
+              fill
+              alt="{{ tenant.comp_name }}"
+              (load)="onFootLogoLoad($event)"
+            />
+          </span>
+        }
       }
       <p>Your department's uniform procurement portal.</p>
       <ul class="links foot__links list-unstyled">
