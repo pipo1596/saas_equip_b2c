@@ -1,0 +1,349 @@
+:host {
+  display: block;
+  background: #e9f0f7;
+  min-height: 60vh;
+}
+
+.checkout-page__title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(24px, 3vw, 32px);
+  color: var(--navy);
+  letter-spacing: -0.4px;
+}
+
+.checkout-page__empty {
+  color: var(--slate-600);
+}
+
+.checkout-page__panel {
+  background: #fff;
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+
+.checkout-page__section-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--slate-900);
+  margin: 0 0 14px;
+}
+
+.checkout-page__empty-note {
+  font-size: 13px;
+  color: var(--slate-500);
+  margin: 0;
+}
+
+.checkout-page__options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.checkout-page__edit-link {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--action);
+  cursor: pointer;
+}
+.checkout-page__edit-link:hover {
+  text-decoration: underline;
+}
+
+.checkout-page__address-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--action);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--action) 5%, white);
+}
+
+.checkout-page__method-select {
+  width: 100%;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border: 1.5px solid var(--slate-200);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--slate-900);
+  background: #fff;
+}
+.checkout-page__method-select:focus {
+  outline: none;
+  border-color: var(--action);
+}
+.checkout-page__method-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--action);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--action) 5%, white);
+}
+
+.checkout-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--slate-200);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.checkout-option:hover {
+  border-color: var(--slate-400);
+}
+.checkout-option--active {
+  border-color: var(--action);
+  background: color-mix(in srgb, var(--action) 5%, white);
+}
+.checkout-option input[type='radio'] {
+  margin-top: 3px;
+  flex: none;
+}
+.checkout-option__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.checkout-option__title {
+  font-size: 13.5px;
+  color: var(--slate-900);
+}
+.checkout-option__line {
+  font-size: 12.5px;
+  color: var(--slate-600);
+}
+.checkout-option__price {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--navy);
+  white-space: nowrap;
+}
+
+.checkout-page__item-list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.checkout-page__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--slate-100);
+}
+.checkout-page__item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.checkout-page__thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: linear-gradient(160deg, #edf1f6, #dde5ef);
+  background-size: cover;
+  background-position: center;
+  flex: none;
+}
+.checkout-page__item-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.checkout-page__item-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--slate-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.checkout-page__item-sku {
+  font-size: 11.5px;
+  color: var(--slate-400);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.checkout-page__item-price {
+  flex: none;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--navy);
+}
+
+.checkout-page__summary {
+  background: #fff;
+  border-radius: 10px;
+  padding: 24px;
+  position: sticky;
+  top: 88px;
+}
+.checkout-page__summary-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--slate-900);
+}
+.checkout-page__summary-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--slate-500);
+  margin: 0 0 8px;
+}
+.checkout-page__summary-amount--dollars {
+  color: var(--action);
+}
+.checkout-page__summary-amount--units {
+  color: var(--good);
+}
+
+.checkout-page__card-brands-img {
+  width: 200px;
+  height: auto;
+  flex: none;
+}
+
+.checkout-page__cc-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  border: 1.5px solid var(--action);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--action) 8%, white);
+}
+.checkout-page__cc-total-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--action);
+}
+.checkout-page__cc-total-amount {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 19px;
+  color: var(--action);
+}
+
+.checkout-page__cc-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+.checkout-page__cc-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.checkout-page__cc-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--slate-600);
+}
+.checkout-page__cc-input {
+  padding: 10px 12px;
+  border: 1.5px solid var(--slate-200);
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--slate-900);
+  background: #fff;
+}
+.checkout-page__cc-input:focus {
+  outline: none;
+  border-color: var(--action);
+}
+
+.checkout-page__place-order {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--action);
+  color: #fff;
+  cursor: pointer;
+}
+.checkout-page__place-order:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.checkout-page__place-order-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+}
+.checkout-page__place-order-sub {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+@media (max-width: 991.98px) {
+  .checkout-page__item {
+    flex-wrap: wrap;
+  }
+}
+
+.address-picker-dialog {
+  /* Bootstrap only defines these custom properties on its own .modal
+     wrapper, which this deliberately doesn't use (the native <dialog>
+     handles positioning/backdrop itself) — without redeclaring them here,
+     .modal-content's background/border/padding below all resolve to
+     nothing, rendering as unstyled, see-through text. Same fix as
+     ConfirmDialog's own — styles don't cross component boundaries. */
+  --bs-modal-padding: 1rem;
+  --bs-modal-color: var(--bs-body-color);
+  --bs-modal-bg: var(--bs-body-bg);
+  --bs-modal-border-color: var(--bs-border-color-translucent);
+  --bs-modal-border-width: var(--bs-border-width);
+  --bs-modal-border-radius: var(--bs-border-radius-lg);
+  --bs-modal-inner-border-radius: calc(var(--bs-border-radius-lg) - var(--bs-border-width));
+  --bs-modal-header-padding-x: 1rem;
+  --bs-modal-header-padding-y: 1rem;
+  --bs-modal-header-padding: 1rem 1rem;
+  --bs-modal-header-border-color: var(--bs-border-color);
+  --bs-modal-header-border-width: var(--bs-border-width);
+  --bs-modal-title-line-height: 1.5;
+  --bs-modal-footer-gap: 0.5rem;
+  --bs-modal-footer-bg: ;
+  --bs-modal-footer-border-color: var(--bs-border-color);
+  --bs-modal-footer-border-width: var(--bs-border-width);
+  padding: 0;
+  border: none;
+  background: transparent;
+  width: min(520px, calc(100vw - 32px));
+  max-width: none;
+}
+.address-picker-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.5);
+}
+.address-picker-dialog .modal-body {
+  max-height: 60vh;
+  overflow-y: auto;
+}

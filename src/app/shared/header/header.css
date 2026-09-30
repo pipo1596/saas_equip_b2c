@@ -517,10 +517,38 @@
 }
 
 /* ---------- cart drawer + overlay ----------
-   Position, size, backdrop, header/close button and open/close transition
-   all come from Bootstrap's own `.offcanvas`/`.offcanvas-end` and
-   `.offcanvas-backdrop` — see header.html. Just the cart-specific content
-   (line items, quantity pill, totals) stays custom below. */
+   Position, size, header/close button and open/close transition all come
+   from Bootstrap's own `.offcanvas`/`.offcanvas-end` classes — see
+   header.html. It's hosted on a native <dialog> (shown via showModal())
+   rather than a plain <aside> so it gets a real focus trap, Escape-to-
+   close, and focus restored to whatever opened it for free.
+
+   The native <dialog> element's own UA stylesheet sets `margin: auto`,
+   `inset: 0` and `height: fit-content` — meant to center a plain dialog
+   box. Bootstrap's `.offcanvas-end` only overrides `top`/`right`/`width`,
+   so those UA defaults survive underneath it and fight its positioning:
+   `margin: auto` + a leftover `left: 0` centers the panel instead of
+   pinning it to the right edge, and `height: fit-content` shrinks it to
+   its content instead of the full viewport height (cutting off whatever
+   doesn't fit, like the Checkout button). The rules below reset exactly
+   those, and give the dialog's native ::backdrop the same dimming
+   Bootstrap's own `.offcanvas-backdrop` used to provide manually. Just the
+   cart-specific content (line items, quantity pill, totals) stays custom
+   further down. */
+dialog.offcanvas {
+  max-width: none;
+  max-height: none;
+  height: auto;
+  border: none;
+  padding: 0;
+  margin: 0;
+  top: 0;
+  bottom: 0;
+  left: auto;
+}
+dialog.offcanvas::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
 .cart-empty {
   color: var(--slate-500);
   font-size: 14px;

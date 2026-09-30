@@ -1,0 +1,304 @@
+<app-header />
+
+<section class="checkout-page">
+  <div class="container py-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a routerLink="/home">Home</a></li>
+        <li class="breadcrumb-item"><a routerLink="/cart">Your Cart</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Checkout</li>
+      </ol>
+    </nav>
+
+    <h1 class="checkout-page__title mb-3">Checkout</h1>
+
+    @if (loading()) {
+      <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading checkout…</span>
+        </div>
+      </div>
+    } @else {
+      @if (error(); as message) {
+        <div class="alert alert-danger" role="alert">{{ message }}</div>
+      }
+
+      @if (cart().items.length === 0) {
+        <div class="checkout-page__empty text-center py-5">
+          <p class="mb-3">Your cart is empty.</p>
+          <a routerLink="/products/full-catalog" class="btn btn-primary">Continue shopping</a>
+        </div>
+      } @else {
+        <div class="row g-4">
+          <div class="col-lg-8">
+            <section class="checkout-page__panel">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="checkout-page__section-title mb-0">Shipping address</h2>
+                @if (shipAddrs().length > 0) {
+                  <button type="button" class="checkout-page__edit-link" (click)="openAddressPicker()">Edit</button>
+                }
+              </div>
+              @if (shipAddrs().length === 0) {
+                <p class="checkout-page__empty-note">
+                  No shipping address on file. Contact your admin to add one.
+                </p>
+              } @else if (selectedAddress(); as address) {
+                <div class="checkout-page__address-preview">
+                  @if (address.attention) {
+                    <strong class="checkout-option__title">{{ address.attention }}</strong>
+                  }
+                  <span class="checkout-option__line">{{ address.addressLine1 }}</span>
+                  @if (address.addressLine2) {
+                    <span class="checkout-option__line">{{ address.addressLine2 }}</span>
+                  }
+                  @if (address.addressLine3) {
+                    <span class="checkout-option__line">{{ address.addressLine3 }}</span>
+                  }
+                  <span class="checkout-option__line">
+                    {{ address.city }}, {{ address.province }} {{ address.postalCode }}, {{ address.country }}
+                  </span>
+                  @if (address.phone) {
+                    <span class="checkout-option__line">{{ address.phone }}</span>
+                  }
+                </div>
+              }
+            </section>
+
+            <section class="checkout-page__panel">
+              <h2 class="checkout-page__section-title">Shipping method</h2>
+              @if (shipMthds().length === 0) {
+                <p class="checkout-page__empty-note">
+                  No shipping method on file. Contact your admin to add one.
+                </p>
+              } @else {
+                <select
+                  class="checkout-page__method-select"
+                  aria-label="Shipping method"
+                  [value]="selectedShipMethodId()"
+                  (change)="selectShipMethod(+$any($event.target).value)"
+                >
+                  @for (method of shipMthds(); track method.shipMethodId) {
+                    <option [value]="method.shipMethodId">
+                      {{ method.methodName }} —
+                      {{ method.rateType === 'FLAT' ? (method.flatAmount | currency) : 'Calculated at fulfillment' }}
+                    </option>
+                  }
+                </select>
+
+                @if (selectedShipMethod(); as method) {
+                  <div class="checkout-page__method-preview">
+                    <span class="checkout-option__line">{{ method.carrier }} · {{ method.serviceCode }}</span>
+                    <span class="checkout-option__line">{{ method.estimatedDelivery }}</span>
+                  </div>
+                }
+              }
+            </section>
+
+            @if (orderTotal() > 0) {
+              <section class="checkout-page__panel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h2 class="checkout-page__section-title mb-0">Credit card</h2>
+                  <img
+                    ngSrc="/images/card-brands.png"
+                    width="900"
+                    height="172"
+                    class="checkout-page__card-brands-img"
+                    alt="Visa, Mastercard, American Express and Discover accepted"
+                  />
+                </div>
+                <div class="checkout-page__cc-total mb-3">
+                  <span class="checkout-page__cc-total-label">Amount to charge</span>
+                  <span class="checkout-page__cc-total-amount">{{ orderTotal() | currency }}</span>
+                </div>
+                <form [formGroup]="creditCardForm" class="checkout-page__cc-form">
+                  <label class="checkout-page__cc-label">
+                    Name on card
+                    <input
+                      type="text"
+                      formControlName="cardholderName"
+                      class="checkout-page__cc-input"
+                      autocomplete="cc-name"
+                      maxlength="120"
+                    />
+                  </label>
+                  <label class="checkout-page__cc-label">
+                    Card number
+                    <input
+                      type="text"
+                      formControlName="cardNumber"
+                      class="checkout-page__cc-input"
+                      inputmode="numeric"
+                      autocomplete="cc-number"
+                      placeholder="1234 5678 9012 3456"
+                      maxlength="19"
+                    />
+                  </label>
+                  <div class="checkout-page__cc-row">
+                    <label class="checkout-page__cc-label">
+                      Expiry
+                      <input
+                        type="text"
+                        formControlName="expiry"
+                        class="checkout-page__cc-input"
+                        inputmode="numeric"
+                        autocomplete="cc-exp"
+                        placeholder="MM/YY"
+                        maxlength="5"
+                      />
+                    </label>
+                    <label class="checkout-page__cc-label">
+                      CVC
+                      <input
+                        type="text"
+                        formControlName="cvc"
+                        class="checkout-page__cc-input"
+                        inputmode="numeric"
+                        autocomplete="cc-csc"
+                        placeholder="123"
+                        maxlength="4"
+                      />
+                    </label>
+                  </div>
+                </form>
+              </section>
+            }
+
+            <button type="button" class="checkout-page__place-order" disabled>
+              <span class="checkout-page__place-order-title">Place order</span>
+              <span class="checkout-page__place-order-sub">Coming soon</span>
+            </button>
+          </div>
+
+          <div class="col-lg-4">
+            <section class="checkout-page__panel">
+              <h2 class="checkout-page__section-title">Order items</h2>
+              <div class="checkout-page__item-list">
+                @for (item of cart().items; track item.cartItemId) {
+                  <div class="checkout-page__item">
+                    @if (item.imageUrl) {
+                      <div class="checkout-page__thumb" [style.backgroundImage]="'url(' + item.imageUrl + ')'" aria-hidden="true"></div>
+                    } @else {
+                      <div class="checkout-page__thumb" aria-hidden="true"></div>
+                    }
+                    <div class="checkout-page__item-body">
+                      <span class="checkout-page__item-name">{{ item.productTitle }}</span>
+                      <span class="checkout-page__item-sku">
+                        {{ item.skuCode }}
+                        @if (item.options.length > 0) {
+                          · {{ formatOptions(item) }}
+                        }
+                        · Qty {{ item.quantity }}
+                      </span>
+                    </div>
+                    <span class="checkout-page__item-price">{{ item.lineTotalPrice | currency }}</span>
+                  </div>
+                }
+              </div>
+            </section>
+
+            <div class="checkout-page__summary">
+              <h2 class="checkout-page__summary-title mb-3">Order summary</h2>
+              <div class="d-flex justify-content-between align-items-baseline mb-2">
+                <span>Order value ({{ cart().itemCount }} items)</span>
+                <b>{{ cart().subtotalPrice | currency }}</b>
+              </div>
+
+              @if (paidFromLines().length > 0) {
+                <hr />
+                <p class="checkout-page__summary-label">Paid from</p>
+                @for (line of paidFromLines(); track line.ruleName) {
+                  <div class="d-flex justify-content-between align-items-baseline mb-2">
+                    <span>{{ line.ruleName }}</span>
+                    <b
+                      [class.checkout-page__summary-amount--dollars]="line.unit === 'DOLLARS'"
+                      [class.checkout-page__summary-amount--units]="line.unit !== 'DOLLARS'"
+                    >
+                      {{ formatAmount(line.amount, line.unit) }}
+                    </b>
+                  </div>
+                }
+              }
+
+              <hr />
+              <div class="d-flex justify-content-between align-items-baseline mb-2">
+                <span>Subtotal due</span>
+                <b>{{ subtotalDue() | currency }}</b>
+              </div>
+              <div class="d-flex justify-content-between align-items-baseline mb-2">
+                <span>Shipping</span>
+                <b>{{ shippingCost() | currency }}</b>
+              </div>
+              @if (taxRate() > 0) {
+                <div class="d-flex justify-content-between align-items-baseline mb-2">
+                  <span>Tax ({{ taxRate() }}%)</span>
+                  <b>{{ taxAmount() | currency }}</b>
+                </div>
+              }
+              <hr />
+              <div class="d-flex justify-content-between align-items-baseline mb-3">
+                <span>Total</span>
+                <b>{{ orderTotal() | currency }}</b>
+              </div>
+              <a routerLink="/cart" class="btn btn-outline-secondary w-100">Back to cart</a>
+            </div>
+          </div>
+        </div>
+      }
+    }
+  </div>
+</section>
+
+<app-footer />
+
+<dialog
+  #addressDialogEl
+  class="address-picker-dialog"
+  aria-labelledby="address-picker-title"
+  (close)="closeAddressPicker()"
+  (click)="onAddressDialogBackdropClick($event)"
+>
+  <div class="modal-content shadow-lg">
+    <div class="modal-header">
+      <h2 id="address-picker-title" class="modal-title fs-5">Choose a shipping address</h2>
+      <button type="button" class="btn-close" aria-label="Close" (click)="closeAddressPicker()"></button>
+    </div>
+    <div class="modal-body">
+      <div class="checkout-page__options">
+        @for (address of shipAddrs(); track address.addressId) {
+          <label
+            class="checkout-option"
+            [class.checkout-option--active]="selectedAddressId() === address.addressId"
+          >
+            <input
+              type="radio"
+              name="ship-address-picker"
+              [checked]="selectedAddressId() === address.addressId"
+              (change)="chooseAddress(address.addressId)"
+            />
+            <span class="checkout-option__body">
+              @if (address.attention) {
+                <strong class="checkout-option__title">{{ address.attention }}</strong>
+              }
+              <span class="checkout-option__line">{{ address.addressLine1 }}</span>
+              @if (address.addressLine2) {
+                <span class="checkout-option__line">{{ address.addressLine2 }}</span>
+              }
+              @if (address.addressLine3) {
+                <span class="checkout-option__line">{{ address.addressLine3 }}</span>
+              }
+              <span class="checkout-option__line">
+                {{ address.city }}, {{ address.province }} {{ address.postalCode }}, {{ address.country }}
+              </span>
+              @if (address.phone) {
+                <span class="checkout-option__line">{{ address.phone }}</span>
+              }
+            </span>
+          </label>
+        }
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline-secondary" (click)="closeAddressPicker()">Cancel</button>
+    </div>
+  </div>
+</dialog>

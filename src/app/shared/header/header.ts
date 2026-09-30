@@ -3,15 +3,20 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  ElementRef,
   OnInit,
   PLATFORM_ID,
+  ViewChild,
+  afterRenderEffect,
   computed,
   effect,
   inject,
   signal,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { NavigationStart, Router, RouterLink } from '@angular/router';
+import { filter } from 'rxjs';
 
 import { AuthService, EmployeeLocation } from '../../core/auth/auth';
 import { CartItem, CartService, PayTag, formatCartItemOptions } from '../../core/cart/cart';
@@ -118,9 +123,90 @@ export class Header implements OnInit {
   private readonly router = inject(Router);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 
-  private readonly clearCatalogNavCloseTimeoutOnDestroy = inject(DestroyRef).onDestroy(() =>
-    this.cancelScheduledCatalogNavClose(),
-  );
+  private readonly clearCatalogNavCloseTimeoutOnDestroy = inject(DestroyRef).onDestroy(() => {
+    this.cancelScheduledCatalogNavClose();
+    this.cancelScheduledCartDialogClose();
+    if (this.isBrowser) {
+      document.body.style.overflow = '';
+    }
+  });
+
+  @ViewChild('cartDialogEl') private readonly cartDialogEl?: ElementRef<HTMLDialogElement>;
+
+  // Backstop for the drawer's own explicit close-on-navigate links below —
+  // those only cover links *inside* the drawer; this catches everything
+  // else (the logo, a department link, browser back/forward) so the
+  // drawer never gets left open over whatever page comes next.
+  private readonly closeCartOnAnyNavigation = this.router.events
+    .pipe(
+      filter((event): event is NavigationStart => event instanceof NavigationStart),
+      takeUntilDestroyed(),
+    )
+    .subscribe(() => this.closeCart());
+
+  // Matches Bootstrap's own `--bs-offcanvas-transition` duration — long
+  // enough for the slide-out to finish before the dialog actually closes.
+  private static readonly CART_DRAWER_CLOSE_TRANSITION_MS = 300;
+  private closeCartDialogTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  // Opens/closes the native <dialog> to track `cartOpen()` — a plain
+  // effect() only guarantees running after change detection, not after the
+  // <dialog> has actually been created/updated in the DOM, so this uses
+  // afterRenderEffect like the rest of the app's own DOM-imperative reads/
+  // writes (see ConfirmDialog for the same pattern). showModal() gives a
+  // real focus trap, Escape-to-close, and focus restored to whatever
+  // opened it — none of which the previous plain <aside> ever had, despite
+  // claiming `aria-modal="true"`.
+  //
+  // Closing is deliberately NOT instant: setting `open` to false snaps the
+  // dialog to `display: none` immediately (a native UA rule our own CSS
+  // doesn't override), which would cut Bootstrap's slide-out transition off
+  // mid-animation. `[class.show]` already reacts to `cartOpen()` the moment
+  // it flips, so the slide-out itself starts right away regardless — this
+  // just delays the actual `close()` call until that animation has had
+  // time to finish. (Escape is the one exception: the browser closes the
+  // dialog natively and instantly on its own before this ever runs.)
+  private readonly syncCartDialogOpenState = afterRenderEffect(() => {
+    const dialog = this.cartDialogEl?.nativeElement;
+    // jsdom (used in tests) doesn't implement showModal()/close() at all —
+    // in a real browser this drives the native modal; in tests the dialog
+    // just never actually opens, and the drawer's own open/close signal is
+    // exercised directly instead.
+    if (!dialog || typeof dialog.showModal !== 'function') {
+      return;
+    }
+    if (this.cartOpen()) {
+      this.cancelScheduledCartDialogClose();
+      if (!dialog.open) {
+        dialog.showModal();
+      }
+    } else if (dialog.open && this.closeCartDialogTimeoutId === null) {
+      this.closeCartDialogTimeoutId = setTimeout(() => {
+        this.closeCartDialogTimeoutId = null;
+        dialog.close();
+      }, Header.CART_DRAWER_CLOSE_TRANSITION_MS);
+    }
+  });
+
+  // showModal() only covers the dialog itself in the top layer — it
+  // doesn't stop the page behind it from scrolling, so without this the
+  // body's own scrollbar keeps running right alongside the drawer's own
+  // item-list scrollbar. Locked/restored on the body directly since a
+  // component's own scoped styles can never reach `<body>` (it's outside
+  // this component's template, so Angular's emulated encapsulation
+  // attribute never lands on it).
+  private readonly lockBodyScrollWhileCartOpen = afterRenderEffect(() => {
+    if (this.isBrowser) {
+      document.body.style.overflow = this.cartOpen() ? 'hidden' : '';
+    }
+  });
+
+  private cancelScheduledCartDialogClose(): void {
+    if (this.closeCartDialogTimeoutId !== null) {
+      clearTimeout(this.closeCartDialogTimeoutId);
+      this.closeCartDialogTimeoutId = null;
+    }
+  }
 
   readonly session = this.authService.session;
   readonly firstName = this.authService.firstName;
@@ -330,6 +416,25 @@ export class Header implements OnInit {
 
   closeCart(): void {
     this.cartService.closeDrawer();
+  }
+
+  // Fires for a close the browser triggered itself (Escape, most notably)
+  // rather than one of this drawer's own buttons/links — those already
+  // clear `cartOpen()` before this can fire, making it a no-op then.
+  onCartDialogNativeClose(): void {
+    if (this.cartOpen()) {
+      this.closeCart();
+    }
+  }
+
+  // The standard "click the backdrop to dismiss" trick for <dialog>: a
+  // click lands on the dialog element itself only when it hits the
+  // backdrop area, since the real content always has some element in
+  // between.
+  onCartDialogBackdropClick(event: MouseEvent): void {
+    if (event.target === this.cartDialogEl?.nativeElement) {
+      this.closeCart();
+    }
   }
 
   goToCart(): void {

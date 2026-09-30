@@ -232,16 +232,13 @@
 
 <div id="mega-menu-overlay" [class.show]="activeCatalogNavItem() !== null" (click)="closeCatalogNav()"></div>
 
-<div class="offcanvas-backdrop fade" [class.show]="cartOpen()" [hidden]="!cartOpen()" (click)="closeCart()"></div>
-<aside
+<dialog
+  #cartDialogEl
   class="offcanvas offcanvas-end shadow-lg"
   [class.show]="cartOpen()"
-  tabindex="-1"
-  role="dialog"
-  aria-modal="true"
   aria-label="Your cart"
-  [attr.aria-hidden]="!cartOpen()"
-  (keydown.escape)="closeCart()"
+  (close)="onCartDialogNativeClose()"
+  (click)="onCartDialogBackdropClick($event)"
 >
   <div class="offcanvas-header border-bottom">
     <h3 class="offcanvas-title font-display fw-bold fs-5">Your cart</h3>
@@ -328,7 +325,7 @@
       </button>
     </div>
   </div>
-</aside>
+</dialog>
 
 <ng-template #categoryBranch let-categories>
   <ul class="cat-flyout__list">

@@ -111,12 +111,12 @@
                 </div>
               }
 
-              <button type="button" class="cart-page__checkout">
+              <a routerLink="/checkout" class="cart-page__checkout">
                 <span class="cart-page__checkout-title">Checkout</span>
                 <span class="cart-page__checkout-sub">
                   {{ amountDueAtCheckout() === 0 ? 'Nothing to pay' : (amountDueAtCheckout() | currency) + ' due' }}
                 </span>
-              </button>
+              </a>
               <a routerLink="/products/full-catalog" class="btn btn-outline-secondary w-100 mt-2">
                 Continue shopping
               </a>

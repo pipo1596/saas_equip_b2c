@@ -596,6 +596,73 @@ describe('Header', () => {
     expect(header.cartOpen()).toBe(false);
   });
 
+  it("should lock the page's own scroll while the cart drawer is open, and restore it on close", () => {
+    const fixture = TestBed.createComponent(Header);
+    const header = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(document.body.style.overflow).toBe('');
+
+    header.openCart();
+    fixture.detectChanges();
+    expect(document.body.style.overflow).toBe('hidden');
+
+    header.closeCart();
+    fixture.detectChanges();
+    expect(document.body.style.overflow).toBe('');
+  });
+
+  it('should close the cart drawer on any navigation, not just links inside it', async () => {
+    const fixture = TestBed.createComponent(Header);
+    const header = fixture.componentInstance;
+    const router = TestBed.inject(Router);
+
+    header.openCart();
+    expect(header.cartOpen()).toBe(true);
+
+    // Any navigation at all — not one of the drawer's own explicit
+    // close-on-click links — should still close it (e.g. the logo, a
+    // department link, browser back/forward). `NavigationStart` (what this
+    // reacts to) fires before route recognition, so this closes the
+    // drawer regardless of whether the navigation itself ultimately
+    // resolves — the empty `provideRouter([])` in this suite means it
+    // never does, hence the expected rejection below.
+    await router.navigateByUrl('/somewhere-else').catch(() => {});
+
+    expect(header.cartOpen()).toBe(false);
+  });
+
+  it('should close the cart drawer when the native <dialog> reports a close (e.g. Escape)', () => {
+    const fixture = TestBed.createComponent(Header);
+    const header = fixture.componentInstance;
+    fixture.detectChanges();
+
+    header.openCart();
+    expect(header.cartOpen()).toBe(true);
+
+    const dialog: HTMLElement = fixture.nativeElement.querySelector('dialog.offcanvas');
+    dialog.dispatchEvent(new Event('close'));
+
+    expect(header.cartOpen()).toBe(false);
+  });
+
+  it('should close the cart drawer when the backdrop area of the dialog is clicked', () => {
+    const fixture = TestBed.createComponent(Header);
+    const header = fixture.componentInstance;
+    fixture.detectChanges();
+
+    header.openCart();
+    expect(header.cartOpen()).toBe(true);
+
+    const dialog: HTMLElement = fixture.nativeElement.querySelector('dialog.offcanvas');
+    // A click landing on the dialog element itself (not one of its
+    // children) is the standard way a native <dialog>'s backdrop click is
+    // detected.
+    dialog.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(header.cartOpen()).toBe(false);
+  });
+
   it('should start with an empty cart', () => {
     const fixture = TestBed.createComponent(Header);
     const header = fixture.componentInstance;

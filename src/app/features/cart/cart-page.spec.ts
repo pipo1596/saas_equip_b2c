@@ -221,6 +221,15 @@ describe('CartPage', () => {
     expect(fixture.nativeElement.querySelector('.alert').textContent).toContain('Not logged in.');
   });
 
+  it('should link Checkout to the new checkout page', () => {
+    const fixture = TestBed.createComponent(CartPage);
+    fixture.detectChanges();
+    flushInitialCartLoads(httpMock, CART);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.cart-page__checkout')?.getAttribute('href')).toBe('/checkout');
+  });
+
   it('should update a quantity via the stepper', () => {
     const fixture = TestBed.createComponent(CartPage);
     const page = fixture.componentInstance;

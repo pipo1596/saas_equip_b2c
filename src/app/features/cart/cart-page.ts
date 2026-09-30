@@ -25,6 +25,12 @@ import {
   formatCartItemOptions,
   tileBalance,
 } from '../../core/cart/cart';
+import {
+  amountDueAtCheckout,
+  lineTagByItemId,
+  paidFromLines,
+  resolvedAllocations,
+} from '../../core/cart/cart-totals';
 import { LocationSelectionService } from '../../core/location/location-selection';
 import { AllotmentBalanceBox } from '../../shared/allotment/balance-box';
 import { PayTagBadge } from '../../shared/allotment/pay-tag';
@@ -71,33 +77,7 @@ export class CartPage implements OnInit, AfterViewInit {
   readonly formatAmount = formatBalanceAmount;
   readonly tileBalance = tileBalance;
 
-  private readonly lineTagByItemId = computed(
-    () => new Map((this.cart().allotment?.lineTags ?? []).map((tag) => [tag.cartItemId, tag])),
-  );
-
-  // The API's own `allocations` (split-funding detail) may not be
-  // populated yet even though the simpler single-rule `ruleId`/`payUnit`
-  // tag is — fall back to treating that single tag as this line's whole
-  // allocation so grouping/checkout math still work against today's data,
-  // not just once the richer per-line breakdown ships.
-  private resolvedAllocations(item: CartItem, tag: LineTag | undefined): LineAllocation[] {
-    if (!tag) {
-      return [];
-    }
-    if (tag.allocations.length > 0) {
-      return tag.allocations;
-    }
-    if (tag.ruleId === null || tag.payUnit === null) {
-      return [];
-    }
-    return [
-      {
-        ruleId: tag.ruleId,
-        payUnit: tag.payUnit,
-        amount: tag.payUnit === 'DOLLARS' ? item.lineTotalPrice : item.quantity,
-      },
-    ];
-  }
+  private readonly tagsByItemId = computed(() => lineTagByItemId(this.cart()));
 
   // One group per rule that's either the *home* allotment for at least one
   // line, or lent an amount to cover another group's overflow — a rule
@@ -110,14 +90,14 @@ export class CartPage implements OnInit, AfterViewInit {
       return [];
     }
     const rules = allotment.rules;
-    const lineTagByItemId = this.lineTagByItemId();
+    const tagsByItemId = this.tagsByItemId();
 
     return rules
       .map((rule): AllotmentGroup | null => {
         const items = cart.items.filter(
-          (item) => this.resolvedAllocations(item, lineTagByItemId.get(item.cartItemId))[0]?.ruleId === rule.ruleId,
+          (item) => resolvedAllocations(item, tagsByItemId.get(item.cartItemId))[0]?.ruleId === rule.ruleId,
         );
-        const lentNotes = this.lentNotesFor(rule, cart.items, lineTagByItemId, rules);
+        const lentNotes = this.lentNotesFor(rule, cart.items, tagsByItemId, rules);
         if (items.length === 0 && lentNotes.length === 0) {
           return null;
         }
@@ -137,86 +117,26 @@ export class CartPage implements OnInit, AfterViewInit {
     return this.cart().items.filter((item) => !groupedItemIds.has(item.cartItemId));
   });
 
-  // What actually pays for this order, one line per rule with anything
-  // `inCart` right now — including a rule with no home items of its own,
-  // since its own balance already folds in whatever it lent elsewhere.
-  readonly paidFromLines = computed(() => {
-    const rules = this.cart().allotment?.rules ?? [];
-    return rules
-      .map((rule) => ({ rule, balance: tileBalance(rule) }))
-      .filter((entry) => !!entry.balance && entry.balance.inCart > 0)
-      .map((entry) => ({
-        ruleName: entry.rule.ruleName,
-        unit: entry.rule.primaryUnit,
-        amount: entry.balance!.inCart,
-      }));
-  });
-
-  // Subtotal minus whatever every line's own allocations cover, corrected
-  // back down for any rule that's actually over-drawn (a negative
-  // `available` — its lines were tagged as covered, but the rule can't
-  // really pay for all of them). A dollar rule's own shortfall is exact;
-  // a units/points rule's shortfall is only a *count*, so it's prorated
-  // across that rule's own lines by their share of the requested units,
-  // for lack of a per-unit dollar rate to convert it exactly.
-  readonly amountDueAtCheckout = computed(() => {
-    const cart = this.cart();
-    const rules = cart.allotment?.rules ?? [];
-    const lineTagByItemId = this.lineTagByItemId();
-    const requestedByRuleId = new Map<number, { units: number; dollarValue: number }>();
-
-    const covered = cart.items.reduce((sum, item) => {
-      const allocations = this.resolvedAllocations(item, lineTagByItemId.get(item.cartItemId));
-      if (allocations.length === 0) {
-        return sum;
-      }
-      const dollarsCovered = allocations
-        .filter((allocation) => allocation.payUnit === 'DOLLARS')
-        .reduce((total, allocation) => total + allocation.amount, 0);
-      const nonDollarAllocations = allocations.filter((allocation) => allocation.payUnit !== 'DOLLARS');
-      for (const allocation of nonDollarAllocations) {
-        const requested = requestedByRuleId.get(allocation.ruleId) ?? { units: 0, dollarValue: 0 };
-        requested.units += allocation.amount;
-        requested.dollarValue += item.lineTotalPrice;
-        requestedByRuleId.set(allocation.ruleId, requested);
-      }
-      return sum + dollarsCovered + (nonDollarAllocations.length > 0 ? item.lineTotalPrice : 0);
-    }, 0);
-
-    const shortfall = rules.reduce((sum, rule) => {
-      const balance = tileBalance(rule);
-      if (!balance || balance.available >= 0) {
-        return sum;
-      }
-      if (rule.primaryUnit === 'DOLLARS') {
-        return sum - balance.available;
-      }
-      const requested = requestedByRuleId.get(rule.ruleId);
-      if (!requested || requested.units <= 0) {
-        return sum;
-      }
-      const shortfallUnits = Math.min(-balance.available, requested.units);
-      return sum + requested.dollarValue * (shortfallUnits / requested.units);
-    }, 0);
-
-    return Math.max(0, cart.subtotalPrice - covered + shortfall);
-  });
+  // What actually pays for this order, and what's left to pay by card —
+  // shared with the checkout page so both show the exact same figures.
+  readonly paidFromLines = computed(() => paidFromLines(this.cart()));
+  readonly amountDueAtCheckout = computed(() => amountDueAtCheckout(this.cart()));
 
   lineTag(cartItemId: number): PayTag | null {
-    return this.lineTagByItemId().get(cartItemId) ?? null;
+    return this.tagsByItemId().get(cartItemId) ?? null;
   }
 
   // The allotment that's actually this line's own (the first one applied)
   // — `null` when nothing covers it, same as `lineTag` returning nothing.
   primaryAllocation(item: CartItem): LineAllocation | null {
-    return this.resolvedAllocations(item, this.lineTagByItemId().get(item.cartItemId))[0] ?? null;
+    return resolvedAllocations(item, this.tagsByItemId().get(item.cartItemId))[0] ?? null;
   }
 
   // Only populated (and only worth showing under the price) once a line's
   // own allotment ran out partway through and a fallback picked up the
   // rest — a single-allocation line has nothing to break down.
   splitAllocations(item: CartItem): LineAllocation[] {
-    const allocations = this.resolvedAllocations(item, this.lineTagByItemId().get(item.cartItemId));
+    const allocations = resolvedAllocations(item, this.tagsByItemId().get(item.cartItemId));
     return allocations.length > 1 ? allocations : [];
   }
 
@@ -229,7 +149,7 @@ export class CartPage implements OnInit, AfterViewInit {
   // your Uniform allotment ran out." — one note per fallback hop, in case
   // a line ever chains through more than two allotments.
   fallbackNotesFor(item: CartItem): string[] {
-    const allocations = this.resolvedAllocations(item, this.lineTagByItemId().get(item.cartItemId));
+    const allocations = resolvedAllocations(item, this.tagsByItemId().get(item.cartItemId));
     if (allocations.length < 2) {
       return [];
     }
@@ -271,12 +191,12 @@ export class CartPage implements OnInit, AfterViewInit {
   private lentNotesFor(
     rule: AllotmentRule,
     items: CartItem[],
-    lineTagByItemId: Map<number, LineTag>,
+    tagsByItemId: Map<number, LineTag>,
     rules: AllotmentRule[],
   ): string[] {
     const lentByHomeRuleId = new Map<number, LineAllocation>();
     for (const item of items) {
-      const allocations = this.resolvedAllocations(item, lineTagByItemId.get(item.cartItemId));
+      const allocations = resolvedAllocations(item, tagsByItemId.get(item.cartItemId));
       if (allocations.length < 2) {
         continue;
       }
