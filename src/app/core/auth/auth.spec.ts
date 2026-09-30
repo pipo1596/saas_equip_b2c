@@ -46,7 +46,7 @@ describe('AuthService', () => {
   });
 
   it('sets the session on a successful login with no MFA step', () => {
-    service.login('pierre.achkar@3linc.com', 'Setup123!').subscribe();
+    service.login('jane.doe@example.com', 'TestPass123!').subscribe();
 
     const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN');
     const response: LoginResponse = {
@@ -54,43 +54,43 @@ describe('AuthService', () => {
       mfaRequired: false,
       empId: '1',
       sessionId: 'sess-1',
-      firstName: 'Pierre',
-      lastName: 'Achkar',
+      firstName: 'Jane',
+      lastName: 'Doe',
       message: null,
     };
     req.flush(response);
 
     httpMock
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
-      .flush({ empId: '1', firstName: 'Pierre', lastName: 'Achkar' });
+      .flush({ empId: '1', firstName: 'Jane', lastName: 'Doe' });
 
     expect(service.isAuthenticated()).toBe(true);
     expect(service.session()).toEqual({
       empId: '1',
       sessionId: 'sess-1',
-      firstName: 'Pierre',
-      lastName: 'Achkar',
+      firstName: 'Jane',
+      lastName: 'Doe',
       locations: [],
     });
   });
 
   it('carries the locations from the employee record into the session (LOGIN1 does not return them)', () => {
-    service.login('pierre.achkar@3linc.com', 'Setup123!').subscribe();
+    service.login('jane.doe@example.com', 'TestPass123!').subscribe();
 
     httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN').flush({
       success: true,
       mfaRequired: false,
       empId: '1',
       sessionId: 'sess-1',
-      firstName: 'Pierre',
-      lastName: 'Achkar',
+      firstName: 'Jane',
+      lastName: 'Doe',
       message: null,
     } satisfies LoginResponse);
 
     httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE').flush({
       empId: '1',
-      firstName: 'Pierre',
-      lastName: 'Achkar',
+      firstName: 'Jane',
+      lastName: 'Doe',
       locations: [
         { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Edmonton Fire Dept Chief' },
       ],
@@ -102,7 +102,7 @@ describe('AuthService', () => {
   });
 
   it('fetches the employee record right after login and uses it as the source of truth for the name', () => {
-    service.login('pierre.achkar@3linc.com', 'Setup123!').subscribe();
+    service.login('jane.doe@example.com', 'TestPass123!').subscribe();
     httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN').flush({
       success: true,
       mfaRequired: false,
@@ -115,19 +115,19 @@ describe('AuthService', () => {
 
     const employeeReq = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE');
     expect(employeeReq.request.body).toEqual({ empId: '1', sessionId: 'sess-1', action: '*GET' });
-    employeeReq.flush({ empId: '1', firstName: 'Pierre', lastName: 'Achkar' });
+    employeeReq.flush({ empId: '1', firstName: 'Jane', lastName: 'Doe' });
 
     expect(service.session()).toEqual({
       empId: '1',
       sessionId: 'sess-1',
-      firstName: 'Pierre',
-      lastName: 'Achkar',
+      firstName: 'Jane',
+      lastName: 'Doe',
       locations: [],
     });
   });
 
   it('marks MFA as pending instead of setting a session when required', () => {
-    service.login('pierre.achkar@3linc.com', 'Setup123!').subscribe();
+    service.login('jane.doe@example.com', 'TestPass123!').subscribe();
 
     const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN');
     req.flush({
@@ -143,7 +143,7 @@ describe('AuthService', () => {
   });
 
   it('resolves the pending MFA state and sets the session once verified', () => {
-    service.login('pierre.achkar@3linc.com', 'Setup123!').subscribe();
+    service.login('jane.doe@example.com', 'TestPass123!').subscribe();
     httpMock
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN')
       .flush({ success: true, mfaRequired: true, empId: '1', sessionId: 'sess-1', message: null });
@@ -161,21 +161,21 @@ describe('AuthService', () => {
       mfaRequired: false,
       empId: '1',
       sessionId: 'sess-1',
-      firstName: 'Pierre',
-      lastName: 'Achkar',
+      firstName: 'Jane',
+      lastName: 'Doe',
       message: null,
     } satisfies LoginResponse);
 
     httpMock
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
-      .flush({ empId: '1', firstName: 'Pierre', lastName: 'Achkar' });
+      .flush({ empId: '1', firstName: 'Jane', lastName: 'Doe' });
 
     expect(service.mfaPending()).toBe(false);
     expect(service.isAuthenticated()).toBe(true);
   });
 
   it('falls back to the pending challenge\'s empId/sessionId when the MFA1 success response omits them, and survives a refresh', () => {
-    service.login('pierre.achkar@3linc.com', 'Setup123!').subscribe();
+    service.login('jane.doe@example.com', 'TestPass123!').subscribe();
     httpMock
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN')
       .flush({ success: true, mfaRequired: true, empId: '1', sessionId: 'sess-1', message: null });
@@ -187,13 +187,13 @@ describe('AuthService', () => {
     httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN').flush({
       success: true,
       mfaRequired: false,
-      firstName: 'Pierre',
-      lastName: 'Achkar',
+      firstName: 'Jane',
+      lastName: 'Doe',
       message: null,
     } satisfies LoginResponse);
     httpMock
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
-      .flush({ empId: '1', firstName: 'Pierre', lastName: 'Achkar', locations: [] });
+      .flush({ empId: '1', firstName: 'Jane', lastName: 'Doe', locations: [] });
 
     expect(service.session()).toEqual(
       expect.objectContaining({ empId: '1', sessionId: 'sess-1' }),
@@ -214,7 +214,7 @@ describe('AuthService', () => {
   });
 
   it('survives a page refresh mid-MFA by restoring the pending challenge from sessionStorage', () => {
-    service.login('pierre.achkar@3linc.com', 'Setup123!').subscribe();
+    service.login('jane.doe@example.com', 'TestPass123!').subscribe();
     httpMock
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN')
       .flush({ success: true, mfaRequired: true, empId: '1', sessionId: 'sess-1', message: null });
@@ -257,7 +257,7 @@ describe('AuthService', () => {
   });
 
   it('clears the persisted pending-MFA entry once verification succeeds', () => {
-    service.login('pierre.achkar@3linc.com', 'Setup123!').subscribe();
+    service.login('jane.doe@example.com', 'TestPass123!').subscribe();
     httpMock
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN')
       .flush({ success: true, mfaRequired: true, empId: '1', sessionId: 'sess-1', message: null });
@@ -277,7 +277,7 @@ describe('AuthService', () => {
   });
 
   it('clears the session and any pending MFA state on logout', () => {
-    service.login('pierre.achkar@3linc.com', 'Setup123!').subscribe();
+    service.login('jane.doe@example.com', 'TestPass123!').subscribe();
     httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN').flush({
       success: true,
       mfaRequired: false,
@@ -287,7 +287,7 @@ describe('AuthService', () => {
     } satisfies LoginResponse);
     httpMock
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
-      .flush({ empId: '1', firstName: 'Pierre', lastName: 'Achkar' });
+      .flush({ empId: '1', firstName: 'Jane', lastName: 'Doe' });
 
     expect(service.isAuthenticated()).toBe(true);
     service.logout();

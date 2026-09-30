@@ -34,7 +34,7 @@ describe('ForgotPassword', () => {
     const fixture = TestBed.createComponent(ForgotPassword);
     const page = fixture.componentInstance;
 
-    page.requestForm.setValue({ email: 'pierre.achkar@3linc.com' });
+    page.requestForm.setValue({ email: 'jane.doe@example.com' });
     const submitPromise = page.submitRequest();
 
     const req = TestBed.inject(HttpTestingController).expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN');
@@ -42,7 +42,7 @@ describe('ForgotPassword', () => {
     await submitPromise;
 
     expect(page.step()).toBe('reset');
-    expect(page.submittedEmail()).toBe('pierre.achkar@3linc.com');
+    expect(page.submittedEmail()).toBe('jane.doe@example.com');
   });
 
   it('should flag mismatched passwords without calling the API', () => {
@@ -61,7 +61,7 @@ describe('ForgotPassword', () => {
   it('should reach the done step on a successful reset', async () => {
     const fixture = TestBed.createComponent(ForgotPassword);
     const page = fixture.componentInstance;
-    page.submittedEmail.set('pierre.achkar@3linc.com');
+    page.submittedEmail.set('jane.doe@example.com');
     page.step.set('reset');
 
     page.resetForm.setValue({

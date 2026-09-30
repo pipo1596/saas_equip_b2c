@@ -210,7 +210,7 @@ describe('ProductDetail', () => {
       empId: '1',
       sessionId: 's1',
       firstName: 'Pat',
-      lastName: 'Achkar',
+      lastName: 'Doe',
       locations: [
         { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Edmonton Fire Dept Chief' },
       ],

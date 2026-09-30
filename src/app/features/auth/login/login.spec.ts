@@ -52,14 +52,14 @@ describe('Login', () => {
     const router = TestBed.inject(Router);
     const navigateSpy = vi.spyOn(router, 'navigateByUrl');
 
-    login.form.setValue({ email: 'pierre.achkar@3linc.com', password: 'Setup123!' });
+    login.form.setValue({ email: 'jane.doe@example.com', password: 'TestPass123!' });
     const submitPromise = login.onSubmit();
 
     const req = TestBed.inject(HttpTestingController).expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN');
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({
-      email: 'pierre.achkar@3linc.com',
-      password: 'Setup123!',
+      email: 'jane.doe@example.com',
+      password: 'TestPass123!',
       action: 'LOGIN1',
     });
 
@@ -67,16 +67,16 @@ describe('Login', () => {
       success: true,
       mfaRequired: false,
       empId: '1',
-      sessionId: '000000825220001251507245121294',
-      firstName: 'Pierre',
-      lastName: 'Achkar',
+      sessionId: 'sess_test_0001',
+      firstName: 'Jane',
+      lastName: 'Doe',
       message: null,
     };
     req.flush(response);
 
     TestBed.inject(HttpTestingController)
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
-      .flush({ empId: '1', firstName: 'Pierre', lastName: 'Achkar' });
+      .flush({ empId: '1', firstName: 'Jane', lastName: 'Doe' });
 
     await submitPromise;
 
@@ -90,7 +90,7 @@ describe('Login', () => {
     const router = TestBed.inject(Router);
     const navigateSpy = vi.spyOn(router, 'navigateByUrl');
 
-    login.form.setValue({ email: 'pierre.achkar@3linc.com', password: 'wrong' });
+    login.form.setValue({ email: 'jane.doe@example.com', password: 'wrong' });
     const submitPromise = login.onSubmit();
 
     const req = TestBed.inject(HttpTestingController).expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN');
@@ -116,7 +116,7 @@ describe('Login', () => {
     const router = TestBed.inject(Router);
     const navigateSpy = vi.spyOn(router, 'navigateByUrl');
 
-    login.form.setValue({ email: 'pierre.achkar@3linc.com', password: 'Setup123!' });
+    login.form.setValue({ email: 'jane.doe@example.com', password: 'TestPass123!' });
     const submitPromise = login.onSubmit();
 
     const req = TestBed.inject(HttpTestingController).expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN');
@@ -124,7 +124,7 @@ describe('Login', () => {
       success: true,
       mfaRequired: true,
       empId: '1',
-      sessionId: '000000825220001251507245121294',
+      sessionId: 'sess_test_0002',
       message: null,
     };
     req.flush(response);

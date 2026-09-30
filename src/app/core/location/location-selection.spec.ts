@@ -36,8 +36,8 @@ describe('LocationSelectionService', () => {
     auth.session.set({
       empId: '19023',
       sessionId: 'sess-1',
-      firstName: 'pierre',
-      lastName: 'achkar',
+      firstName: 'jane',
+      lastName: 'doe',
       locations: LOCATIONS,
     });
 
@@ -50,8 +50,8 @@ describe('LocationSelectionService', () => {
     auth.session.set({
       empId: '19023',
       sessionId: 'sess-1',
-      firstName: 'pierre',
-      lastName: 'achkar',
+      firstName: 'jane',
+      lastName: 'doe',
       locations: LOCATIONS,
     });
 
@@ -73,8 +73,8 @@ describe('LocationSelectionService', () => {
     auth.session.set({
       empId: '19023',
       sessionId: 'sess-1',
-      firstName: 'pierre',
-      lastName: 'achkar',
+      firstName: 'jane',
+      lastName: 'doe',
       locations: LOCATIONS,
     });
 

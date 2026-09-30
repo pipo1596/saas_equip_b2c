@@ -128,8 +128,8 @@ describe('Header', () => {
     auth.session.set({
       empId: '19023',
       sessionId: 'sess-1',
-      firstName: 'pierre',
-      lastName: 'achkar',
+      firstName: 'jane',
+      lastName: 'doe',
       locations: [
         { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Edmonton Fire Dept Chief' },
         { empLocId: 14999, locationId: 15, locationCode: '001', locationName: 'Edmonton Fire Dept Office' },
@@ -159,8 +159,8 @@ describe('Header', () => {
     auth.session.set({
       empId: '19023',
       sessionId: 'sess-1',
-      firstName: 'pierre',
-      lastName: 'achkar',
+      firstName: 'jane',
+      lastName: 'doe',
       locations,
     });
     TestBed.tick();
@@ -226,8 +226,8 @@ describe('Header', () => {
     auth.session.set({
       empId: '19023',
       sessionId: 'sess-1',
-      firstName: 'pierre',
-      lastName: 'achkar',
+      firstName: 'jane',
+      lastName: 'doe',
       locations: [
         { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Edmonton Fire Dept Chief' },
       ],
@@ -268,8 +268,8 @@ describe('Header', () => {
     auth.session.set({
       empId: '19023',
       sessionId: 'sess-1',
-      firstName: 'pierre',
-      lastName: 'achkar',
+      firstName: 'jane',
+      lastName: 'doe',
       locations: [
         { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Edmonton Fire Dept Chief' },
       ],
@@ -324,8 +324,8 @@ describe('Header', () => {
     auth.session.set({
       empId: '19023',
       sessionId: 'sess-1',
-      firstName: 'pierre',
-      lastName: 'achkar',
+      firstName: 'jane',
+      lastName: 'doe',
       locations: [
         { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Edmonton Fire Dept Chief' },
       ],
@@ -410,8 +410,8 @@ describe('Header', () => {
     auth.session.set({
       empId: '19023',
       sessionId: 'sess-1',
-      firstName: 'pierre',
-      lastName: 'achkar',
+      firstName: 'jane',
+      lastName: 'doe',
       locations: [
         { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Edmonton Fire Dept Chief' },
       ],
@@ -559,8 +559,8 @@ describe('Header', () => {
     auth.session.set({
       empId: '19023',
       sessionId: 'sess-1',
-      firstName: 'pierre',
-      lastName: 'achkar',
+      firstName: 'jane',
+      lastName: 'doe',
       locations,
     });
 
@@ -878,14 +878,14 @@ describe('Header', () => {
     auth.session.set({
       empId: '19023',
       sessionId: 'sess-1',
-      firstName: 'pierre',
-      lastName: 'achkar',
+      firstName: 'jane',
+      lastName: 'doe',
       locations: [],
     });
 
-    expect(header.firstName()).toBe('Pierre');
-    expect(header.fullName()).toBe('Pierre Achkar');
-    expect(header.initials()).toBe('PA');
+    expect(header.firstName()).toBe('Jane');
+    expect(header.fullName()).toBe('Jane Doe');
+    expect(header.initials()).toBe('JD');
   });
 
   it('should close the user menu, clear the session and navigate to / on log off', () => {
@@ -898,8 +898,8 @@ describe('Header', () => {
     auth.session.set({
       empId: '1',
       sessionId: 's',
-      firstName: 'pierre',
-      lastName: 'achkar',
+      firstName: 'jane',
+      lastName: 'doe',
       locations: [],
     });
     header.toggleUserMenu();

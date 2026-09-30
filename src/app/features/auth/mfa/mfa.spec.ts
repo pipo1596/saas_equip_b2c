@@ -54,16 +54,16 @@ describe('Mfa', () => {
       success: true,
       mfaRequired: false,
       empId: '1',
-      sessionId: '000000825220001251507245121294',
-      firstName: 'Pierre',
-      lastName: 'Achkar',
+      sessionId: 'sess_test_0004',
+      firstName: 'Jane',
+      lastName: 'Doe',
       message: null,
     };
     req.flush(response);
 
     TestBed.inject(HttpTestingController)
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
-      .flush({ empId: '1', firstName: 'Pierre', lastName: 'Achkar' });
+      .flush({ empId: '1', firstName: 'Jane', lastName: 'Doe' });
 
     await submitPromise;
 

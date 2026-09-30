@@ -11,7 +11,7 @@ const SESSION: Session = {
   empId: 'E1',
   sessionId: 'S1',
   firstName: 'Pat',
-  lastName: 'Achkar',
+  lastName: 'Doe',
   locations: [],
 };
 
