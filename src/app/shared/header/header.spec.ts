@@ -4,6 +4,7 @@ import { Router, provideRouter } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 
 import { AuthService } from '../../core/auth/auth';
+import { FAKE_SESSION } from '../../core/auth/auth.testing';
 import { CatalogView } from '../../core/catalog/catalog-view';
 import { TenantSettings, TenantSettingsService } from '../../core/tenant/tenant-settings';
 import { ConfirmService } from '../confirm/confirm';
@@ -126,10 +127,7 @@ describe('Header', () => {
     const auth = TestBed.inject(AuthService);
 
     auth.session.set({
-      empId: '19023',
-      sessionId: 'sess-1',
-      firstName: 'jane',
-      lastName: 'doe',
+      ...FAKE_SESSION,
       locations: [
         { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Edmonton Fire Dept Chief' },
         { empLocId: 14999, locationId: 15, locationCode: '001', locationName: 'Edmonton Fire Dept Office' },
@@ -157,10 +155,7 @@ describe('Header', () => {
       { empLocId: 14999, locationId: 15, locationCode: '001', locationName: 'Edmonton Fire Dept Office' },
     ];
     auth.session.set({
-      empId: '19023',
-      sessionId: 'sess-1',
-      firstName: 'jane',
-      lastName: 'doe',
+      ...FAKE_SESSION,
       locations,
     });
     TestBed.tick();
@@ -224,10 +219,7 @@ describe('Header', () => {
     const httpMock = TestBed.inject(HttpTestingController);
 
     auth.session.set({
-      empId: '19023',
-      sessionId: 'sess-1',
-      firstName: 'jane',
-      lastName: 'doe',
+      ...FAKE_SESSION,
       locations: [
         { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Edmonton Fire Dept Chief' },
       ],
@@ -266,10 +258,7 @@ describe('Header', () => {
     } as TenantSettings);
 
     auth.session.set({
-      empId: '19023',
-      sessionId: 'sess-1',
-      firstName: 'jane',
-      lastName: 'doe',
+      ...FAKE_SESSION,
       locations: [
         { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Edmonton Fire Dept Chief' },
       ],
@@ -322,10 +311,7 @@ describe('Header', () => {
     const httpMock = TestBed.inject(HttpTestingController);
 
     auth.session.set({
-      empId: '19023',
-      sessionId: 'sess-1',
-      firstName: 'jane',
-      lastName: 'doe',
+      ...FAKE_SESSION,
       locations: [
         { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Edmonton Fire Dept Chief' },
       ],
@@ -408,10 +394,7 @@ describe('Header', () => {
     });
 
     auth.session.set({
-      empId: '19023',
-      sessionId: 'sess-1',
-      firstName: 'jane',
-      lastName: 'doe',
+      ...FAKE_SESSION,
       locations: [
         { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Edmonton Fire Dept Chief' },
       ],
@@ -455,13 +438,17 @@ describe('Header', () => {
     expect(header.openCatalogNavKey()).toBe('gear');
   });
 
-  it('should open a catalog nav flyout on hover, and close it after a grace period once the mouse leaves', () => {
+  it('should open a catalog nav flyout on hover after a short delay, and close it after a grace period once the mouse leaves', () => {
     vi.useFakeTimers();
     try {
       const fixture = TestBed.createComponent(Header);
       const header = fixture.componentInstance;
 
       header.openCatalogNavOnHover('footwear');
+      // Doesn't open the instant the mouse enters — see the next test for
+      // why that grace period exists.
+      expect(header.openCatalogNavKey()).toBeNull();
+      vi.advanceTimersByTime(150);
       expect(header.openCatalogNavKey()).toBe('footwear');
 
       header.scheduleCatalogNavClose();
@@ -482,15 +469,53 @@ describe('Header', () => {
     }
   });
 
+  it('does not open the flyout if the mouse leaves again before the hover-open delay elapses', () => {
+    vi.useFakeTimers();
+    try {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+
+      // Simulates the mouse sweeping past this nav item on its way
+      // elsewhere — it should never actually flash open.
+      header.openCatalogNavOnHover('footwear');
+      header.scheduleCatalogNavClose();
+      vi.advanceTimersByTime(200);
+
+      expect(header.openCatalogNavKey()).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('should switch directly to a different flyout on hover without an intermediate close', () => {
+    vi.useFakeTimers();
+    try {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+
+      header.openCatalogNavOnHover('footwear');
+      vi.advanceTimersByTime(150);
+      header.scheduleCatalogNavClose();
+      header.openCatalogNavOnHover('gear');
+      vi.advanceTimersByTime(150);
+
+      expect(header.openCatalogNavKey()).toBe('gear');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('closes an open catalog nav flyout on Escape', () => {
     const fixture = TestBed.createComponent(Header);
     const header = fixture.componentInstance;
+    fixture.detectChanges();
 
-    header.openCatalogNavOnHover('footwear');
-    header.scheduleCatalogNavClose();
-    header.openCatalogNavOnHover('gear');
+    header.toggleCatalogNav('footwear');
+    expect(header.openCatalogNavKey()).toBe('footwear');
 
-    expect(header.openCatalogNavKey()).toBe('gear');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    expect(header.openCatalogNavKey()).toBeNull();
   });
 
   it('should navigate to /products with the search term as a query param', () => {
@@ -557,10 +582,7 @@ describe('Header', () => {
       { empLocId: 14999, locationId: 15, locationCode: '001', locationName: 'Edmonton Fire Dept Office' },
     ];
     auth.session.set({
-      empId: '19023',
-      sessionId: 'sess-1',
-      firstName: 'jane',
-      lastName: 'doe',
+      ...FAKE_SESSION,
       locations,
     });
 
@@ -943,16 +965,17 @@ describe('Header', () => {
     const auth = TestBed.inject(AuthService);
 
     auth.session.set({
-      empId: '19023',
-      sessionId: 'sess-1',
-      firstName: 'jane',
+      ...FAKE_SESSION,
+      // Deliberately lowercase here — this test is specifically checking
+      // that the header capitalizes the session's raw name for display.
+      firstName: 'pat',
       lastName: 'doe',
       locations: [],
     });
 
-    expect(header.firstName()).toBe('Jane');
-    expect(header.fullName()).toBe('Jane Doe');
-    expect(header.initials()).toBe('JD');
+    expect(header.firstName()).toBe('Pat');
+    expect(header.fullName()).toBe('Pat Doe');
+    expect(header.initials()).toBe('PD');
   });
 
   it('should close the user menu, clear the session and navigate to / on log off', () => {
@@ -962,13 +985,7 @@ describe('Header', () => {
     const router = TestBed.inject(Router);
     const navigateSpy = vi.spyOn(router, 'navigateByUrl');
 
-    auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'jane',
-      lastName: 'doe',
-      locations: [],
-    });
+    auth.session.set({ ...FAKE_SESSION, locations: [] });
     header.toggleUserMenu();
     expect(header.userMenuOpen()).toBe(true);
 
@@ -977,6 +994,26 @@ describe('Header', () => {
     expect(header.userMenuOpen()).toBe(false);
     expect(auth.session()).toBeNull();
     expect(navigateSpy).toHaveBeenCalledWith('/');
+  });
+
+  it('should link to order history from the user menu, and close the menu when it is clicked', () => {
+    const fixture = TestBed.createComponent(Header);
+    const header = fixture.componentInstance;
+    fixture.detectChanges();
+
+    // No `/orders` route is registered in this spec's bare `provideRouter([])`
+    // — mocked so the click below doesn't reject with "Cannot match any
+    // routes" as an unhandled rejection.
+    vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+
+    header.toggleUserMenu();
+    expect(header.userMenuOpen()).toBe(true);
+
+    const link: HTMLAnchorElement = fixture.nativeElement.querySelector('.user-menu a[href="/orders"]');
+    expect(link.textContent).toContain('My orders');
+
+    link.click();
+    expect(header.userMenuOpen()).toBe(false);
   });
 
   describe('allotment', () => {
@@ -1031,6 +1068,7 @@ describe('Header', () => {
             available: 325,
           },
           ruleCount: 1,
+          allotExclTaxFreight: 'N',
           rules: [DOLLAR_RULE],
           approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
           openOrders: null,
@@ -1066,6 +1104,7 @@ describe('Header', () => {
             available: -75,
           },
           ruleCount: 1,
+          allotExclTaxFreight: 'N',
           rules: [DOLLAR_RULE],
           approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
           openOrders: null,
@@ -1089,6 +1128,7 @@ describe('Header', () => {
           programId: 3,
           allotmentBar: null,
           ruleCount: 1,
+          allotExclTaxFreight: 'N',
           rules: [{ ...DOLLAR_RULE, allotType: 'UNITS', primaryUnit: 'UNITS', isBarRule: 'N' }],
           approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
           openOrders: null,
@@ -1111,6 +1151,7 @@ describe('Header', () => {
           programId: null,
           allotmentBar: null,
           ruleCount: 0,
+          allotExclTaxFreight: 'N',
           rules: [],
           approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
           openOrders: null,
@@ -1140,6 +1181,7 @@ describe('Header', () => {
             available: 325,
           },
           ruleCount: 2,
+          allotExclTaxFreight: 'N',
           rules: [
             DOLLAR_RULE,
             {

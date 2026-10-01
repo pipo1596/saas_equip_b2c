@@ -1,0 +1,279 @@
+<app-header />
+
+<section class="order-detail">
+  <div class="container py-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a routerLink="/home">Home</a></li>
+        <li class="breadcrumb-item"><a routerLink="/orders">Order history</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Order</li>
+      </ol>
+    </nav>
+
+    @if (loading()) {
+      <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading order…</span>
+        </div>
+      </div>
+    } @else if (notFound()) {
+      <div class="order-detail__empty text-center py-5">
+        <h1 class="order-detail__title mb-2">Order not found</h1>
+        <p class="mb-3">This order doesn't exist, or isn't visible to your account.</p>
+        <a routerLink="/orders" class="btn btn-primary">Back to order history</a>
+      </div>
+    } @else if (error(); as message) {
+      <div class="alert alert-danger" role="alert">{{ message }}</div>
+    } @else if (order(); as order) {
+      <div [class]="'order-detail__banner order-detail__banner--' + statusTone(order.status)">
+        @if (justPlaced && order.status === 'SUBMITTED') {
+          <p class="order-detail__banner-title">
+            Thank you! Your order <strong>{{ order.orderNumber }}</strong> has been placed.
+          </p>
+          <p class="order-detail__banner-sub">It will ship via {{ order.shipMethod.name }}.</p>
+        } @else if (justPlaced && order.status === 'PENDING_APPROVAL') {
+          <p class="order-detail__banner-title">
+            Your order <strong>{{ order.orderNumber }}</strong> was sent for approval.
+          </p>
+          <p class="order-detail__banner-sub">
+            Your allotment is reserved and will be charged once it's approved.
+          </p>
+        } @else {
+          <p class="order-detail__banner-title">
+            Order <strong>{{ order.orderNumber }}</strong>
+            <span [class]="'order-detail__status-chip order-detail__status-chip--' + statusTone(order.status)">
+              {{ statusLabel(order.status) }}
+            </span>
+          </p>
+          <p class="order-detail__banner-sub">Placed {{ order.placedTs }}</p>
+        }
+        @if (order.status === 'REJECTED' && order.rejectReason) {
+          <p class="order-detail__reject-reason">{{ order.rejectReason }}</p>
+        }
+      </div>
+
+      <div class="row g-4 mt-1">
+        <div class="col-lg-8">
+          <section class="order-detail__panel">
+            <h2 class="order-detail__section-title">Items</h2>
+            <div class="order-detail__item-list">
+              @for (line of order.lines; track line.orderLineId) {
+                <div class="order-detail__item">
+                  <div class="order-detail__item-body">
+                    <span class="order-detail__item-name">{{ line.productTitle }}</span>
+                    <span class="order-detail__item-sku">
+                      {{ line.skuCode }}
+                      @if (line.optionDesc) {
+                        · {{ line.optionDesc }}
+                      }
+                      · Qty {{ line.qtyOrdered }}
+                    </span>
+                    @if (lineStatusNote(line); as note) {
+                      <span class="order-detail__item-status">{{ note }}</span>
+                    }
+                  </div>
+                  <span class="order-detail__item-price">
+                    @if (line.unitsUsed === line.qtyOrdered && line.lineTotal === 0) {
+                      Covered by {{ line.unitsUsed }} unit{{ line.unitsUsed === 1 ? '' : 's' }}
+                    } @else {
+                      {{ line.lineTotal | currency }}
+                    }
+                  </span>
+                </div>
+              }
+            </div>
+          </section>
+
+          <section class="order-detail__panel">
+            <h2 class="order-detail__section-title">Contact & shipping</h2>
+            <div class="order-detail__contact-ship">
+              <div>
+                <div class="order-detail__label">Contact</div>
+                <p class="order-detail__line">{{ order.contact.firstName }} {{ order.contact.lastName }}</p>
+                <p class="order-detail__line">{{ order.contact.email }}</p>
+                <p class="order-detail__line">
+                  {{ order.contact.phone }}
+                  @if (order.contact.phoneExt) {
+                    ext. {{ order.contact.phoneExt }}
+                  }
+                </p>
+              </div>
+              <div>
+                <div class="order-detail__label">Shipping address</div>
+                @if (order.shipTo.attention) {
+                  <p class="order-detail__line">{{ order.shipTo.attention }}</p>
+                }
+                <p class="order-detail__line">{{ order.shipTo.addressLine1 }}</p>
+                @if (order.shipTo.addressLine2) {
+                  <p class="order-detail__line">{{ order.shipTo.addressLine2 }}</p>
+                }
+                @if (order.shipTo.addressLine3) {
+                  <p class="order-detail__line">{{ order.shipTo.addressLine3 }}</p>
+                }
+                <p class="order-detail__line">
+                  {{ order.shipTo.city }}, {{ order.shipTo.province }} {{ order.shipTo.postalCode }}
+                </p>
+                <p class="order-detail__line">{{ order.shipTo.country }}</p>
+              </div>
+              <div>
+                <div class="order-detail__label">Shipping method</div>
+                <p class="order-detail__line">{{ order.shipMethod.name }}</p>
+                @if (order.shipMethod.carrier) {
+                  <p class="order-detail__line">
+                    {{ order.shipMethod.carrier }}
+                    @if (order.shipMethod.serviceCode) {
+                      · {{ order.shipMethod.serviceCode }}
+                    }
+                  </p>
+                }
+              </div>
+            </div>
+          </section>
+
+          @if (order.shipments.length > 0) {
+            <section class="order-detail__panel">
+              <h2 class="order-detail__section-title">Shipments</h2>
+              @for (shipment of order.shipments; track shipment.shipmentId) {
+                <div class="order-detail__shipment">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                      <p class="order-detail__line">
+                        <b>{{ shipment.carrier }}</b>
+                        @if (shipment.serviceCode) {
+                          {{ shipment.serviceCode }}
+                        }
+                      </p>
+                      @if (shipment.trackingNumber) {
+                        <p class="order-detail__line">
+                          @if (shipment.trackingUrl) {
+                            <a [href]="shipment.trackingUrl" target="_blank" rel="noopener">{{ shipment.trackingNumber }}</a>
+                          } @else {
+                            {{ shipment.trackingNumber }}
+                          }
+                        </p>
+                      }
+                    </div>
+                    <span
+                      [class]="
+                        'order-detail__status-chip order-detail__status-chip--shipment-' +
+                        shipment.status.toLowerCase()
+                      "
+                    >
+                      {{ shipmentStatusLabel(shipment.status) }}
+                    </span>
+                  </div>
+                  @if (shipment.shippedTs) {
+                    <p class="order-detail__line order-detail__line--muted">Shipped {{ shipment.shippedTs }}</p>
+                  }
+                  @if (shipment.deliveredTs) {
+                    <p class="order-detail__line order-detail__line--muted">Delivered {{ shipment.deliveredTs }}</p>
+                  }
+                  <p class="order-detail__line order-detail__line--muted">
+                    @for (line of shipment.lines; track line.orderLineId; let last = $last) {
+                      {{ shipmentLineLabel(line) }}{{ last ? '' : ', ' }}
+                    }
+                  </p>
+                </div>
+              }
+            </section>
+          }
+
+          <section class="order-detail__panel">
+            <h2 class="order-detail__section-title">Timeline</h2>
+            <ol class="order-detail__timeline">
+              @for (entry of sortedHistory(); track entry.ts + entry.toStatus + (entry.orderLineId ?? '')) {
+                <li class="order-detail__timeline-entry">
+                  <span class="order-detail__timeline-label">{{ historyEntryLabel(entry) }}</span>
+                  <span class="order-detail__timeline-meta">{{ historySourceLabel(entry.source) }} · {{ entry.ts }}</span>
+                  @if (entry.note) {
+                    <p class="order-detail__timeline-note">{{ entry.note }}</p>
+                  }
+                </li>
+              }
+            </ol>
+          </section>
+        </div>
+
+        <div class="col-lg-4">
+          <section class="order-detail__panel order-detail__summary">
+            <h2 class="order-detail__section-title">Order summary</h2>
+            <div class="d-flex justify-content-between align-items-baseline mb-2">
+              <span>Order value</span>
+              <b>{{ order.totals.subtotal | currency }}</b>
+            </div>
+
+            @if (order.paidFrom.length > 0) {
+              <div class="order-detail__label mt-3 mb-2">Paid from</div>
+              @for (paid of order.paidFrom; track paid.ruleId) {
+                <div class="d-flex justify-content-between align-items-baseline mb-2">
+                  <span>
+                    {{ paid.ruleName }}
+                    @if (paid.state === 'RESERVED') {
+                      <span class="order-detail__summary-note">(reserved)</span>
+                    }
+                  </span>
+                  <b>{{ formatAmount(paid.amount, paid.amountType) }}</b>
+                </div>
+              }
+            }
+
+            <hr />
+            <div class="d-flex justify-content-between align-items-baseline mb-2">
+              <span>
+                Shipping
+                <span class="order-detail__summary-note">
+                  {{ order.totals.allotExclTaxFreight === 'N' ? '(covered by allotment)' : '(billed to company)' }}
+                </span>
+              </span>
+              <b>{{ order.totals.shipping | currency }}</b>
+            </div>
+            @if (order.totals.taxRate > 0) {
+              <div class="d-flex justify-content-between align-items-baseline mb-2">
+                <span>
+                  Tax ({{ order.totals.taxRate }}%{{ order.totals.taxProvince ? ', ' + order.totals.taxProvince : '' }})
+                  <span class="order-detail__summary-note">
+                    {{ order.totals.allotExclTaxFreight === 'N' ? '(covered by allotment)' : '(billed to company)' }}
+                  </span>
+                </span>
+                <b>{{ order.totals.tax | currency }}</b>
+              </div>
+            }
+            @if (order.totals.allotExclTaxFreight === 'Y') {
+              <div class="d-flex justify-content-between align-items-baseline mb-2">
+                <span>Billed to company</span>
+                <b>{{ order.totals.customerBilled | currency }}</b>
+              </div>
+            }
+            <hr />
+            <div class="d-flex justify-content-between align-items-baseline mb-3">
+              <span>Total</span>
+              <b>{{ order.totals.total | currency }}</b>
+            </div>
+
+            <div class="order-detail__amount-due">
+              <span>Amount due</span>
+              <b>{{ 0 | currency }}</b>
+            </div>
+          </section>
+
+          @if (cancelError(); as message) {
+            <div class="alert alert-danger py-2 px-3 small" role="alert">{{ message }}</div>
+          }
+          @if (canCancel()) {
+            <button
+              type="button"
+              class="btn btn-outline-danger w-100 mb-2"
+              (click)="cancelOrder()"
+              [disabled]="cancelling()"
+            >
+              {{ cancelling() ? 'Cancelling…' : 'Cancel order' }}
+            </button>
+          }
+          <a routerLink="/orders" class="btn btn-outline-secondary w-100">Back to order history</a>
+        </div>
+      </div>
+    }
+  </div>
+</section>
+
+<app-footer />

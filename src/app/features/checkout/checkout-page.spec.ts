@@ -1,8 +1,10 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 
+import { AuthService } from '../../core/auth/auth';
+import { FAKE_SESSION } from '../../core/auth/auth.testing';
 import { Cart } from '../../core/cart/cart';
 import { CheckoutPage } from './checkout-page';
 
@@ -97,15 +99,17 @@ const EXPRESS_SHIP_METHOD = {
 const QC_TAX_RATE = { province: 'QC', tax_rate: 14.975 };
 const ON_TAX_RATE = { province: 'ON', tax_rate: 13.0 };
 
-// CART, with an allotment that fully covers its one line (179.98) — used to
-// check that shipping/tax still produce a credit-card balance even once the
-// goods themselves are entirely covered.
+// CART, with an allotment that fully covers its one line (179.98) and
+// explicitly excludes shipping/tax from that coverage (`allotExclTaxFreight:
+// 'Y'`) — used to check that shipping/tax still produce a credit-card
+// balance even once the goods themselves are entirely covered.
 const FULLY_COVERED_CART: Cart = {
   ...CART,
   allotment: {
     programId: 3,
     allotmentBar: null,
     ruleCount: 1,
+    allotExclTaxFreight: 'Y',
     rules: [
       {
         ruleId: 99,
@@ -147,6 +151,14 @@ const FULLY_COVERED_CART: Cart = {
     ],
     productTag: null,
   },
+};
+
+// Same coverage as FULLY_COVERED_CART, but the allotment also covers
+// shipping/tax (`allotExclTaxFreight: 'N'`) — used to check that they no
+// longer produce a credit-card balance in that case.
+const CART_WITH_SHIPPING_AND_TAX_COVERED: Cart = {
+  ...FULLY_COVERED_CART,
+  allotment: { ...FULLY_COVERED_CART.allotment!, allotExclTaxFreight: 'N' },
 };
 
 function flushInitialCartLoads(httpMock: HttpTestingController, response: object) {
@@ -191,6 +203,54 @@ describe('CheckoutPage', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
+  it('should pre-fill the contact form name fields from the logged-in session', () => {
+    TestBed.inject(AuthService).session.set(FAKE_SESSION);
+
+    const fixture = TestBed.createComponent(CheckoutPage);
+    const page = fixture.componentInstance;
+
+    expect(page.contactForm.controls.firstName.value).toBe(FAKE_SESSION.firstName);
+    expect(page.contactForm.controls.lastName.value).toBe(FAKE_SESSION.lastName);
+    expect(page.contactForm.controls.email.value).toBe('');
+    expect(page.contactForm.controls.phone.value).toBe('');
+  });
+
+  it('should require email, first/last name, and phone on the contact form, but not extension', () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    const page = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(page.contactForm.invalid).toBe(true);
+
+    page.contactForm.setValue({
+      email: 'not-an-email',
+      firstName: 'Pat',
+      lastName: 'Doe',
+      phone: '555-0100',
+      extension: '',
+    });
+    expect(page.contactForm.controls.email.hasError('email')).toBe(true);
+    expect(page.contactForm.controls.extension.valid).toBe(true);
+
+    page.contactForm.controls.email.setValue('pat.doe@example.com');
+    expect(page.contactForm.valid).toBe(true);
+  });
+
+  it('should render the contact information fields', () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    fixture.detectChanges();
+    flushInitialCartLoads(httpMock, CART);
+    flushCheckoutData(httpMock, { cust_addrs: [], ship_addrs: [], ship_mthds: [], tax_rates: [] });
+    fixture.detectChanges();
+
+    const host: HTMLElement = fixture.nativeElement;
+    expect(host.querySelector<HTMLInputElement>('#contact-email')).not.toBeNull();
+    expect(host.querySelector<HTMLInputElement>('#contact-first-name')).not.toBeNull();
+    expect(host.querySelector<HTMLInputElement>('#contact-last-name')).not.toBeNull();
+    expect(host.querySelector<HTMLInputElement>('#contact-phone')).not.toBeNull();
+    expect(host.querySelector<HTMLInputElement>('#contact-extension')).not.toBeNull();
+  });
+
   it('should scroll to the top of the page on first render', () => {
     const fixture = TestBed.createComponent(CheckoutPage);
     const scrollIntoViewSpy = vi.fn();
@@ -199,6 +259,24 @@ describe('CheckoutPage', () => {
     fixture.detectChanges();
 
     expect(scrollIntoViewSpy).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' });
+  });
+
+  it('should show each item\'s unit price alongside its line total, only when more than one was ordered', () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    fixture.detectChanges();
+    flushInitialCartLoads(httpMock, {
+      ...CART,
+      items: [...CART.items, { ...CART.items[0], cartItemId: 9002, quantity: 1, lineTotalPrice: 89.99 }],
+    });
+    flushCheckoutData(httpMock, { cust_addrs: [], ship_addrs: [], ship_mthds: [], tax_rates: [] });
+    fixture.detectChanges();
+
+    const rows: HTMLElement[] = fixture.nativeElement.querySelectorAll('.checkout-page__item-price');
+    expect(rows[0].querySelector('.checkout-page__item-linetotal')?.textContent).toContain('179.98');
+    expect(rows[0].querySelector('.checkout-page__item-unit-price')?.textContent).toContain('89.99');
+
+    expect(rows[1].querySelector('.checkout-page__item-linetotal')?.textContent).toContain('89.99');
+    expect(rows[1].querySelector('.checkout-page__item-unit-price')).toBeNull();
   });
 
   it('should load the cart and checkout data, defaulting to the primary address and default shipping method', () => {
@@ -416,8 +494,9 @@ describe('CheckoutPage', () => {
     expect(page.orderTotal()).toBeCloseTo(179.98 + 12.5 + expectedTax, 5);
   });
 
-  it('should show a credit card section, above Place Order, when there is a balance not covered by an allotment', () => {
+  it("should block placing the order and explain why when there's a balance not covered by an allotment", () => {
     const fixture = TestBed.createComponent(CheckoutPage);
+    const page = fixture.componentInstance;
     fixture.detectChanges();
     flushInitialCartLoads(httpMock, CART);
     flushCheckoutData(httpMock, {
@@ -428,115 +507,22 @@ describe('CheckoutPage', () => {
     });
     fixture.detectChanges();
 
-    const leftColumn: HTMLElement = fixture.nativeElement.querySelector('.col-lg-8');
-    const ccForm = leftColumn.querySelector('.checkout-page__cc-form');
-    const creditCardPanel = ccForm?.closest('.checkout-page__panel') as HTMLElement | null;
-    // The full order total (subtotal due 179.98 + shipping 12.50, no tax
-    // configured here) — not just the goods-only subtotal-due figure.
-    expect(creditCardPanel?.textContent).toContain('$192.48');
-    expect(creditCardPanel?.querySelectorAll('.checkout-page__cc-input').length).toBe(4);
+    // Full order total (subtotal due 179.98 + shipping 12.50, no tax
+    // configured here) — credit card payment isn't collected at all yet,
+    // so any balance at all blocks the order outright.
+    expect(page.orderTotal()).toBeCloseTo(192.48, 5);
 
-    const children = Array.from(leftColumn.children);
-    const creditCardIndex = children.indexOf(creditCardPanel!);
-    const placeOrderIndex = children.findIndex((el) => el.classList.contains('checkout-page__place-order'));
-    expect(creditCardIndex).toBeGreaterThanOrEqual(0);
-    expect(placeOrderIndex).toBeGreaterThan(creditCardIndex);
+    const warning: HTMLElement = fixture.nativeElement.querySelector('.alert-warning');
+    expect(warning?.textContent).toContain('$192.48');
+
+    const placeOrder: HTMLElement = fixture.nativeElement.querySelector('.checkout-page__place-order');
+    expect(placeOrder.hasAttribute('disabled')).toBe(true);
+    expect(placeOrder.querySelector('.checkout-page__place-order-sub')?.textContent).toContain(
+      'Balance must be $0.00',
+    );
   });
 
-  it('formats the card number into groups of 4 digits, dropping anything else typed', () => {
-    const fixture = TestBed.createComponent(CheckoutPage);
-    fixture.detectChanges();
-    flushInitialCartLoads(httpMock, CART);
-    flushCheckoutData(httpMock, { cust_addrs: [], ship_addrs: [], ship_mthds: [], tax_rates: [] });
-    fixture.detectChanges();
-
-    const input: HTMLInputElement = fixture.nativeElement.querySelector('input[formcontrolname="cardNumber"]');
-    input.value = '4111-1111 1111x1111999';
-    input.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-
-    expect(input.value).toBe('4111 1111 1111 1111');
-  });
-
-  it('auto-inserts the slash into the expiry field after the second digit', () => {
-    const fixture = TestBed.createComponent(CheckoutPage);
-    fixture.detectChanges();
-    flushInitialCartLoads(httpMock, CART);
-    flushCheckoutData(httpMock, { cust_addrs: [], ship_addrs: [], ship_mthds: [], tax_rates: [] });
-    fixture.detectChanges();
-
-    const input: HTMLInputElement = fixture.nativeElement.querySelector('input[formcontrolname="expiry"]');
-    input.value = '1225';
-    input.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-
-    expect(input.value).toBe('12/25');
-  });
-
-  it('adds the slash as soon as the second digit is typed, not only once a third digit arrives', () => {
-    const fixture = TestBed.createComponent(CheckoutPage);
-    fixture.detectChanges();
-    flushInitialCartLoads(httpMock, CART);
-    flushCheckoutData(httpMock, { cust_addrs: [], ship_addrs: [], ship_mthds: [], tax_rates: [] });
-    fixture.detectChanges();
-
-    const input: HTMLInputElement = fixture.nativeElement.querySelector('input[formcontrolname="expiry"]');
-    input.value = '1';
-    input.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-    expect(input.value).toBe('1');
-
-    input.value = '12';
-    input.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-    expect(input.value).toBe('12/');
-  });
-
-  it('lets backspacing past the auto-inserted slash reach the bare month digits again', () => {
-    const fixture = TestBed.createComponent(CheckoutPage);
-    fixture.detectChanges();
-    flushInitialCartLoads(httpMock, CART);
-    flushCheckoutData(httpMock, { cust_addrs: [], ship_addrs: [], ship_mthds: [], tax_rates: [] });
-    fixture.detectChanges();
-
-    const input: HTMLInputElement = fixture.nativeElement.querySelector('input[formcontrolname="expiry"]');
-    const type = (value: string) => {
-      input.value = value;
-      input.dispatchEvent(new Event('input'));
-      fixture.detectChanges();
-    };
-
-    type('12');
-    expect(input.value).toBe('12/');
-
-    // Backspacing the trailing slash itself must not immediately grow it
-    // back — that would trap the shopper at "12/" forever.
-    type('12');
-    expect(input.value).toBe('12');
-
-    type('1');
-    expect(input.value).toBe('1');
-
-    type('');
-    expect(input.value).toBe('');
-  });
-
-  it('strips non-digits and caps the CVC field at 4 characters', () => {
-    const fixture = TestBed.createComponent(CheckoutPage);
-    fixture.detectChanges();
-    flushInitialCartLoads(httpMock, CART);
-    flushCheckoutData(httpMock, { cust_addrs: [], ship_addrs: [], ship_mthds: [], tax_rates: [] });
-    fixture.detectChanges();
-
-    const input: HTMLInputElement = fixture.nativeElement.querySelector('input[formcontrolname="cvc"]');
-    input.value = 'a1b2c3d4e5';
-    input.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-
-    expect(input.value).toBe('1234');
-  });
-
-  it('should hide the credit card section only when nothing at all is owed by card', () => {
+  it('should show no balance warning once nothing at all is owed by card, but still require the other fields', () => {
     const fixture = TestBed.createComponent(CheckoutPage);
     const page = fixture.componentInstance;
     fixture.detectChanges();
@@ -551,10 +537,18 @@ describe('CheckoutPage', () => {
 
     expect(page.subtotalDue()).toBe(0);
     expect(page.orderTotal()).toBe(0);
-    expect(fixture.nativeElement.querySelector('.checkout-page__cc-form')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.alert-warning')).toBeNull();
+
+    // No balance owed, but there's no shipping method on file (and the
+    // contact form is still empty) — the order still can't be placed.
+    expect(page.canPlaceOrder()).toBe(false);
+    const placeOrder: HTMLElement = fixture.nativeElement.querySelector('.checkout-page__place-order');
+    expect(placeOrder.querySelector('.checkout-page__place-order-sub')?.textContent?.trim()).toBe(
+      'Complete the required fields to continue',
+    );
   });
 
-  it("should still show a credit-card balance for shipping and tax even once the goods are fully covered", () => {
+  it("should still block the order for shipping and tax even once the goods themselves are fully covered", () => {
     const fixture = TestBed.createComponent(CheckoutPage);
     const page = fixture.componentInstance;
     fixture.detectChanges();
@@ -569,16 +563,41 @@ describe('CheckoutPage', () => {
 
     // subtotalDue is 0 (goods fully covered), but tax still applies to the
     // full $179.98 of goods plus the $12.50 shipping — an allotment
-    // covering the cost doesn't exempt it from tax.
+    // covering the cost doesn't exempt it from tax — so there's still a
+    // balance that would need a credit card, and the order stays blocked.
     const expectedTax = (179.98 + 12.5) * 0.14975;
     const expectedTotal = 12.5 + expectedTax;
     expect(page.subtotalDue()).toBe(0);
     expect(page.taxAmount()).toBeCloseTo(expectedTax, 5);
     expect(page.orderTotal()).toBeCloseTo(expectedTotal, 5);
 
-    const ccForm = fixture.nativeElement.querySelector('.checkout-page__cc-form');
-    expect(ccForm).not.toBeNull();
-    expect(ccForm.closest('.checkout-page__panel').textContent).toContain('$41.32');
+    expect(fixture.nativeElement.querySelector('.alert-warning')?.textContent).toContain('$41.32');
+  });
+
+  it('should not charge shipping/tax to the card when the allotment explicitly covers them too', () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    const page = fixture.componentInstance;
+    fixture.detectChanges();
+    flushInitialCartLoads(httpMock, CART_WITH_SHIPPING_AND_TAX_COVERED);
+    flushCheckoutData(httpMock, {
+      cust_addrs: [PRIMARY_ADDRESS],
+      ship_addrs: [PRIMARY_ADDRESS],
+      ship_mthds: [DEFAULT_SHIP_METHOD],
+      tax_rates: [QC_TAX_RATE],
+    });
+    fixture.detectChanges();
+
+    // Shipping/tax still compute and display for reference, but — unlike
+    // the `allotExclTaxFreight: 'Y'` case above — don't add to the balance
+    // that would need a credit card.
+    expect(page.shippingCost()).toBe(12.5);
+    expect(page.taxAmount()).toBeGreaterThan(0);
+    expect(page.shippingAndTaxCoveredByAllotment()).toBe(true);
+    expect(page.subtotalDue()).toBe(0);
+    expect(page.orderTotal()).toBe(0);
+
+    expect(fixture.nativeElement.querySelector('.alert-warning')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('(covered by allotment)');
   });
 
   it('should show empty-state notes when there are no addresses or shipping methods on file', () => {
@@ -616,5 +635,225 @@ describe('CheckoutPage', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('.alert')?.textContent).toContain('Not logged in.');
+  });
+
+  describe('placing an order', () => {
+    it('should re-evaluate canPlaceOrder once the contact form becomes valid, with no other signal changing', () => {
+      TestBed.inject(AuthService).session.set({
+        ...FAKE_SESSION,
+        locations: [{ empLocId: 1, locationId: 77, locationCode: '001', locationName: 'HQ' }],
+      });
+
+      const fixture = TestBed.createComponent(CheckoutPage);
+      const page = fixture.componentInstance;
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, CART_WITH_SHIPPING_AND_TAX_COVERED);
+      flushCheckoutData(httpMock, {
+        cust_addrs: [PRIMARY_ADDRESS],
+        ship_addrs: [PRIMARY_ADDRESS],
+        ship_mthds: [DEFAULT_SHIP_METHOD],
+        tax_rates: [],
+      });
+      fixture.detectChanges();
+
+      // Reading it once here — while the form is still blank — is what
+      // used to poison the memoized computed(): since `FormGroup.valid` is
+      // a plain getter (not a signal), `canPlaceOrder` never re-ran once
+      // the form changed, so it kept returning this first, stale `false`.
+      expect(page.canPlaceOrder()).toBe(false);
+
+      page.contactForm.setValue({
+        email: 'pat.doe@example.com',
+        firstName: 'Pat',
+        lastName: 'Doe',
+        phone: '555-0100',
+        extension: '',
+      });
+
+      expect(page.canPlaceOrder()).toBe(true);
+    });
+
+    function setUpReadyToPlace(): { fixture: ReturnType<typeof TestBed.createComponent<CheckoutPage>>; page: CheckoutPage } {
+      TestBed.inject(AuthService).session.set({
+        ...FAKE_SESSION,
+        locations: [{ empLocId: 1, locationId: 77, locationCode: '001', locationName: 'HQ' }],
+      });
+
+      const fixture = TestBed.createComponent(CheckoutPage);
+      const page = fixture.componentInstance;
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, CART_WITH_SHIPPING_AND_TAX_COVERED);
+      flushCheckoutData(httpMock, {
+        cust_addrs: [PRIMARY_ADDRESS],
+        ship_addrs: [PRIMARY_ADDRESS],
+        ship_mthds: [DEFAULT_SHIP_METHOD],
+        tax_rates: [],
+      });
+      fixture.detectChanges();
+
+      page.contactForm.setValue({
+        email: 'pat.doe@example.com',
+        firstName: 'Pat',
+        lastName: 'Doe',
+        phone: '555-0100',
+        extension: '',
+      });
+
+      expect(page.canPlaceOrder()).toBe(true);
+      return { fixture, page };
+    }
+
+    function flushOrderRequest(response: object) {
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      expect(req.request.body.action).toBe('*PLACE');
+      req.flush(response as never);
+      return req;
+    }
+
+    // No `/orders/:orderId` route is registered in this spec's bare
+    // `provideRouter([])` — mocked (not just spied on) so a real `navigate`
+    // call doesn't reject with "Cannot match any routes" as an unhandled
+    // rejection in every test that successfully places an order, not only
+    // the one below that actually asserts on it.
+    function mockNavigate() {
+      return vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    }
+
+    it('should place the order with the expected payload, refresh the cart, and navigate to the confirmation page', () => {
+      const { page } = setUpReadyToPlace();
+      const navigateSpy = mockNavigate();
+
+      page.placeOrder();
+
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      expect(req.request.body).toEqual({
+        action: '*PLACE',
+        locationId: 77,
+        checkoutKey: expect.any(String),
+        addressId: PRIMARY_ADDRESS.addressId,
+        shipMethodId: DEFAULT_SHIP_METHOD.shipMethodId,
+        email: 'pat.doe@example.com',
+        firstName: 'Pat',
+        lastName: 'Doe',
+        phone: '555-0100',
+      });
+      expect(req.request.body.checkoutKey).not.toBe('');
+
+      req.flush({
+        success: true,
+        message: 'Order EQ100001 placed.',
+        orderId: 42,
+        orderNumber: 'EQ100001',
+        status: 'SUBMITTED',
+      });
+
+      // The server already emptied the cart — this page refreshes the
+      // shared signal so the header's badge/drawer reflect that too.
+      httpMock
+        .expectOne((r) => r.url === '/cgi/APPSCDSPCH?SEPGM=APCCART' && r.body?.action === '*GET')
+        .flush({ cartId: null, itemCount: 0, subtotalPrice: 0, subtotalPoints: null, items: [] });
+
+      expect(page.submitting()).toBe(false);
+      expect(navigateSpy).toHaveBeenCalledWith(['/orders', 42], { state: { justPlaced: true } });
+    });
+
+    it('should include phoneExt only when an extension was entered', () => {
+      const { page } = setUpReadyToPlace();
+      mockNavigate();
+      page.contactForm.controls.extension.setValue('204');
+
+      page.placeOrder();
+
+      const req = flushOrderRequest({
+        success: true,
+        message: 'Order EQ100001 placed.',
+        orderId: 42,
+        orderNumber: 'EQ100001',
+        status: 'SUBMITTED',
+      });
+      expect(req.request.body.phoneExt).toBe('204');
+      httpMock
+        .expectOne((r) => r.url === '/cgi/APPSCDSPCH?SEPGM=APCCART' && r.body?.action === '*GET')
+        .flush({ cartId: null, itemCount: 0, subtotalPrice: 0, subtotalPoints: null, items: [] });
+    });
+
+    it('should show a PCH cart-changed message as a warning, reload the cart, and mint a new checkoutKey', () => {
+      const { page } = setUpReadyToPlace();
+      mockNavigate();
+
+      page.placeOrder();
+      const firstReq = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      const firstKey = firstReq.request.body.checkoutKey;
+      firstReq.flush({ success: false, code: 'PCH', message: '2 item(s) in your cart changed price.' });
+
+      // PCH reloads the cart — flush that incidental request.
+      httpMock
+        .expectOne((r) => r.url === '/cgi/APPSCDSPCH?SEPGM=APCCART' && r.body?.action === '*GET')
+        .flush(CART_WITH_SHIPPING_AND_TAX_COVERED);
+
+      expect(page.submitting()).toBe(false);
+      expect(page.placeOrderWarning()).toBe('2 item(s) in your cart changed price.');
+      expect(page.placeOrderError()).toBeNull();
+
+      page.placeOrder();
+      const secondReq = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      expect(secondReq.request.body.checkoutKey).not.toBe(firstKey);
+      secondReq.flush({
+        success: true,
+        message: 'Order EQ100001 placed.',
+        orderId: 43,
+        orderNumber: 'EQ100002',
+        status: 'SUBMITTED',
+      });
+      httpMock
+        .expectOne((r) => r.url === '/cgi/APPSCDSPCH?SEPGM=APCCART' && r.body?.action === '*GET')
+        .flush({ cartId: null, itemCount: 0, subtotalPrice: 0, subtotalPoints: null, items: [] });
+    });
+
+    it('should show an INS (insufficient allotment) message as a blocking error and keep the same checkoutKey for Retry', () => {
+      const { page } = setUpReadyToPlace();
+
+      page.placeOrder();
+      const firstReq = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      const firstKey = firstReq.request.body.checkoutKey;
+      firstReq.flush({ success: false, code: 'INS', message: 'Not enough allotment for SKU ABC-100.' });
+
+      expect(page.placeOrderError()).toBe('Not enough allotment for SKU ABC-100.');
+      expect(page.placeOrderWarning()).toBeNull();
+
+      // Retry reuses the same checkoutKey — the server can use it to
+      // recognize this as the same attempt, not a brand new order.
+      page.placeOrder();
+      const secondReq = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      expect(secondReq.request.body.checkoutKey).toBe(firstKey);
+      secondReq.flush({ success: false, code: 'INS', message: 'Not enough allotment for SKU ABC-100.' });
+    });
+
+    it('should show a generic message and keep the same checkoutKey on a network error', () => {
+      const { page } = setUpReadyToPlace();
+
+      page.placeOrder();
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      const firstKey = req.request.body.checkoutKey;
+      req.error(new ProgressEvent('error'), { status: 0 });
+
+      expect(page.submitting()).toBe(false);
+      expect(page.placeOrderError()).toBe('We could not reach the order service. Please try again.');
+
+      page.placeOrder();
+      const retryReq = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      expect(retryReq.request.body.checkoutKey).toBe(firstKey);
+      retryReq.flush({ success: false, code: 'ERR', message: 'Still busy.' });
+    });
+
+    it('should mark the contact form touched and not submit when it is invalid', () => {
+      const { page } = setUpReadyToPlace();
+      page.contactForm.controls.email.setValue('');
+
+      page.placeOrder();
+
+      expect(page.contactForm.controls.email.touched).toBe(true);
+      httpMock.expectNone('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+    });
   });
 });

@@ -4,6 +4,7 @@ import { Router, provideRouter } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 
 import { AuthService } from '../../../core/auth/auth';
+import { FAKE_SESSION } from '../../../core/auth/auth.testing';
 import { CartService } from '../../../core/cart/cart';
 import { ProductDetailInfo } from '../../../core/catalog/product-detail';
 import { ProductDetail } from './product-detail';
@@ -207,10 +208,7 @@ describe('ProductDetail', () => {
 
   it('sends the shopper\'s active locationId once one is known', () => {
     TestBed.inject(AuthService).session.set({
-      empId: '1',
-      sessionId: 's1',
-      firstName: 'Pat',
-      lastName: 'Doe',
+      ...FAKE_SESSION,
       locations: [
         { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Edmonton Fire Dept Chief' },
       ],
@@ -973,6 +971,7 @@ describe('ProductDetail', () => {
         programId: 3,
         allotmentBar: null,
         ruleCount: 1,
+        allotExclTaxFreight: 'N',
         rules: [],
         approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
         openOrders: null,
@@ -1007,6 +1006,7 @@ describe('ProductDetail', () => {
         programId: 3,
         allotmentBar: null,
         ruleCount: 1,
+        allotExclTaxFreight: 'N',
         rules: [],
         approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
         openOrders: null,
@@ -1046,6 +1046,7 @@ describe('ProductDetail', () => {
         programId: 3,
         allotmentBar: null,
         ruleCount: 1,
+        allotExclTaxFreight: 'N',
         rules: [],
         approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
         openOrders: null,
@@ -1081,6 +1082,7 @@ describe('ProductDetail', () => {
         programId: 3,
         allotmentBar: null,
         ruleCount: 1,
+        allotExclTaxFreight: 'N',
         rules: [
           {
             ruleId: 12,

@@ -52,4 +52,16 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./features/checkout/checkout-page').then((m) => m.CheckoutPage),
   },
+  {
+    path: 'orders',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/orders/order-history/order-history').then((m) => m.OrderHistoryPage),
+  },
+  {
+    path: 'orders/:orderId',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/orders/order-detail/order-detail').then((m) => m.OrderDetailPage),
+  },
 ];

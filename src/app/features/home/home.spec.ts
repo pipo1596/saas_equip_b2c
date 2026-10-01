@@ -4,6 +4,7 @@ import { provideRouter } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 
 import { AuthService } from '../../core/auth/auth';
+import { FAKE_SESSION } from '../../core/auth/auth.testing';
 import { Home } from './home';
 
 describe('Home', () => {
@@ -99,10 +100,7 @@ describe('Home', () => {
     home.ngOnInit();
 
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: [
         {
           empLocId: 14998,
@@ -163,9 +161,11 @@ describe('Home', () => {
     expect(home.firstName()).toBeNull();
 
     const auth = TestBed.inject(AuthService);
-    auth.session.set({ empId: '1', sessionId: 's', firstName: 'aaron', lastName: 'ermis', locations: [] });
+    // Deliberately lowercase here — this test is specifically checking
+    // that Home capitalizes the session's raw name for display.
+    auth.session.set({ ...FAKE_SESSION, firstName: 'pat', lastName: 'doe', locations: [] });
 
-    expect(home.firstName()).toBe('Aaron');
+    expect(home.firstName()).toBe('Pat');
   });
 
   describe('allotment hero tiles', () => {
@@ -209,6 +209,7 @@ describe('Home', () => {
         programId: 3,
         allotmentBar: null,
         ruleCount: 2,
+        allotExclTaxFreight: 'N',
         rules: [
           DOLLAR_RULE,
           {
@@ -248,6 +249,7 @@ describe('Home', () => {
         programId: 3,
         allotmentBar: null,
         ruleCount: 0,
+        allotExclTaxFreight: 'N',
         rules: [],
         approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
         openOrders: null,
@@ -268,6 +270,7 @@ describe('Home', () => {
         programId: 3,
         allotmentBar: null,
         ruleCount: 0,
+        allotExclTaxFreight: 'N',
         rules: [],
         approvals: { canApprove: 'Y', pendingApprovals: null, awaitingApproval: null },
         openOrders: null,
@@ -287,6 +290,7 @@ describe('Home', () => {
         programId: 3,
         allotmentBar: null,
         ruleCount: 0,
+        allotExclTaxFreight: 'N',
         rules: [],
         approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
         openOrders: null,

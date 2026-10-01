@@ -126,6 +126,11 @@ export interface Allotment {
   programId: number | null;
   allotmentBar: AllotmentBar | null;
   ruleCount: number;
+  // 'Y' means shipping and tax are excluded from allotment coverage — they
+  // become a credit-card balance at checkout regardless of how much of the
+  // goods themselves the allotment covers. 'N' means the allotment covers
+  // them too, so they don't add to that balance.
+  allotExclTaxFreight: 'Y' | 'N';
   rules: AllotmentRule[];
   approvals: AllotmentApprovals;
   openOrders: number | null;

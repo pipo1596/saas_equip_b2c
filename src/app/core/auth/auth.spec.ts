@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 
 import { AuthService, LoginResponse } from './auth';
+import { FAKE_EMP_ID, FAKE_FIRST_NAME, FAKE_LAST_NAME, FAKE_SESSION_ID } from './auth.testing';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -32,7 +33,7 @@ describe('AuthService', () => {
   it('discards a cached session from before `locations` existed on the Session shape', () => {
     localStorage.setItem(
       'auth.session',
-      JSON.stringify({ empId: '1', sessionId: 's', firstName: 'P', lastName: 'A' }),
+      JSON.stringify({ empId: FAKE_EMP_ID, sessionId: 's', firstName: 'P', lastName: 'A' }),
     );
 
     TestBed.resetTestingModule();
@@ -52,24 +53,24 @@ describe('AuthService', () => {
     const response: LoginResponse = {
       success: true,
       mfaRequired: false,
-      empId: '1',
-      sessionId: 'sess-1',
-      firstName: 'Jane',
-      lastName: 'Doe',
+      empId: FAKE_EMP_ID,
+      sessionId: FAKE_SESSION_ID,
+      firstName: FAKE_FIRST_NAME,
+      lastName: FAKE_LAST_NAME,
       message: null,
     };
     req.flush(response);
 
     httpMock
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
-      .flush({ empId: '1', firstName: 'Jane', lastName: 'Doe' });
+      .flush({ empId: FAKE_EMP_ID, firstName: FAKE_FIRST_NAME, lastName: FAKE_LAST_NAME });
 
     expect(service.isAuthenticated()).toBe(true);
     expect(service.session()).toEqual({
-      empId: '1',
-      sessionId: 'sess-1',
-      firstName: 'Jane',
-      lastName: 'Doe',
+      empId: FAKE_EMP_ID,
+      sessionId: FAKE_SESSION_ID,
+      firstName: FAKE_FIRST_NAME,
+      lastName: FAKE_LAST_NAME,
       locations: [],
     });
   });
@@ -80,17 +81,17 @@ describe('AuthService', () => {
     httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN').flush({
       success: true,
       mfaRequired: false,
-      empId: '1',
-      sessionId: 'sess-1',
-      firstName: 'Jane',
-      lastName: 'Doe',
+      empId: FAKE_EMP_ID,
+      sessionId: FAKE_SESSION_ID,
+      firstName: FAKE_FIRST_NAME,
+      lastName: FAKE_LAST_NAME,
       message: null,
     } satisfies LoginResponse);
 
     httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE').flush({
-      empId: '1',
-      firstName: 'Jane',
-      lastName: 'Doe',
+      empId: FAKE_EMP_ID,
+      firstName: FAKE_FIRST_NAME,
+      lastName: FAKE_LAST_NAME,
       locations: [
         { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Edmonton Fire Dept Chief' },
       ],
@@ -106,22 +107,22 @@ describe('AuthService', () => {
     httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN').flush({
       success: true,
       mfaRequired: false,
-      empId: '1',
-      sessionId: 'sess-1',
+      empId: FAKE_EMP_ID,
+      sessionId: FAKE_SESSION_ID,
       firstName: 'P',
       lastName: 'A',
       message: null,
     } satisfies LoginResponse);
 
     const employeeReq = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE');
-    expect(employeeReq.request.body).toEqual({ empId: '1', sessionId: 'sess-1', action: '*GET' });
-    employeeReq.flush({ empId: '1', firstName: 'Jane', lastName: 'Doe' });
+    expect(employeeReq.request.body).toEqual({ empId: FAKE_EMP_ID, sessionId: FAKE_SESSION_ID, action: '*GET' });
+    employeeReq.flush({ empId: FAKE_EMP_ID, firstName: FAKE_FIRST_NAME, lastName: FAKE_LAST_NAME });
 
     expect(service.session()).toEqual({
-      empId: '1',
-      sessionId: 'sess-1',
-      firstName: 'Jane',
-      lastName: 'Doe',
+      empId: FAKE_EMP_ID,
+      sessionId: FAKE_SESSION_ID,
+      firstName: FAKE_FIRST_NAME,
+      lastName: FAKE_LAST_NAME,
       locations: [],
     });
   });
@@ -133,8 +134,8 @@ describe('AuthService', () => {
     req.flush({
       success: true,
       mfaRequired: true,
-      empId: '1',
-      sessionId: 'sess-1',
+      empId: FAKE_EMP_ID,
+      sessionId: FAKE_SESSION_ID,
       message: null,
     } satisfies LoginResponse);
 
@@ -146,29 +147,29 @@ describe('AuthService', () => {
     service.login('jane.doe@example.com', 'TestPass123!').subscribe();
     httpMock
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN')
-      .flush({ success: true, mfaRequired: true, empId: '1', sessionId: 'sess-1', message: null });
+      .flush({ success: true, mfaRequired: true, empId: FAKE_EMP_ID, sessionId: FAKE_SESSION_ID, message: null });
 
     service.verifyMfa('123456').subscribe();
     const verifyReq = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN');
     expect(verifyReq.request.body).toEqual({
-      empId: '1',
-      sessionId: 'sess-1',
+      empId: FAKE_EMP_ID,
+      sessionId: FAKE_SESSION_ID,
       code: '123456',
       action: 'MFA1',
     });
     verifyReq.flush({
       success: true,
       mfaRequired: false,
-      empId: '1',
-      sessionId: 'sess-1',
-      firstName: 'Jane',
-      lastName: 'Doe',
+      empId: FAKE_EMP_ID,
+      sessionId: FAKE_SESSION_ID,
+      firstName: FAKE_FIRST_NAME,
+      lastName: FAKE_LAST_NAME,
       message: null,
     } satisfies LoginResponse);
 
     httpMock
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
-      .flush({ empId: '1', firstName: 'Jane', lastName: 'Doe' });
+      .flush({ empId: FAKE_EMP_ID, firstName: FAKE_FIRST_NAME, lastName: FAKE_LAST_NAME });
 
     expect(service.mfaPending()).toBe(false);
     expect(service.isAuthenticated()).toBe(true);
@@ -178,7 +179,7 @@ describe('AuthService', () => {
     service.login('jane.doe@example.com', 'TestPass123!').subscribe();
     httpMock
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN')
-      .flush({ success: true, mfaRequired: true, empId: '1', sessionId: 'sess-1', message: null });
+      .flush({ success: true, mfaRequired: true, empId: FAKE_EMP_ID, sessionId: FAKE_SESSION_ID, message: null });
 
     service.verifyMfa('123456').subscribe();
     // The verify response confirms success but — unlike the fixture used
@@ -187,16 +188,16 @@ describe('AuthService', () => {
     httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN').flush({
       success: true,
       mfaRequired: false,
-      firstName: 'Jane',
-      lastName: 'Doe',
+      firstName: FAKE_FIRST_NAME,
+      lastName: FAKE_LAST_NAME,
       message: null,
     } satisfies LoginResponse);
     httpMock
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
-      .flush({ empId: '1', firstName: 'Jane', lastName: 'Doe', locations: [] });
+      .flush({ empId: FAKE_EMP_ID, firstName: FAKE_FIRST_NAME, lastName: FAKE_LAST_NAME, locations: [] });
 
     expect(service.session()).toEqual(
-      expect.objectContaining({ empId: '1', sessionId: 'sess-1' }),
+      expect.objectContaining({ empId: FAKE_EMP_ID, sessionId: FAKE_SESSION_ID }),
     );
 
     // Simulate a refresh: a brand new AuthService instance restoring only
@@ -209,7 +210,7 @@ describe('AuthService', () => {
 
     expect(restored.isAuthenticated()).toBe(true);
     expect(restored.session()).toEqual(
-      expect.objectContaining({ empId: '1', sessionId: 'sess-1' }),
+      expect.objectContaining({ empId: FAKE_EMP_ID, sessionId: FAKE_SESSION_ID }),
     );
   });
 
@@ -217,7 +218,7 @@ describe('AuthService', () => {
     service.login('jane.doe@example.com', 'TestPass123!').subscribe();
     httpMock
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN')
-      .flush({ success: true, mfaRequired: true, empId: '1', sessionId: 'sess-1', message: null });
+      .flush({ success: true, mfaRequired: true, empId: FAKE_EMP_ID, sessionId: FAKE_SESSION_ID, message: null });
 
     // Simulate a refresh: a brand new AuthService instance, same persisted
     // sessionStorage, nothing else carried over from the old instance.
@@ -233,18 +234,18 @@ describe('AuthService', () => {
     restored.verifyMfa('123456').subscribe();
     const verifyReq = httpMockAfterRefresh.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN');
     expect(verifyReq.request.body).toEqual({
-      empId: '1',
-      sessionId: 'sess-1',
+      empId: FAKE_EMP_ID,
+      sessionId: FAKE_SESSION_ID,
       code: '123456',
       action: 'MFA1',
     });
-    verifyReq.flush({ success: true, mfaRequired: false, empId: '1', sessionId: 'sess-1', message: null });
-    httpMockAfterRefresh.expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE').flush({ empId: '1' });
+    verifyReq.flush({ success: true, mfaRequired: false, empId: FAKE_EMP_ID, sessionId: FAKE_SESSION_ID, message: null });
+    httpMockAfterRefresh.expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE').flush({ empId: FAKE_EMP_ID });
     httpMockAfterRefresh.verify();
   });
 
   it('discards a corrupt pending-MFA entry from sessionStorage instead of restoring it', () => {
-    sessionStorage.setItem('auth.pendingMfa', JSON.stringify({ empId: '1' }));
+    sessionStorage.setItem('auth.pendingMfa', JSON.stringify({ empId: FAKE_EMP_ID }));
 
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
@@ -260,18 +261,18 @@ describe('AuthService', () => {
     service.login('jane.doe@example.com', 'TestPass123!').subscribe();
     httpMock
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN')
-      .flush({ success: true, mfaRequired: true, empId: '1', sessionId: 'sess-1', message: null });
+      .flush({ success: true, mfaRequired: true, empId: FAKE_EMP_ID, sessionId: FAKE_SESSION_ID, message: null });
     expect(sessionStorage.getItem('auth.pendingMfa')).not.toBeNull();
 
     service.verifyMfa('123456').subscribe();
     httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN').flush({
       success: true,
       mfaRequired: false,
-      empId: '1',
-      sessionId: 'sess-1',
+      empId: FAKE_EMP_ID,
+      sessionId: FAKE_SESSION_ID,
       message: null,
     });
-    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE').flush({ empId: '1' });
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE').flush({ empId: FAKE_EMP_ID });
 
     expect(sessionStorage.getItem('auth.pendingMfa')).toBeNull();
   });
@@ -281,13 +282,13 @@ describe('AuthService', () => {
     httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN').flush({
       success: true,
       mfaRequired: false,
-      empId: '1',
-      sessionId: 'sess-1',
+      empId: FAKE_EMP_ID,
+      sessionId: FAKE_SESSION_ID,
       message: null,
     } satisfies LoginResponse);
     httpMock
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
-      .flush({ empId: '1', firstName: 'Jane', lastName: 'Doe' });
+      .flush({ empId: FAKE_EMP_ID, firstName: FAKE_FIRST_NAME, lastName: FAKE_LAST_NAME });
 
     expect(service.isAuthenticated()).toBe(true);
     service.logout();

@@ -4,6 +4,7 @@ import { Router, provideRouter } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 
 import { LoginResponse } from '../../../core/auth/auth';
+import { FAKE_EMP_ID, FAKE_FIRST_NAME, FAKE_LAST_NAME } from '../../../core/auth/auth.testing';
 import { Mfa } from './mfa';
 
 describe('Mfa', () => {
@@ -53,17 +54,17 @@ describe('Mfa', () => {
     const response: LoginResponse = {
       success: true,
       mfaRequired: false,
-      empId: '1',
+      empId: FAKE_EMP_ID,
       sessionId: 'sess_test_0004',
-      firstName: 'Jane',
-      lastName: 'Doe',
+      firstName: FAKE_FIRST_NAME,
+      lastName: FAKE_LAST_NAME,
       message: null,
     };
     req.flush(response);
 
     TestBed.inject(HttpTestingController)
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
-      .flush({ empId: '1', firstName: 'Jane', lastName: 'Doe' });
+      .flush({ empId: FAKE_EMP_ID, firstName: FAKE_FIRST_NAME, lastName: FAKE_LAST_NAME });
 
     await submitPromise;
 

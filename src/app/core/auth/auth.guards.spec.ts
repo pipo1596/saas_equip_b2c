@@ -5,6 +5,7 @@ import { Router, UrlTree, provideRouter } from '@angular/router';
 
 import { AuthService } from './auth';
 import { authGuard, guestGuard, mfaPendingGuard } from './auth.guards';
+import { FAKE_EMP_ID, FAKE_SESSION, FAKE_SESSION_ID } from './auth.testing';
 
 describe('auth guards', () => {
   let router: Router;
@@ -35,7 +36,7 @@ describe('auth guards', () => {
 
     it('allows navigation once a session exists', () => {
       const auth = TestBed.inject(AuthService);
-      auth.session.set({ empId: '1', sessionId: 's', firstName: 'P', lastName: 'A', locations: [] });
+      auth.session.set(FAKE_SESSION);
       const result = TestBed.runInInjectionContext(() => authGuard({} as never, {} as never));
       expect(result).toBe(true);
     });
@@ -49,7 +50,7 @@ describe('auth guards', () => {
 
     it('redirects an already-authenticated user to /home', () => {
       const auth = TestBed.inject(AuthService);
-      auth.session.set({ empId: '1', sessionId: 's', firstName: 'P', lastName: 'A', locations: [] });
+      auth.session.set(FAKE_SESSION);
       const result = TestBed.runInInjectionContext(() => guestGuard({} as never, {} as never));
       expect(result).toBeInstanceOf(UrlTree);
       expect(router.serializeUrl(result as UrlTree)).toBe('/home');
@@ -67,7 +68,7 @@ describe('auth guards', () => {
 
     it('allows navigation while MFA verification is pending', () => {
       const auth = TestBed.inject(AuthService);
-      auth.pendingMfa.set({ empId: '1', sessionId: 's' });
+      auth.pendingMfa.set({ empId: FAKE_EMP_ID, sessionId: FAKE_SESSION_ID });
       const result = TestBed.runInInjectionContext(() =>
         mfaPendingGuard({} as never, {} as never),
       );

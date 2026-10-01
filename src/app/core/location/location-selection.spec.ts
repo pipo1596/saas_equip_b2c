@@ -3,6 +3,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 
 import { AuthService } from '../auth/auth';
+import { FAKE_SESSION } from '../auth/auth.testing';
 import { LocationSelectionService } from './location-selection';
 
 const LOCATIONS = [
@@ -33,13 +34,7 @@ describe('LocationSelectionService', () => {
     const service = TestBed.inject(LocationSelectionService);
     const auth = TestBed.inject(AuthService);
 
-    auth.session.set({
-      empId: '19023',
-      sessionId: 'sess-1',
-      firstName: 'jane',
-      lastName: 'doe',
-      locations: LOCATIONS,
-    });
+    auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
 
     expect(service.activeLocation()?.locationName).toBe('Edmonton Fire Dept Chief');
   });
@@ -47,13 +42,7 @@ describe('LocationSelectionService', () => {
   it('switches the active location and persists the choice', () => {
     const service = TestBed.inject(LocationSelectionService);
     const auth = TestBed.inject(AuthService);
-    auth.session.set({
-      empId: '19023',
-      sessionId: 'sess-1',
-      firstName: 'jane',
-      lastName: 'doe',
-      locations: LOCATIONS,
-    });
+    auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
 
     service.select(LOCATIONS[1]);
 
@@ -70,13 +59,7 @@ describe('LocationSelectionService', () => {
     });
     const service = TestBed.inject(LocationSelectionService);
     const auth = TestBed.inject(AuthService);
-    auth.session.set({
-      empId: '19023',
-      sessionId: 'sess-1',
-      firstName: 'jane',
-      lastName: 'doe',
-      locations: LOCATIONS,
-    });
+    auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
 
     expect(service.activeLocation()?.locationName).toBe('Edmonton Fire Dept Office');
   });

@@ -225,6 +225,7 @@ describe('CartService', () => {
             programId: 3,
             allotmentBar: ALLOTMENT_BAR,
             ruleCount: 1,
+            allotExclTaxFreight: 'N',
             rules: [
               {
                 ...DOLLAR_RULE,
@@ -259,6 +260,7 @@ describe('CartService', () => {
             programId: 3,
             allotmentBar: ALLOTMENT_BAR,
             ruleCount: 1,
+            allotExclTaxFreight: 'N',
             rules: [DOLLAR_RULE],
             approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
             openOrders: null,
@@ -297,6 +299,7 @@ describe('CartService', () => {
             programId: 3,
             allotmentBar: ALLOTMENT_BAR,
             ruleCount: 1,
+            allotExclTaxFreight: 'N',
             rules: [DOLLAR_RULE],
             approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
             openOrders: null,
@@ -318,6 +321,7 @@ describe('CartService', () => {
             programId: 3,
             allotmentBar: ALLOTMENT_BAR,
             ruleCount: 2,
+            allotExclTaxFreight: 'N',
             rules: [
               { ...DOLLAR_RULE, ruleId: 21, ruleName: 'Uniform allotment', fallbackRuleIds: [22] },
               { ...DOLLAR_RULE, ruleId: 22, ruleName: 'Footwear allotment', fallbackRuleIds: [] },

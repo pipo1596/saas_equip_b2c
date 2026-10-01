@@ -1,4 +1,4 @@
-import { CurrencyPipe, NgOptimizedImage, isPlatformBrowser } from '@angular/common';
+import { CurrencyPipe, isPlatformBrowser } from '@angular/common';
 import {
   AfterViewInit,
   ChangeDetectionStrategy,
@@ -12,9 +12,11 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 
+import { AuthService } from '../../core/auth/auth';
 import { CartService, formatBalanceAmount, formatCartItemOptions } from '../../core/cart/cart';
 import { amountDueAtCheckout, paidFromLines } from '../../core/cart/cart-totals';
 import {
@@ -24,40 +26,13 @@ import {
   ProvinceTaxRate,
 } from '../../core/checkout/checkout';
 import { LocationSelectionService } from '../../core/location/location-selection';
+import { OrderService } from '../../core/order/order';
 import { Footer } from '../../shared/footer/footer';
 import { Header } from '../../shared/header/header';
 
-// "1234 5678 9012 3456" — digits only, grouped in 4s, capped at 16 digits.
-// The trailing lookahead keeps the last group from getting a dangling space
-// while it's still being typed.
-function formatCardNumber(value: string): string {
-  return value
-    .replace(/\D/g, '')
-    .slice(0, 16)
-    .replace(/(.{4})(?=.)/g, '$1 ');
-}
-
-// "MM/YY" — digits only, capped at 4, with the slash inserted as soon as
-// the month's 2nd digit is typed (not just once a 3rd digit shows up) so
-// typing "1225" reads "12/25" the moment the "2" lands. `isDeleting` skips
-// that auto-insert, or backspacing away the year digits would immediately
-// re-add the slash it just removed and get stuck unable to reach "12" or
-// less.
-function formatExpiry(value: string, isDeleting: boolean): string {
-  const digits = value.replace(/\D/g, '').slice(0, 4);
-  const threshold = isDeleting ? 2 : 1;
-  return digits.length > threshold ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
-}
-
-// Digits only, capped at `maxLength` — shared by CVC (4) and anything else
-// that's just a plain numeric code.
-function formatDigits(value: string, maxLength: number): string {
-  return value.replace(/\D/g, '').slice(0, maxLength);
-}
-
 @Component({
   selector: 'app-checkout-page',
-  imports: [Header, Footer, RouterLink, CurrencyPipe, ReactiveFormsModule, NgOptimizedImage],
+  imports: [Header, Footer, RouterLink, CurrencyPipe, ReactiveFormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './checkout-page.html',
   styleUrls: ['../../shared/shared.css', './checkout-page.css'],
@@ -65,46 +40,33 @@ function formatDigits(value: string, maxLength: number): string {
 export class CheckoutPage implements OnInit, AfterViewInit {
   private readonly cartService = inject(CartService);
   private readonly checkoutService = inject(CheckoutService);
+  private readonly orderService = inject(OrderService);
   private readonly locationSelectionService = inject(LocationSelectionService);
+  private readonly authService = inject(AuthService);
   private readonly formBuilder = inject(FormBuilder);
+  private readonly router = inject(Router);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
   private readonly hostElementRef = inject(ElementRef<HTMLElement>);
 
-  // Nothing submits this yet (there's no order/payment endpoint) — the
-  // fields and validators are here so the form is ready to wire up once
-  // one exists, rather than being pure decoration.
-  readonly creditCardForm = this.formBuilder.nonNullable.group({
-    cardholderName: ['', Validators.required],
-    cardNumber: ['', Validators.required],
-    expiry: ['', Validators.required],
-    cvc: ['', Validators.required],
+  // Pre-filled from the logged-in session where it already has the answer
+  // (name) — email/phone have no such source yet, so those start blank.
+  readonly contactForm = this.formBuilder.nonNullable.group({
+    email: ['', [Validators.required, Validators.email]],
+    firstName: [this.authService.session()?.firstName ?? '', Validators.required],
+    lastName: [this.authService.session()?.lastName ?? '', Validators.required],
+    phone: ['', Validators.required],
+    extension: [''],
   });
 
-  constructor() {
-    // Reformats as the shopper types (grouped digits, auto "/", digits-
-    // only) — done via valueChanges rather than an (input) handler so it
-    // can't race with ReactiveFormsModule's own value accessor, and
-    // `emitEvent: false` keeps a corrected value from re-triggering itself.
-    this.reformatOnChange('cardNumber', (value) => formatCardNumber(value));
-    this.reformatOnChange('expiry', formatExpiry);
-    this.reformatOnChange('cvc', (value) => formatDigits(value, 4));
-  }
-
-  private reformatOnChange(
-    controlName: 'cardNumber' | 'expiry' | 'cvc',
-    format: (value: string, isDeleting: boolean) => string,
-  ): void {
-    const control = this.creditCardForm.controls[controlName];
-    let previousLength = 0;
-    control.valueChanges.subscribe((value) => {
-      const isDeleting = value.length < previousLength;
-      const formatted = format(value, isDeleting);
-      previousLength = formatted.length;
-      if (formatted !== value) {
-        control.setValue(formatted, { emitEvent: false });
-      }
-    });
-  }
+  // `FormGroup.valid` is a plain getter, not a signal — reading it directly
+  // inside a `computed()` wouldn't register it as a dependency, so that
+  // computed would never re-run once the form's validity actually changes
+  // (e.g. the shopper typing a valid email) and the Place order button
+  // would stay stuck showing whatever its very first validity happened to
+  // be. Bridging `statusChanges` through `toSignal` makes it reactive.
+  private readonly contactFormStatus = toSignal(this.contactForm.statusChanges, {
+    initialValue: this.contactForm.status,
+  });
 
   @ViewChild('addressDialogEl') private readonly addressDialogEl?: ElementRef<HTMLDialogElement>;
 
@@ -159,7 +121,53 @@ export class CheckoutPage implements OnInit, AfterViewInit {
   // tax, so this taxes the full order value plus shipping.
   readonly taxAmount = computed(() => (this.cart().subtotalPrice + this.shippingCost()) * (this.taxRate() / 100));
 
-  readonly orderTotal = computed(() => this.subtotalDue() + this.shippingCost() + this.taxAmount());
+  // Only an explicit 'N' means the allotment itself covers shipping/tax —
+  // no allotment at all, or an explicit 'Y', both mean they're a
+  // credit-card balance like today.
+  readonly shippingAndTaxCoveredByAllotment = computed(
+    () => this.cart().allotment?.allotExclTaxFreight === 'N',
+  );
+
+  readonly orderTotal = computed(() =>
+    this.shippingAndTaxCoveredByAllotment()
+      ? this.subtotalDue()
+      : this.subtotalDue() + this.shippingCost() + this.taxAmount(),
+  );
+
+  readonly submitting = signal(false);
+  readonly placeOrderError = signal<string | null>(null);
+  // `PCH` is a warning, not a blocking error — the cart's just been
+  // reloaded with fresh prices and the employee can simply try again.
+  readonly placeOrderWarning = signal<string | null>(null);
+
+  readonly canPlaceOrder = computed(
+    () =>
+      this.orderTotal() === 0 &&
+      !!this.selectedAddress() &&
+      !!this.selectedShipMethod() &&
+      this.contactFormStatus() === 'VALID' &&
+      !this.submitting(),
+  );
+
+  readonly placeOrderSubtitle = computed(() => {
+    if (this.orderTotal() > 0) {
+      return 'Balance must be $0.00 to continue';
+    }
+    if (this.submitting()) {
+      return 'Submitting your order…';
+    }
+    if (!this.canPlaceOrder()) {
+      return 'Complete the required fields to continue';
+    }
+    return null;
+  });
+
+  // Idempotency key for `*PLACE` (see the API guide) — the same key is
+  // reused across retries of the *same* attempt (timeouts, the "busy"
+  // error, a double click) so a retried request can't ever create a
+  // second order; a fresh one is only minted once the employee actually
+  // changes something (the `PCH` cart-changed path below).
+  private checkoutKey = '';
 
   // Opens/closes the native <dialog> to track the picker — a plain effect()
   // only guarantees running after change detection, not after the <dialog>
@@ -190,6 +198,8 @@ export class CheckoutPage implements OnInit, AfterViewInit {
     if (!this.isBrowser) {
       return;
     }
+    this.checkoutKey = crypto.randomUUID();
+
     // Fire-and-forget refresh of the shared cart signal — same reasoning
     // as product detail's own piggyback load: there's nowhere on this page
     // to surface a failure beyond just not updating the totals.
@@ -257,5 +267,68 @@ export class CheckoutPage implements OnInit, AfterViewInit {
     if (event.target === this.addressDialogEl?.nativeElement) {
       this.closeAddressPicker();
     }
+  }
+
+  placeOrder(): void {
+    if (this.contactForm.invalid) {
+      this.contactForm.markAllAsTouched();
+      return;
+    }
+    const address = this.selectedAddress();
+    const shipMethod = this.selectedShipMethod();
+    const locationId = this.currentLocationId();
+    // The button is already disabled whenever any of this is missing (see
+    // `canPlaceOrder`) — this is just the defensive version for a stray
+    // call, not a path a shopper can actually reach.
+    if (!this.canPlaceOrder() || !address || !shipMethod || locationId === null) {
+      return;
+    }
+
+    const { email, firstName, lastName, phone, extension } = this.contactForm.getRawValue();
+
+    this.submitting.set(true);
+    this.placeOrderError.set(null);
+    this.placeOrderWarning.set(null);
+
+    this.orderService
+      .place({
+        locationId,
+        checkoutKey: this.checkoutKey,
+        addressId: address.addressId,
+        shipMethodId: shipMethod.shipMethodId,
+        email,
+        firstName,
+        lastName,
+        phone,
+        ...(extension ? { phoneExt: extension } : {}),
+      })
+      .subscribe({
+        next: (result) => {
+          this.submitting.set(false);
+          if (result.success) {
+            // The server already emptied the cart — refresh the shared
+            // signal so the header's badge/drawer reflect that too.
+            this.cartService.load(locationId).subscribe({ error: () => {} });
+            this.router.navigate(['/orders', result.orderId], { state: { justPlaced: true } });
+            return;
+          }
+          if (result.code === 'PCH') {
+            this.cartService.load(locationId).subscribe({ error: () => {} });
+            // A new attempt — prices/cart just changed, so this is no
+            // longer a retry of the one that failed.
+            this.checkoutKey = crypto.randomUUID();
+            this.placeOrderWarning.set(result.message);
+            return;
+          }
+          // `INS`, `NFD`, `BOP`, and plain `ERR` all just show the
+          // message — the checkoutKey is kept as-is so Retry doesn't
+          // risk placing a second order.
+          this.placeOrderError.set(result.message);
+        },
+        error: () => {
+          this.submitting.set(false);
+          this.placeOrderError.set('We could not reach the order service. Please try again.');
+        },
+      });
   }
 }

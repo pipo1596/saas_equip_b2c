@@ -4,6 +4,7 @@ import { provideRouter } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 
 import { AuthService } from '../../../core/auth/auth';
+import { FAKE_SESSION } from '../../../core/auth/auth.testing';
 import { ProductSearchResult } from '../../../core/catalog/catalog-products';
 import { ProductList } from './product-list';
 
@@ -141,10 +142,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -165,10 +163,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -187,10 +182,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', 'full-catalog');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -205,7 +197,7 @@ describe('ProductList', () => {
     const fixture = TestBed.createComponent(ProductList);
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '45');
-    auth.session.set({ empId: '1', sessionId: 's', firstName: 'P', lastName: 'A', locations: LOCATIONS });
+    auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
     fixture.detectChanges();
     expectProductsRequest(httpMock).flush({
       ...SAMPLE,
@@ -233,7 +225,7 @@ describe('ProductList', () => {
     const fixture = TestBed.createComponent(ProductList);
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', 'full-catalog');
-    auth.session.set({ empId: '1', sessionId: 's', firstName: 'P', lastName: 'A', locations: LOCATIONS });
+    auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
     fixture.detectChanges();
     expectProductsRequest(httpMock).flush(SAMPLE);
     fixture.detectChanges();
@@ -247,10 +239,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -267,10 +256,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -296,10 +282,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', 'footwear');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -320,10 +303,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', 'full-catalog');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -343,10 +323,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('q', 'steel toe boots');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -367,10 +344,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -390,10 +364,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -424,10 +395,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -461,10 +429,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -505,10 +470,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -549,10 +511,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -579,10 +538,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -613,10 +569,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -639,10 +592,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -665,10 +615,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -692,10 +639,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -717,10 +661,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -739,10 +680,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', 'full-catalog');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -773,10 +711,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', 'full-catalog');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -799,10 +734,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -833,10 +765,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -866,10 +795,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -896,10 +822,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();
@@ -922,10 +845,7 @@ describe('ProductList', () => {
     const auth = TestBed.inject(AuthService);
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({
-      empId: '1',
-      sessionId: 's',
-      firstName: 'P',
-      lastName: 'A',
+      ...FAKE_SESSION,
       locations: LOCATIONS,
     });
     fixture.detectChanges();

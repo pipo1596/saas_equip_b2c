@@ -4,37 +4,32 @@ import { Router, provideRouter } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 
 import { TenantSettings, TenantSettingsService } from '../tenant/tenant-settings';
-import { AuthService, Session } from './auth';
+import { AuthService } from './auth';
+import { FAKE_SESSION } from './auth.testing';
 import { IdleTimeoutService } from './idle-timeout';
 
-const SESSION: Session = {
-  empId: 'E1',
-  sessionId: 'S1',
-  firstName: 'Pat',
-  lastName: 'Doe',
-  locations: [],
-};
+const SESSION = FAKE_SESSION;
 
 const TENANT_SETTINGS: TenantSettings = {
   tp_id: 2,
-  cont_name: 'Seth Bailey',
-  pric_eml: 'bailey-seth@galls.com',
-  pric_phn: '(902) 468-4314',
-  adm_ct_eml: 'sbailey@uniformworks.ca',
-  adm_ct_phn: '(902) 468-5367',
+  cont_name: 'Test Contact',
+  pric_eml: 'contact@example.com',
+  pric_phn: '555-0100',
+  adm_ct_eml: 'admin@example.com',
+  adm_ct_phn: '555-0101',
   supprt_name: null,
   supprt_eml: null,
-  comp_name: 'Uniform Works',
+  comp_name: 'Test Company',
   dflt_lang: 'EN',
   bilng_mode: 'N',
   timezone: 'America/Halifax',
   currency: 'CAD',
   fisc_yr_mo: 11,
-  addr_line1: '89 Cutler Ave',
-  addr_line2: 'Unit 105',
-  city: 'Dartmouth',
+  addr_line1: '123 Test St',
+  addr_line2: 'Suite 100',
+  city: 'Testville',
   province: 'NS',
-  postal_code: 'NS B3B 0J5',
+  postal_code: 'A1A 1A1',
   country: 'CA',
   mfa_reqd: 'Y',
   ses_timeout: 15,
@@ -51,7 +46,7 @@ const TENANT_SETTINGS: TenantSettings = {
   youtub_url: '',
   linkdin_url: '',
   twiter_url: '',
-  shopng_url: '',
+  shopng_url: 'f',
   meas_sys: 'METRIC',
   welcom_copy: '',
   alert_copy: '',

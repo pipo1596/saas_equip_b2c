@@ -112,6 +112,9 @@ function buildDisplayCategories(
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './header.html',
   styleUrls: ['../shared.css', './header.css'],
+  host: {
+    '(document:keydown.escape)': 'closeCatalogNav()',
+  },
 })
 export class Header implements OnInit {
   private readonly authService = inject(AuthService);
@@ -124,6 +127,7 @@ export class Header implements OnInit {
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 
   private readonly clearCatalogNavCloseTimeoutOnDestroy = inject(DestroyRef).onDestroy(() => {
+    this.cancelScheduledCatalogNavOpen();
     this.cancelScheduledCatalogNavClose();
     this.cancelScheduledCartDialogClose();
     if (this.isBrowser) {
@@ -295,6 +299,11 @@ export class Header implements OnInit {
   }
 
   private closeCatalogNavTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  // A short delay before actually opening on hover, so sweeping the mouse
+  // across the nav bar toward something else (e.g. the search box) doesn't
+  // flash every menu it passes over.
+  private static readonly CATALOG_NAV_OPEN_DELAY_MS = 150;
+  private openCatalogNavTimeoutId: ReturnType<typeof setTimeout> | null = null;
   readonly deptMenuOpen = signal(false);
   // Shared via `CartService` (like `cartOpen` below) so a page like product
   // detail can expand this same panel — e.g. its "View rule" link — without
@@ -352,6 +361,7 @@ export class Header implements OnInit {
   }
 
   toggleCatalogNav(key: CatalogNavLabel['key']): void {
+    this.cancelScheduledCatalogNavOpen();
     this.cancelScheduledCatalogNavClose();
     this.deptMenuOpen.set(false);
     this.rulesMenuOpen.set(false);
@@ -361,15 +371,29 @@ export class Header implements OnInit {
 
   openCatalogNavOnHover(key: CatalogNavLabel['key']): void {
     this.cancelScheduledCatalogNavClose();
-    this.deptMenuOpen.set(false);
-    this.rulesMenuOpen.set(false);
-    this.userMenuOpen.set(false);
-    this.openCatalogNavKey.set(key);
+    if (this.openCatalogNavKey() === key) {
+      return;
+    }
+    this.cancelScheduledCatalogNavOpen();
+    this.openCatalogNavTimeoutId = setTimeout(() => {
+      this.deptMenuOpen.set(false);
+      this.rulesMenuOpen.set(false);
+      this.userMenuOpen.set(false);
+      this.openCatalogNavKey.set(key);
+    }, Header.CATALOG_NAV_OPEN_DELAY_MS);
   }
 
   scheduleCatalogNavClose(): void {
+    this.cancelScheduledCatalogNavOpen();
     this.cancelScheduledCatalogNavClose();
     this.closeCatalogNavTimeoutId = setTimeout(() => this.openCatalogNavKey.set(null), 200);
+  }
+
+  cancelScheduledCatalogNavOpen(): void {
+    if (this.openCatalogNavTimeoutId !== null) {
+      clearTimeout(this.openCatalogNavTimeoutId);
+      this.openCatalogNavTimeoutId = null;
+    }
   }
 
   cancelScheduledCatalogNavClose(): void {
@@ -380,6 +404,7 @@ export class Header implements OnInit {
   }
 
   closeCatalogNav(): void {
+    this.cancelScheduledCatalogNavOpen();
     this.cancelScheduledCatalogNavClose();
     this.openCatalogNavKey.set(null);
   }

@@ -1,0 +1,102 @@
+<app-header />
+
+<section class="order-history">
+  <div class="container py-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a routerLink="/home">Home</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Order history</li>
+      </ol>
+    </nav>
+
+    <h1 class="order-history__title mb-3">Order history</h1>
+
+    <div class="order-history__chips mb-3" role="group" aria-label="Filter by status">
+      @for (chip of statusChips; track chip.value) {
+        <button
+          type="button"
+          class="order-history__chip"
+          [class.order-history__chip--active]="statusFilter() === chip.value"
+          [attr.aria-pressed]="statusFilter() === chip.value"
+          (click)="setFilter(chip.value)"
+        >
+          {{ chip.label }}
+        </button>
+      }
+    </div>
+
+    @if (loading()) {
+      <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading orders…</span>
+        </div>
+      </div>
+    } @else if (error(); as message) {
+      <div class="alert alert-danger" role="alert">{{ message }}</div>
+    } @else if (orders().length === 0) {
+      <div class="order-history__empty text-center py-5">
+        <p class="mb-3">You haven't placed any orders yet.</p>
+        <a routerLink="/products/full-catalog" [queryParams]="{ name: 'Full Catalog' }" class="btn btn-primary">
+          Start shopping
+        </a>
+      </div>
+    } @else {
+      <div class="order-history__list">
+        @for (order of orders(); track order.orderId) {
+          <a class="order-history__row" [routerLink]="['/orders', order.orderId]">
+            <div class="order-history__row-main">
+              <div class="order-history__row-head">
+                <span class="order-history__order-number">{{ order.orderNumber }}</span>
+                <span [class]="'order-history__status-chip order-history__status-chip--' + statusTone(order.status)">
+                  {{ statusLabel(order.status) }}
+                </span>
+              </div>
+              <span class="order-history__row-meta">
+                {{ orderDate(order.placedTs) }} · {{ order.itemCount }} item{{ order.itemCount === 1 ? '' : 's' }} ·
+                {{ order.shipMethodName }}
+              </span>
+              <span class="order-history__row-meta">{{ paidByAllotmentLabel(order) }}</span>
+              @if (order.trackingCount > 0) {
+                <span class="order-history__row-meta order-history__row-tracking">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" />
+                    <circle cx="7" cy="18" r="1.6" />
+                    <circle cx="17.5" cy="18" r="1.6" />
+                  </svg>
+                  {{ order.trackingCount }} shipment{{ order.trackingCount === 1 ? '' : 's' }}
+                </span>
+              }
+            </div>
+            <span class="order-history__row-total">{{ order.orderTotal | currency }}</span>
+          </a>
+        }
+      </div>
+
+      @if (pagination(); as p) {
+        @if (p.totalPages > 1) {
+          <nav class="order-history__pager" aria-label="Order history pages">
+            <button
+              type="button"
+              class="btn btn-outline-secondary btn-sm"
+              [disabled]="p.page <= 1"
+              (click)="goToPage(p.page - 1)"
+            >
+              Previous
+            </button>
+            <span class="order-history__pager-label">Page {{ p.page }} of {{ p.totalPages }}</span>
+            <button
+              type="button"
+              class="btn btn-outline-secondary btn-sm"
+              [disabled]="p.page >= p.totalPages"
+              (click)="goToPage(p.page + 1)"
+            >
+              Next
+            </button>
+          </nav>
+        }
+      }
+    }
+  </div>
+</section>
+
+<app-footer />

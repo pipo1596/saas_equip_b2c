@@ -85,26 +85,26 @@ describe('Footer', () => {
     TestBed.inject(HttpTestingController)
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS')
       .flush({
-        cont_name: 'Seth Bailey',
-        pric_phn: '(902) 468-4314',
-        pric_eml: 'bailey-seth@galls.com',
-        addr_line1: '89 Cutler Ave',
-        addr_line2: 'Unit 105',
-        city: 'Dartmouth',
+        cont_name: 'Test Contact',
+        pric_phn: '555-0100',
+        pric_eml: 'contact@example.com',
+        addr_line1: '123 Test St',
+        addr_line2: 'Suite 100',
+        city: 'Testville',
         province: 'NS',
-        postal_code: 'NS B3B 0J5',
+        postal_code: 'A1A 1A1',
       } as never);
 
     expect(footer.departmentContact()).toEqual({
-      name: 'Seth Bailey',
-      phone: '(902) 468-4314',
-      phoneHref: 'tel:9024684314',
-      email: 'bailey-seth@galls.com',
+      name: 'Test Contact',
+      phone: '555-0100',
+      phoneHref: 'tel:5550100',
+      email: 'contact@example.com',
     });
     expect(footer.departmentAddress()).toEqual({
-      line1: '89 Cutler Ave',
-      line2: 'Unit 105',
-      cityLine: 'Dartmouth, NS NS B3B 0J5',
+      line1: '123 Test St',
+      line2: 'Suite 100',
+      cityLine: 'Testville, NS A1A 1A1',
     });
   });
 
@@ -116,17 +116,17 @@ describe('Footer', () => {
     TestBed.inject(HttpTestingController)
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS')
       .flush({
-        facebk_url: 'http://facebook.com',
-        twiter_url: 'x.com',
-        instag_url: 'https://instagram.com',
+        facebk_url: 'facebook.com/test',
+        twiter_url: 'x.com/test',
+        instag_url: 'instagram.com/test',
         youtub_url: '',
         linkdin_url: null,
       } as never);
 
     expect(footer.socialLinks()).toEqual({
-      facebook: 'http://facebook.com',
-      twitter: 'https://x.com',
-      instagram: 'https://instagram.com',
+      facebook: 'https://facebook.com/test',
+      twitter: 'https://x.com/test',
+      instagram: 'https://instagram.com/test',
       youtube: null,
       linkedin: null,
     });

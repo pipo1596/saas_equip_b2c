@@ -32,6 +32,98 @@
         <div class="row g-4">
           <div class="col-lg-8">
             <section class="checkout-page__panel">
+              <h2 class="checkout-page__section-title">Contact information</h2>
+              <div [formGroup]="contactForm" class="checkout-page__contact-form">
+                <div class="checkout-page__field checkout-page__field--full">
+                  <label for="contact-email" class="checkout-page__field-label">
+                    <span class="checkout-page__field-required" aria-hidden="true">*</span> Email
+                  </label>
+                  <input
+                    id="contact-email"
+                    type="email"
+                    class="checkout-page__field-input"
+                    formControlName="email"
+                    autocomplete="email"
+                    required
+                    [attr.aria-invalid]="contactForm.controls.email.invalid && contactForm.controls.email.touched"
+                    [attr.aria-describedby]="
+                      contactForm.controls.email.invalid && contactForm.controls.email.touched
+                        ? 'contact-email-error'
+                        : null
+                    "
+                  />
+                </div>
+                @if (contactForm.controls.email.invalid && contactForm.controls.email.touched) {
+                  <p class="text-danger small mb-0" id="contact-email-error">
+                    {{
+                      contactForm.controls.email.hasError('required')
+                        ? 'Enter your email address.'
+                        : 'Enter a valid email address.'
+                    }}
+                  </p>
+                }
+
+                <div class="checkout-page__field-row">
+                  <div class="checkout-page__field">
+                    <label for="contact-first-name" class="checkout-page__field-label">
+                      <span class="checkout-page__field-required" aria-hidden="true">*</span> First Name
+                    </label>
+                    <input
+                      id="contact-first-name"
+                      type="text"
+                      class="checkout-page__field-input"
+                      formControlName="firstName"
+                      autocomplete="given-name"
+                      required
+                      [attr.aria-invalid]="contactForm.controls.firstName.invalid && contactForm.controls.firstName.touched"
+                    />
+                  </div>
+                  <div class="checkout-page__field">
+                    <label for="contact-last-name" class="checkout-page__field-label">
+                      <span class="checkout-page__field-required" aria-hidden="true">*</span> Last Name
+                    </label>
+                    <input
+                      id="contact-last-name"
+                      type="text"
+                      class="checkout-page__field-input"
+                      formControlName="lastName"
+                      autocomplete="family-name"
+                      required
+                      [attr.aria-invalid]="contactForm.controls.lastName.invalid && contactForm.controls.lastName.touched"
+                    />
+                  </div>
+                </div>
+
+                <div class="checkout-page__field-row">
+                  <div class="checkout-page__field">
+                    <label for="contact-phone" class="checkout-page__field-label">
+                      <span class="checkout-page__field-required" aria-hidden="true">*</span> Phone Number
+                    </label>
+                    <input
+                      id="contact-phone"
+                      type="tel"
+                      class="checkout-page__field-input"
+                      formControlName="phone"
+                      autocomplete="tel"
+                      required
+                      [attr.aria-invalid]="contactForm.controls.phone.invalid && contactForm.controls.phone.touched"
+                    />
+                  </div>
+                  <div class="checkout-page__field">
+                    <label for="contact-extension" class="checkout-page__field-label">Extension</label>
+                    <input
+                      id="contact-extension"
+                      type="text"
+                      class="checkout-page__field-input"
+                      formControlName="extension"
+                      autocomplete="off"
+                    />
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="checkout-page__panel">
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h2 class="checkout-page__section-title mb-0">Shipping address</h2>
                 @if (shipAddrs().length > 0) {
@@ -95,77 +187,29 @@
             </section>
 
             @if (orderTotal() > 0) {
-              <section class="checkout-page__panel">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                  <h2 class="checkout-page__section-title mb-0">Credit card</h2>
-                  <img
-                    ngSrc="/images/card-brands.png"
-                    width="900"
-                    height="172"
-                    class="checkout-page__card-brands-img"
-                    alt="Visa, Mastercard, American Express and Discover accepted"
-                  />
-                </div>
-                <div class="checkout-page__cc-total mb-3">
-                  <span class="checkout-page__cc-total-label">Amount to charge</span>
-                  <span class="checkout-page__cc-total-amount">{{ orderTotal() | currency }}</span>
-                </div>
-                <form [formGroup]="creditCardForm" class="checkout-page__cc-form">
-                  <label class="checkout-page__cc-label">
-                    Name on card
-                    <input
-                      type="text"
-                      formControlName="cardholderName"
-                      class="checkout-page__cc-input"
-                      autocomplete="cc-name"
-                      maxlength="120"
-                    />
-                  </label>
-                  <label class="checkout-page__cc-label">
-                    Card number
-                    <input
-                      type="text"
-                      formControlName="cardNumber"
-                      class="checkout-page__cc-input"
-                      inputmode="numeric"
-                      autocomplete="cc-number"
-                      placeholder="1234 5678 9012 3456"
-                      maxlength="19"
-                    />
-                  </label>
-                  <div class="checkout-page__cc-row">
-                    <label class="checkout-page__cc-label">
-                      Expiry
-                      <input
-                        type="text"
-                        formControlName="expiry"
-                        class="checkout-page__cc-input"
-                        inputmode="numeric"
-                        autocomplete="cc-exp"
-                        placeholder="MM/YY"
-                        maxlength="5"
-                      />
-                    </label>
-                    <label class="checkout-page__cc-label">
-                      CVC
-                      <input
-                        type="text"
-                        formControlName="cvc"
-                        class="checkout-page__cc-input"
-                        inputmode="numeric"
-                        autocomplete="cc-csc"
-                        placeholder="123"
-                        maxlength="4"
-                      />
-                    </label>
-                  </div>
-                </form>
-              </section>
+              <div class="alert alert-warning mb-0" role="alert">
+                Credit card payment isn't available yet. This order has a
+                {{ orderTotal() | currency }} balance that isn't covered by an allotment, so it can't be placed until
+                that balance is $0.00 — adjust items or shipping method to bring it down.
+              </div>
+            }
+            @if (placeOrderWarning(); as warning) {
+              <div class="alert alert-warning mb-0" role="alert">{{ warning }}</div>
+            }
+            @if (placeOrderError(); as message) {
+              <div class="alert alert-danger mb-0" role="alert">{{ message }}</div>
             }
 
-            <button type="button" class="checkout-page__place-order" disabled>
+            <button
+              type="button"
+              class="checkout-page__place-order"
+              [disabled]="!canPlaceOrder()"
+              (click)="placeOrder()"
+            >
               <span class="checkout-page__place-order-title">Place order</span>
-              <span class="checkout-page__place-order-sub">Coming soon</span>
+              @if (placeOrderSubtitle(); as subtitle) {
+                <span class="checkout-page__place-order-sub">{{ subtitle }}</span>
+              }
             </button>
           </div>
 
@@ -190,7 +234,12 @@
                         · Qty {{ item.quantity }}
                       </span>
                     </div>
-                    <span class="checkout-page__item-price">{{ item.lineTotalPrice | currency }}</span>
+                    <span class="checkout-page__item-price">
+                      <span class="checkout-page__item-linetotal">{{ item.lineTotalPrice | currency }}</span>
+                      @if (item.quantity > 1) {
+                        <span class="checkout-page__item-unit-price">{{ item.currentPrice | currency }} each</span>
+                      }
+                    </span>
                   </div>
                 }
               </div>
@@ -225,12 +274,22 @@
                 <b>{{ subtotalDue() | currency }}</b>
               </div>
               <div class="d-flex justify-content-between align-items-baseline mb-2">
-                <span>Shipping</span>
+                <span>
+                  Shipping
+                  @if (shippingAndTaxCoveredByAllotment()) {
+                    <span class="checkout-page__summary-note">(covered by allotment)</span>
+                  }
+                </span>
                 <b>{{ shippingCost() | currency }}</b>
               </div>
               @if (taxRate() > 0) {
                 <div class="d-flex justify-content-between align-items-baseline mb-2">
-                  <span>Tax ({{ taxRate() }}%)</span>
+                  <span>
+                    Tax ({{ taxRate() }}%)
+                    @if (shippingAndTaxCoveredByAllotment()) {
+                      <span class="checkout-page__summary-note">(covered by allotment)</span>
+                    }
+                  </span>
                   <b>{{ taxAmount() | currency }}</b>
                 </div>
               }
