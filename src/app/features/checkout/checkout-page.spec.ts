@@ -747,6 +747,27 @@ describe('CheckoutPage', () => {
       return vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     }
 
+    it('still generates a usable checkoutKey when crypto.randomUUID is unavailable (e.g. a non-HTTPS deployment)', () => {
+      const originalRandomUUID = crypto.randomUUID;
+      // `crypto.randomUUID` only exists in a secure context (HTTPS/localhost)
+      // — this simulates a plain-HTTP deployment, where it's missing
+      // entirely rather than just throwing.
+      // @ts-expect-error - deliberately simulating its absence
+      crypto.randomUUID = undefined;
+
+      try {
+        const { page } = setUpReadyToPlace();
+        page.placeOrder();
+
+        const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+        expect(typeof req.request.body.checkoutKey).toBe('string');
+        expect(req.request.body.checkoutKey).not.toBe('');
+        req.flush({ success: false, code: 'ERR', message: 'Not logged in.' });
+      } finally {
+        crypto.randomUUID = originalRandomUUID;
+      }
+    });
+
     it('should place the order with the expected payload, refresh the cart, and navigate to the confirmation page', () => {
       const { page } = setUpReadyToPlace();
       const navigateSpy = mockNavigate();

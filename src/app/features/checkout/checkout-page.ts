@@ -50,6 +50,19 @@ function formatPhoneNumber(value: string): string {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
+// `crypto.randomUUID()` only exists in a "secure context" (HTTPS, or
+// localhost) — calling it on a plain-HTTP deployment throws instead of
+// just being `undefined`, which would otherwise crash checkout on load.
+// The checkoutKey only needs to be unique enough to key a single
+// attempt, not a strict RFC 4122 UUID, so this falls back to a
+// timestamp + random-suffix string wherever `randomUUID` isn't there.
+function generateCheckoutKey(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `ckt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
 @Component({
   selector: 'app-checkout-page',
   imports: [Header, Footer, RouterLink, CurrencyPipe, ReactiveFormsModule],
@@ -230,7 +243,7 @@ export class CheckoutPage implements OnInit, AfterViewInit {
     if (!this.isBrowser) {
       return;
     }
-    this.checkoutKey = crypto.randomUUID();
+    this.checkoutKey = generateCheckoutKey();
 
     // Fire-and-forget refresh of the shared cart signal — same reasoning
     // as product detail's own piggyback load: there's nowhere on this page
@@ -348,7 +361,7 @@ export class CheckoutPage implements OnInit, AfterViewInit {
             this.cartService.load(locationId).subscribe({ error: () => {} });
             // A new attempt — prices/cart just changed, so this is no
             // longer a retry of the one that failed.
-            this.checkoutKey = crypto.randomUUID();
+            this.checkoutKey = generateCheckoutKey();
             this.placeOrderWarning.set(result.message);
             return;
           }
