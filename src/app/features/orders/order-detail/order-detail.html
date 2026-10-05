@@ -26,7 +26,7 @@
       <div class="alert alert-danger" role="alert">{{ message }}</div>
     } @else if (order(); as order) {
       <div [class]="'order-detail__banner order-detail__banner--' + statusTone(order.status)">
-        @if (justPlaced && order.status === 'SUBMITTED') {
+        @if (justPlaced && order.status === 'PROCESSING') {
           <p class="order-detail__banner-title">
             Thank you! Your order <strong>{{ order.orderNumber }}</strong> has been placed.
           </p>
@@ -59,6 +59,11 @@
             <div class="order-detail__item-list">
               @for (line of order.lines; track line.orderLineId) {
                 <div class="order-detail__item">
+                  <img
+                    class="order-detail__item-thumb"
+                    [src]="line.imageUrl ?? placeholderImage"
+                    [alt]="line.productTitle"
+                  />
                   <div class="order-detail__item-body">
                     <span class="order-detail__item-name">{{ line.productTitle }}</span>
                     <span class="order-detail__item-sku">
@@ -250,26 +255,8 @@
               <b>{{ order.totals.total | currency }}</b>
             </div>
 
-            <div class="order-detail__amount-due">
-              <span>Amount due</span>
-              <b>{{ 0 | currency }}</b>
-            </div>
+            <a routerLink="/orders" class="btn btn-outline-secondary w-100 mt-3">Back to order history</a>
           </section>
-
-          @if (cancelError(); as message) {
-            <div class="alert alert-danger py-2 px-3 small" role="alert">{{ message }}</div>
-          }
-          @if (canCancel()) {
-            <button
-              type="button"
-              class="btn btn-outline-danger w-100 mb-2"
-              (click)="cancelOrder()"
-              [disabled]="cancelling()"
-            >
-              {{ cancelling() ? 'Cancelling…' : 'Cancel order' }}
-            </button>
-          }
-          <a routerLink="/orders" class="btn btn-outline-secondary w-100">Back to order history</a>
         </div>
       </div>
     }

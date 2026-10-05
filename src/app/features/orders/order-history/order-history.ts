@@ -3,24 +3,27 @@ import { ChangeDetectionStrategy, Component, OnInit, PLATFORM_ID, computed, inje
 import { RouterLink } from '@angular/router';
 
 import { formatBalanceAmount } from '../../../core/cart/cart';
-import { OrderPage, OrderService, OrderSummary, orderStatusLabel, orderStatusTone } from '../../../core/order/order';
+import {
+  OrderPage,
+  OrderService,
+  OrderSummary,
+  PRODUCT_IMAGE_PLACEHOLDER,
+  orderStatusLabel,
+  orderStatusTone,
+} from '../../../core/order/order';
 import { Footer } from '../../../shared/footer/footer';
 import { Header } from '../../../shared/header/header';
 
 const PAGE_SIZE = 25;
 
-// The filter is a single exact status, not a grouped one — "Processing"
-// only ever matches `SUBMITTED`, even though `SEND_FAILED` displays with
-// the same label (see ORDERS_UI_SPEC.md §5's own note on this).
 const STATUS_CHIPS: { label: string; value: string }[] = [
   { label: 'All', value: '' },
-  { label: 'Pending approval', value: 'PENDING_APPROVAL' },
-  { label: 'Processing', value: 'SUBMITTED' },
-  { label: 'Shipped', value: 'SHIPPED' },
+  { label: 'Processing', value: 'PROCESSING' },
   { label: 'Partially shipped', value: 'PARTIALLY_SHIPPED' },
-  { label: 'Delivered', value: 'DELIVERED' },
-  { label: 'Cancelled', value: 'CANCELLED' },
+  { label: 'Shipped', value: 'SHIPPED' },
+  { label: 'Pending approval', value: 'PENDING_APPROVAL' },
   { label: 'Rejected', value: 'REJECTED' },
+  { label: 'Cancelled', value: 'CANCELLED' },
 ];
 
 @Component({
@@ -47,6 +50,7 @@ export class OrderHistoryPage implements OnInit {
 
   readonly statusLabel = orderStatusLabel;
   readonly statusTone = orderStatusTone;
+  readonly placeholderImage = PRODUCT_IMAGE_PLACEHOLDER;
 
   ngOnInit(): void {
     if (!this.isBrowser) {
@@ -80,6 +84,12 @@ export class OrderHistoryPage implements OnInit {
     }
     const units = order.allotUnitsUsed === 1 ? '1 unit' : `${order.allotUnitsUsed} units`;
     return `Paid by allotment: ${dollars} (+ ${units})`;
+  }
+
+  // `thumbnails` only ever holds up to 4 — this is how many more distinct
+  // products beyond those the order has, for the "+N more" badge.
+  moreThumbsCount(order: OrderSummary): number {
+    return Math.max(0, order.lineCount - order.thumbnails.length);
   }
 
   // Timestamps are `'YYYY-MM-DD HH:MM:SS'` with no timezone — this row only

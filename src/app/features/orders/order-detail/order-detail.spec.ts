@@ -3,15 +3,12 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideRouter } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 
-import { AuthService } from '../../../core/auth/auth';
-import { FAKE_SESSION } from '../../../core/auth/auth.testing';
-import { ConfirmService } from '../../../shared/confirm/confirm';
 import { OrderDetailPage } from './order-detail';
 
 const BASE_ORDER = {
   orderId: 42,
   orderNumber: 'EQ100001',
-  status: 'SUBMITTED' as const,
+  status: 'PROCESSING' as const,
   placedTs: '2026-09-30 10:00:00',
   employeeId: 1001,
   locationId: 18,
@@ -59,6 +56,7 @@ const BASE_ORDER = {
       skuCode: 'ABC-100-BLK-M',
       productTitle: "Men's Trail Jacket",
       optionDesc: 'BLACK / M',
+      imageUrl: 'https://cdn.example.com/black-m.jpg',
       qtyOrdered: 2,
       qtyShipped: 1,
       qtyCancelled: 0,
@@ -78,7 +76,7 @@ const BASE_ORDER = {
   ],
   shipments: [] as never[],
   history: [
-    { fromStatus: null, toStatus: 'SUBMITTED', source: 'PORTAL' as const, note: null, orderLineId: null, ts: '2026-09-30 10:00:00', by: null },
+    { fromStatus: null, toStatus: 'PROCESSING', source: 'PORTAL' as const, note: null, orderLineId: null, ts: '2026-09-30 10:00:00', by: null },
   ],
 };
 
@@ -131,6 +129,17 @@ describe('OrderDetailPage', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
+  it('should scroll to the top of the page on first render', () => {
+    const { fixture } = createPage();
+    const scrollIntoViewSpy = vi.fn();
+    fixture.nativeElement.scrollIntoView = scrollIntoViewSpy;
+
+    fixture.detectChanges();
+    flushOrderGet(httpMock, BASE_ORDER);
+
+    expect(scrollIntoViewSpy).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' });
+  });
+
   it('loads the order on init and exposes it', () => {
     const { fixture, page } = createPage();
     fixture.detectChanges();
@@ -161,7 +170,7 @@ describe('OrderDetailPage', () => {
     expect(fixture.nativeElement.querySelector('.alert-danger')?.textContent).toContain('Something went wrong.');
   });
 
-  it('shows the "just placed" banner for a SUBMITTED order arriving from checkout', () => {
+  it('shows the "just placed" banner for a PROCESSING order arriving from checkout', () => {
     history.pushState({ justPlaced: true }, '');
     const { fixture } = createPage();
     fixture.detectChanges();
@@ -206,6 +215,31 @@ describe('OrderDetailPage', () => {
     expect(fixture.nativeElement.querySelector('.order-detail__reject-reason')?.textContent).toContain(
       'Exceeds remaining allotment.',
     );
+  });
+
+  it("shows each line's image, with productTitle as the alt text", () => {
+    const { fixture } = createPage();
+    fixture.detectChanges();
+    flushOrderGet(httpMock, BASE_ORDER);
+    fixture.detectChanges();
+
+    const img: HTMLImageElement = fixture.nativeElement.querySelector('.order-detail__item-thumb');
+    expect(img.src).toBe('https://cdn.example.com/black-m.jpg');
+    expect(img.alt).toBe("Men's Trail Jacket");
+  });
+
+  it('shows a placeholder image when a line has no imageUrl', () => {
+    const { fixture } = createPage();
+    fixture.detectChanges();
+    flushOrderGet(httpMock, {
+      ...BASE_ORDER,
+      lines: [{ ...BASE_ORDER.lines[0], imageUrl: null }],
+    });
+    fixture.detectChanges();
+
+    const img: HTMLImageElement = fixture.nativeElement.querySelector('.order-detail__item-thumb');
+    expect(img.src).toMatch(/^data:image\/svg\+xml,/);
+    expect(img.alt).toBe("Men's Trail Jacket");
   });
 
   it('shows a per-line shipped/backordered note', () => {
@@ -255,13 +289,14 @@ describe('OrderDetailPage', () => {
     expect(fixture.nativeElement.textContent).toContain('$41.30');
   });
 
-  it('always shows a $0.00 amount due', () => {
+  it('does not show an amount due', () => {
     const { fixture } = createPage();
     fixture.detectChanges();
     flushOrderGet(httpMock, BASE_ORDER);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('.order-detail__amount-due')?.textContent).toContain('$0.00');
+    expect(fixture.nativeElement.querySelector('.order-detail__amount-due')).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('Amount due');
   });
 
   it('does not repeat the country on the shipping address', () => {
@@ -281,95 +316,23 @@ describe('OrderDetailPage', () => {
     expect(countryOccurrences).toBeGreaterThanOrEqual(1);
   });
 
-  describe('cancelling', () => {
-    function setSessionEmpId(empId: string) {
-      TestBed.inject(AuthService).session.set({ ...FAKE_SESSION, empId, locations: [] });
-    }
+  it('never shows a Cancel order button', () => {
+    const { fixture } = createPage();
+    fixture.detectChanges();
+    flushOrderGet(httpMock, { ...BASE_ORDER, status: 'PROCESSING' });
+    fixture.detectChanges();
 
-    it('shows Cancel order when the viewer owns the order and it is still cancellable', () => {
-      setSessionEmpId('1001');
-      const { fixture } = createPage();
-      fixture.detectChanges();
-      flushOrderGet(httpMock, { ...BASE_ORDER, status: 'SUBMITTED' });
-      fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('Cancel order');
+  });
 
-      expect(fixture.nativeElement.querySelector('.order-detail__actions, button')).toBeTruthy();
-      expect(fixture.nativeElement.textContent).toContain('Cancel order');
-    });
+  it('puts "Back to order history" inside the order summary card', () => {
+    const { fixture } = createPage();
+    fixture.detectChanges();
+    flushOrderGet(httpMock, BASE_ORDER);
+    fixture.detectChanges();
 
-    it('hides Cancel order for someone else\'s order', () => {
-      setSessionEmpId('999');
-      const { fixture, page } = createPage();
-      fixture.detectChanges();
-      flushOrderGet(httpMock, { ...BASE_ORDER, status: 'SUBMITTED' });
-      fixture.detectChanges();
-
-      expect(page.canCancel()).toBe(false);
-    });
-
-    it('hides Cancel order once the order is past a cancellable status', () => {
-      setSessionEmpId('1001');
-      const { fixture, page } = createPage();
-      fixture.detectChanges();
-      flushOrderGet(httpMock, { ...BASE_ORDER, status: 'SHIPPED' });
-      fixture.detectChanges();
-
-      expect(page.canCancel()).toBe(false);
-    });
-
-    it('does nothing when the confirmation is declined', () => {
-      setSessionEmpId('1001');
-      const { fixture, page } = createPage();
-      fixture.detectChanges();
-      flushOrderGet(httpMock, { ...BASE_ORDER, status: 'SUBMITTED' });
-      fixture.detectChanges();
-
-      page.cancelOrder();
-      TestBed.inject(ConfirmService).respond(false);
-
-      httpMock.expectNone((r) => r.url === '/cgi/APPSCDSPCH?SEPGM=APCORDER' && r.body?.action === '*CANCEL');
-    });
-
-    it('cancels and reloads the order once confirmed', () => {
-      setSessionEmpId('1001');
-      const { fixture, page } = createPage();
-      fixture.detectChanges();
-      flushOrderGet(httpMock, { ...BASE_ORDER, status: 'SUBMITTED' });
-      fixture.detectChanges();
-
-      page.cancelOrder();
-      TestBed.inject(ConfirmService).respond(true);
-
-      const cancelReq = httpMock.expectOne(
-        (r) => r.url === '/cgi/APPSCDSPCH?SEPGM=APCORDER' && r.body?.action === '*CANCEL',
-      );
-      expect(cancelReq.request.body).toEqual({ action: '*CANCEL', orderId: 42 });
-      cancelReq.flush({ success: true, message: 'Order cancelled.', orderId: 42, orderNumber: 'EQ100001', status: 'CANCELLED' });
-
-      flushOrderGet(httpMock, { ...BASE_ORDER, status: 'CANCELLED' });
-
-      expect(page.cancelling()).toBe(false);
-      expect(page.order()?.status).toBe('CANCELLED');
-    });
-
-    it('shows the API message and stops cancelling on failure, without reloading', () => {
-      setSessionEmpId('1001');
-      const { fixture, page } = createPage();
-      fixture.detectChanges();
-      flushOrderGet(httpMock, { ...BASE_ORDER, status: 'SUBMITTED' });
-      fixture.detectChanges();
-
-      page.cancelOrder();
-      TestBed.inject(ConfirmService).respond(true);
-
-      const cancelReq = httpMock.expectOne(
-        (r) => r.url === '/cgi/APPSCDSPCH?SEPGM=APCORDER' && r.body?.action === '*CANCEL',
-      );
-      cancelReq.flush({ success: false, code: 'ERR', message: 'Too late to cancel.' });
-
-      expect(page.cancelling()).toBe(false);
-      expect(page.cancelError()).toBe('Too late to cancel.');
-      expect(page.order()?.status).toBe('SUBMITTED');
-    });
+    const summary: HTMLElement = fixture.nativeElement.querySelector('.order-detail__summary');
+    const link = summary.querySelector('a[href="/orders"]');
+    expect(link?.textContent).toContain('Back to order history');
   });
 });

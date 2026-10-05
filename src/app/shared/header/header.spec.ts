@@ -145,6 +145,45 @@ describe('Header', () => {
     expect(header.deptMenuOpen()).toBe(false);
   });
 
+  it('should block switching locations while the cart has items, and explain why in the menu', () => {
+    const fixture = TestBed.createComponent(Header);
+    const header = fixture.componentInstance;
+    const auth = TestBed.inject(AuthService);
+    const httpMock = TestBed.inject(HttpTestingController);
+
+    const locations = [
+      { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Edmonton Fire Dept Chief' },
+      { empLocId: 14999, locationId: 15, locationCode: '001', locationName: 'Edmonton Fire Dept Office' },
+    ];
+    auth.session.set({ ...FAKE_SESSION, locations });
+    fixture.detectChanges();
+
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS').flush({});
+    httpMock
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART')
+      .flush({ cartId: 1, itemCount: 2, subtotalPrice: 50, subtotalPoints: null, items: [] });
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPCVEW').flush({
+      viewId: 1,
+      programId: 1,
+      categoryCount: 0,
+      menu: { clothing: [], footwear: [], gear: [] },
+    } satisfies CatalogView);
+    fixture.detectChanges();
+
+    expect(header.cartBlocksLocationChange()).toBe(true);
+
+    header.selectLocation(locations[1]);
+    expect(header.activeLocation()?.locationName).toBe('Edmonton Fire Dept Chief');
+
+    header.toggleDeptMenu();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Clear your cart to switch locations.');
+    const optionButtons: HTMLButtonElement[] = Array.from(fixture.nativeElement.querySelectorAll('.dept-opt'));
+    expect(optionButtons.length).toBeGreaterThan(0);
+    expect(optionButtons.every((button) => button.disabled)).toBe(true);
+  });
+
   it('should load the catalog menu for the default location, and again when the location changes', () => {
     const fixture = TestBed.createComponent(Header);
     const auth = TestBed.inject(AuthService);

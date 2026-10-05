@@ -82,8 +82,17 @@
      header.html. */
   width: 270px;
 }
+.dept-menu__note {
+  font-size: 12px;
+  color: var(--slate-500);
+  padding: 0 1rem 8px;
+}
 .dept-opt {
   cursor: pointer;
+}
+.dept-opt:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 .dept-opt__dot {
   width: 26px;

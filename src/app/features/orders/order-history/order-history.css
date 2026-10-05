@@ -60,6 +60,44 @@
   box-shadow: var(--shadow);
 }
 
+.order-history__thumbs {
+  display: flex;
+  align-items: center;
+  /* Fixed to the widest case (4 overlapping thumbnails + a "+N more"
+     badge) so the columns after it never shift based on how many of the
+     up-to-4 thumbnails + badge a given row actually has. */
+  width: 160px;
+  flex: none;
+}
+.order-history__thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #edf1f6;
+  border: 2px solid #fff;
+  margin-left: -10px;
+}
+.order-history__thumb:first-child {
+  margin-left: 0;
+}
+.order-history__thumb-more {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--slate-600);
+  background: var(--slate-100);
+  border: 2px solid #fff;
+  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  margin-left: -10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.1;
+}
+
 .order-history__row-main {
   display: flex;
   flex-direction: column;

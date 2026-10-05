@@ -12,14 +12,11 @@ import { environment } from '../../../environments/environment';
 
 export type OrderStatus =
   | 'PENDING_APPROVAL'
-  | 'REJECTED'
-  | 'SUBMITTED'
-  | 'SEND_FAILED'
-  | 'SENT'
+  | 'PROCESSING'
   | 'PARTIALLY_SHIPPED'
   | 'SHIPPED'
-  | 'DELIVERED'
-  | 'CANCELLED';
+  | 'CANCELLED'
+  | 'REJECTED';
 
 export type LineStatus = 'OPEN' | 'BACKORDERED' | 'PARTIALLY_SHIPPED' | 'SHIPPED' | 'CANCELLED';
 
@@ -58,6 +55,12 @@ export interface OrderLine {
   skuCode: string;
   productTitle: string;
   optionDesc: string | null;
+  // Looked up from the *current* catalog entry, not captured at order
+  // time — a product's picture can change (or the product can be removed
+  // entirely, which is also when this comes back `null`) after the order
+  // was placed, so an old order can show a different photo than what the
+  // shopper actually received.
+  imageUrl: string | null;
   qtyOrdered: number;
   qtyShipped: number;
   qtyCancelled: number;
@@ -177,12 +180,30 @@ function normalizeOrderDetail(raw: RawOrderDetail): OrderDetail {
 }
 
 // ---- *LIST / *APPRQ ----
+
+// Same "looked up from the current catalog" caveat as `OrderLine.imageUrl`
+// — `null` means the product has no image, or has been removed entirely.
+export interface OrderThumb {
+  lineNo: number;
+  skuId: number | null;
+  productTitle: string;
+  imageUrl: string | null;
+}
+
 export interface OrderSummary {
   orderId: number;
   orderNumber: string;
   status: OrderStatus;
   placedTs: string;
+  // Total quantity across every line (e.g. "7 items") — `lineCount` below
+  // is how many distinct products that's spread across, not the same
+  // number whenever an order has more than one of something.
   itemCount: number;
+  lineCount: number;
+  // Up to 4 lines, in line order, for the order card's own image strip —
+  // not every line, even when there are more than 4 (`lineCount` is what
+  // says how many more there are).
+  thumbnails: OrderThumb[];
   orderTotal: number;
   allotDollarsUsed: number;
   allotUnitsUsed: number;
@@ -211,40 +232,53 @@ export interface ListOrdersParams {
   pageSize: number;
 }
 
+interface RawOrderSummary extends Omit<OrderSummary, 'thumbnails'> {
+  thumbnails: OrderThumb[] | null;
+}
+
 interface RawOrderPage extends Omit<OrderPage, 'data'> {
-  data: OrderSummary[] | null;
+  data: RawOrderSummary[] | null;
 }
 
 function normalizeOrderPage(raw: RawOrderPage): OrderPage {
-  return { ...raw, data: raw.data ?? [] };
+  return {
+    ...raw,
+    data: (raw.data ?? []).map((row) => ({ ...row, thumbnails: row.thumbnails ?? [] })),
+  };
 }
+
+// A small generic "no photo" icon — shown in place of a product image
+// whenever `imageUrl` is `null` (no image on file, or the product's been
+// removed from the catalog since).
+export const PRODUCT_IMAGE_PLACEHOLDER =
+  'data:image/svg+xml,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">' +
+      '<rect width="48" height="48" rx="6" fill="#edf1f6"/>' +
+      '<circle cx="18" cy="17" r="3.5" fill="#cbd5e1"/>' +
+      '<path d="M8 36l10-12 7 6 6-8 9 14" fill="none" stroke="#94a3b8" stroke-width="2.2" ' +
+      'stroke-linecap="round" stroke-linejoin="round"/>' +
+      '</svg>',
+  );
 
 export type OrderStatusTone = 'amber' | 'red' | 'blue' | 'teal' | 'green' | 'grey';
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
-  PENDING_APPROVAL: 'Awaiting approval',
-  REJECTED: 'Rejected',
-  SUBMITTED: 'Processing',
-  // Shown the same as SUBMITTED — it's an internal retry state, not
-  // something the employee needs to act on.
-  SEND_FAILED: 'Processing',
-  SENT: 'Sent to warehouse',
+  PENDING_APPROVAL: 'Pending approval',
+  PROCESSING: 'Processing',
   PARTIALLY_SHIPPED: 'Partially shipped',
   SHIPPED: 'Shipped',
-  DELIVERED: 'Delivered',
   CANCELLED: 'Cancelled',
+  REJECTED: 'Rejected',
 };
 
 const STATUS_TONES: Record<OrderStatus, OrderStatusTone> = {
   PENDING_APPROVAL: 'amber',
-  REJECTED: 'red',
-  SUBMITTED: 'blue',
-  SEND_FAILED: 'blue',
-  SENT: 'blue',
+  PROCESSING: 'blue',
   PARTIALLY_SHIPPED: 'teal',
   SHIPPED: 'green',
-  DELIVERED: 'green',
   CANCELLED: 'grey',
+  REJECTED: 'red',
 };
 
 export function orderStatusLabel(status: OrderStatus): string {

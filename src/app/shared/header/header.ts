@@ -321,6 +321,11 @@ export class Header implements OnInit {
 
   readonly cart = this.cartService.cart;
   readonly cartCount = computed(() => this.cart().itemCount);
+  // Switching locations re-scopes the allotment breakdown (and the catalog
+  // itself) to a different program — with items already in the cart, that'd
+  // leave them covered (or not) by rules that were never actually checked
+  // against, so switching is blocked until the cart's empty again.
+  readonly cartBlocksLocationChange = computed(() => this.cartCount() > 0);
   readonly cartSubtotal = computed(() => this.cart().subtotalPrice);
   readonly cartRemovingSkuId = signal<number | null>(null);
   readonly cartOpen = this.cartService.drawerOpen;
@@ -417,6 +422,9 @@ export class Header implements OnInit {
   }
 
   selectLocation(location: EmployeeLocation): void {
+    if (this.cartBlocksLocationChange()) {
+      return;
+    }
     this.locationSelectionService.select(location);
     this.deptMenuOpen.set(false);
   }

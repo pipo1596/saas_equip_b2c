@@ -203,7 +203,7 @@ describe('CheckoutPage', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it('should pre-fill the contact form name fields from the logged-in session', () => {
+  it('should pre-fill the contact form from the logged-in session, formatting the phone number', () => {
     TestBed.inject(AuthService).session.set(FAKE_SESSION);
 
     const fixture = TestBed.createComponent(CheckoutPage);
@@ -211,8 +211,8 @@ describe('CheckoutPage', () => {
 
     expect(page.contactForm.controls.firstName.value).toBe(FAKE_SESSION.firstName);
     expect(page.contactForm.controls.lastName.value).toBe(FAKE_SESSION.lastName);
-    expect(page.contactForm.controls.email.value).toBe('');
-    expect(page.contactForm.controls.phone.value).toBe('');
+    expect(page.contactForm.controls.email.value).toBe(FAKE_SESSION.email);
+    expect(page.contactForm.controls.phone.value).toBe('(780) 555-0100');
   });
 
   it('should require email, first/last name, and phone on the contact form, but not extension', () => {
@@ -234,6 +234,29 @@ describe('CheckoutPage', () => {
 
     page.contactForm.controls.email.setValue('pat.doe@example.com');
     expect(page.contactForm.valid).toBe(true);
+  });
+
+  it('should format the phone field live as digits are typed, and while deleting', () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    const page = fixture.componentInstance;
+    fixture.detectChanges();
+    const phone = page.contactForm.controls.phone;
+
+    phone.setValue('7');
+    expect(phone.value).toBe('(7');
+    phone.setValue('780555');
+    expect(phone.value).toBe('(780) 555');
+    phone.setValue('7805550100');
+    expect(phone.value).toBe('(780) 555-0100');
+
+    // Backspacing the last digit should shrink the formatted value, not
+    // get stuck re-inserting whatever separator was just deleted.
+    phone.setValue('(780) 555-010');
+    expect(phone.value).toBe('(780) 555-010');
+
+    // A stray 11th digit is dropped rather than overflowing the mask.
+    phone.setValue('78055501009');
+    expect(phone.value).toBe('(780) 555-0100');
   });
 
   it('should render the contact information fields', () => {
@@ -639,8 +662,13 @@ describe('CheckoutPage', () => {
 
   describe('placing an order', () => {
     it('should re-evaluate canPlaceOrder once the contact form becomes valid, with no other signal changing', () => {
+      // No email/phone here (unlike the rest of this describe block) so
+      // the contact form actually starts out invalid/blank, which is what
+      // this test is exercising.
       TestBed.inject(AuthService).session.set({
         ...FAKE_SESSION,
+        email: '',
+        phone: '',
         locations: [{ empLocId: 1, locationId: 77, locationCode: '001', locationName: 'HQ' }],
       });
 
@@ -695,7 +723,7 @@ describe('CheckoutPage', () => {
         email: 'pat.doe@example.com',
         firstName: 'Pat',
         lastName: 'Doe',
-        phone: '555-0100',
+        phone: '780-555-0100',
         extension: '',
       });
 
@@ -735,7 +763,7 @@ describe('CheckoutPage', () => {
         email: 'pat.doe@example.com',
         firstName: 'Pat',
         lastName: 'Doe',
-        phone: '555-0100',
+        phone: '(780) 555-0100',
       });
       expect(req.request.body.checkoutKey).not.toBe('');
 
@@ -744,7 +772,7 @@ describe('CheckoutPage', () => {
         message: 'Order EQ100001 placed.',
         orderId: 42,
         orderNumber: 'EQ100001',
-        status: 'SUBMITTED',
+        status: 'PROCESSING',
       });
 
       // The server already emptied the cart — this page refreshes the
@@ -769,7 +797,7 @@ describe('CheckoutPage', () => {
         message: 'Order EQ100001 placed.',
         orderId: 42,
         orderNumber: 'EQ100001',
-        status: 'SUBMITTED',
+        status: 'PROCESSING',
       });
       expect(req.request.body.phoneExt).toBe('204');
       httpMock
@@ -803,7 +831,7 @@ describe('CheckoutPage', () => {
         message: 'Order EQ100001 placed.',
         orderId: 43,
         orderNumber: 'EQ100002',
-        status: 'SUBMITTED',
+        status: 'PROCESSING',
       });
       httpMock
         .expectOne((r) => r.url === '/cgi/APPSCDSPCH?SEPGM=APCCART' && r.body?.action === '*GET')

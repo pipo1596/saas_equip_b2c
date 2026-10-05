@@ -42,6 +42,8 @@ export interface LoginResponse {
   sessionId?: string;
   firstName?: string;
   lastName?: string;
+  email?: string;
+  phone?: string;
   message: string | null;
 }
 
@@ -55,6 +57,8 @@ export interface Session {
   sessionId: string;
   firstName: string;
   lastName: string;
+  email: string;
+  phone: string;
   locations: EmployeeLocation[];
 }
 
@@ -164,6 +168,8 @@ export class AuthService {
       sessionId: response.sessionId || pending?.sessionId || '',
       firstName: response.firstName ?? '',
       lastName: response.lastName ?? '',
+      email: response.email ?? '',
+      phone: response.phone ?? '',
       locations: [],
     };
     this.pendingMfa.set(null);
@@ -173,14 +179,17 @@ export class AuthService {
     this.loadEmployeeDetails(session);
   }
 
-  // The login/MFA response's name fields are a stopgap, and it doesn't carry
-  // locations at all — the employee record is the source of truth for both.
+  // The login/MFA response's name/contact fields are a stopgap, and it
+  // doesn't carry locations at all — the employee record is the source of
+  // truth for all of it.
   private loadEmployeeDetails(session: Session): void {
     this.employeeService.load(session.empId, session.sessionId).subscribe((employee) => {
       const updated: Session = {
         ...session,
         firstName: employee.firstName || session.firstName,
         lastName: employee.lastName || session.lastName,
+        email: employee.email || session.email,
+        phone: employee.phone || session.phone,
         locations: employee.locations ?? session.locations,
       };
       this.session.set(updated);
@@ -205,10 +214,17 @@ export class AuthService {
         return null;
       }
       const parsed = JSON.parse(raw) as Partial<Session>;
-      // A session cached before a field (e.g. `locations`) was added to the
-      // Session shape would otherwise silently restore without it — discard
-      // it instead so the user logs in again and gets the full payload.
-      if (!parsed.empId || !parsed.sessionId || !Array.isArray(parsed.locations)) {
+      // A session cached before a field (e.g. `locations`, `email`/`phone`)
+      // was added to the Session shape would otherwise silently restore
+      // without it — discard it instead so the user logs in again and gets
+      // the full payload.
+      if (
+        !parsed.empId ||
+        !parsed.sessionId ||
+        !Array.isArray(parsed.locations) ||
+        typeof parsed.email !== 'string' ||
+        typeof parsed.phone !== 'string'
+      ) {
         localStorage.removeItem(AUTH_STORAGE_KEY);
         return null;
       }

@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 
 import { AuthService, LoginResponse } from './auth';
-import { FAKE_EMP_ID, FAKE_FIRST_NAME, FAKE_LAST_NAME, FAKE_SESSION_ID } from './auth.testing';
+import { FAKE_EMAIL, FAKE_EMP_ID, FAKE_FIRST_NAME, FAKE_LAST_NAME, FAKE_PHONE, FAKE_SESSION_ID } from './auth.testing';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -46,7 +46,23 @@ describe('AuthService', () => {
     expect(localStorage.getItem('auth.session')).toBeNull();
   });
 
-  it('sets the session on a successful login with no MFA step', () => {
+  it('discards a cached session from before `email`/`phone` existed on the Session shape', () => {
+    localStorage.setItem(
+      'auth.session',
+      JSON.stringify({ empId: FAKE_EMP_ID, sessionId: FAKE_SESSION_ID, firstName: 'P', lastName: 'A', locations: [] }),
+    );
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    const restored = TestBed.inject(AuthService);
+
+    expect(restored.isAuthenticated()).toBe(false);
+    expect(localStorage.getItem('auth.session')).toBeNull();
+  });
+
+  it('sets the session (including email/phone) on a successful login with no MFA step', () => {
     service.login('jane.doe@example.com', 'TestPass123!').subscribe();
 
     const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN');
@@ -57,6 +73,8 @@ describe('AuthService', () => {
       sessionId: FAKE_SESSION_ID,
       firstName: FAKE_FIRST_NAME,
       lastName: FAKE_LAST_NAME,
+      email: FAKE_EMAIL,
+      phone: FAKE_PHONE,
       message: null,
     };
     req.flush(response);
@@ -71,8 +89,36 @@ describe('AuthService', () => {
       sessionId: FAKE_SESSION_ID,
       firstName: FAKE_FIRST_NAME,
       lastName: FAKE_LAST_NAME,
+      email: FAKE_EMAIL,
+      phone: FAKE_PHONE,
       locations: [],
     });
+  });
+
+  it("prefers the employee record's email/phone over the login response's, when both are present", () => {
+    service.login('jane.doe@example.com', 'TestPass123!').subscribe();
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN').flush({
+      success: true,
+      mfaRequired: false,
+      empId: FAKE_EMP_ID,
+      sessionId: FAKE_SESSION_ID,
+      firstName: FAKE_FIRST_NAME,
+      lastName: FAKE_LAST_NAME,
+      email: 'stopgap@example.com',
+      phone: '555-0000',
+      message: null,
+    } satisfies LoginResponse);
+
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE').flush({
+      empId: FAKE_EMP_ID,
+      firstName: FAKE_FIRST_NAME,
+      lastName: FAKE_LAST_NAME,
+      email: FAKE_EMAIL,
+      phone: FAKE_PHONE,
+    });
+
+    expect(service.session()?.email).toBe(FAKE_EMAIL);
+    expect(service.session()?.phone).toBe(FAKE_PHONE);
   });
 
   it('carries the locations from the employee record into the session (LOGIN1 does not return them)', () => {
@@ -123,6 +169,8 @@ describe('AuthService', () => {
       sessionId: FAKE_SESSION_ID,
       firstName: FAKE_FIRST_NAME,
       lastName: FAKE_LAST_NAME,
+      email: '',
+      phone: '',
       locations: [],
     });
   });

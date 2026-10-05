@@ -1,7 +1,9 @@
 import { CurrencyPipe, isPlatformBrowser } from '@angular/common';
 import {
+  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   OnInit,
   PLATFORM_ID,
   computed,
@@ -11,14 +13,13 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-import { AuthService } from '../../../core/auth/auth';
 import { formatBalanceAmount } from '../../../core/cart/cart';
 import {
   HistoryEntry,
   OrderDetail,
   OrderLine,
   OrderService,
-  OrderStatus,
+  PRODUCT_IMAGE_PLACEHOLDER,
   Shipment,
   historySourceLabel,
   historyStatusLabel,
@@ -27,14 +28,8 @@ import {
   orderStatusTone,
   shipmentStatusLabel,
 } from '../../../core/order/order';
-import { ConfirmService } from '../../../shared/confirm/confirm';
 import { Footer } from '../../../shared/footer/footer';
 import { Header } from '../../../shared/header/header';
-
-// Only these statuses mean there's still something to call off — once it's
-// sent/shipped/delivered/cancelled/rejected, cancelling is no longer an
-// option.
-const CANCELLABLE_STATUSES: OrderStatus[] = ['PENDING_APPROVAL', 'SUBMITTED', 'SEND_FAILED'];
 
 @Component({
   selector: 'app-order-detail-page',
@@ -43,19 +38,18 @@ const CANCELLABLE_STATUSES: OrderStatus[] = ['PENDING_APPROVAL', 'SUBMITTED', 'S
   templateUrl: './order-detail.html',
   styleUrls: ['../../../shared/shared.css', './order-detail.css'],
 })
-export class OrderDetailPage implements OnInit {
+export class OrderDetailPage implements OnInit, AfterViewInit {
   private readonly orderService = inject(OrderService);
-  private readonly authService = inject(AuthService);
-  private readonly confirmService = inject(ConfirmService);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
+  private readonly hostElementRef = inject(ElementRef<HTMLElement>);
 
   // Bound from the route (`/orders/:orderId`, see app.routes.ts).
   readonly orderId = input('');
 
   // Only meaningful arriving straight from Place order's own navigation —
   // captured once at construction, since `history.state` reflects
-  // whichever navigation is current, and later reloads (e.g. after
-  // cancelling) shouldn't keep showing the "just placed" banner forever.
+  // whichever navigation is current, and a later reload of this same page
+  // (e.g. via the back button) shouldn't keep showing this banner forever.
   readonly justPlaced = this.isBrowser && !!history.state?.['justPlaced'];
 
   readonly loading = signal(false);
@@ -63,10 +57,8 @@ export class OrderDetailPage implements OnInit {
   readonly notFound = signal(false);
   readonly error = signal<string | null>(null);
 
-  readonly cancelling = signal(false);
-  readonly cancelError = signal<string | null>(null);
-
   readonly formatAmount = formatBalanceAmount;
+  readonly placeholderImage = PRODUCT_IMAGE_PLACEHOLDER;
   readonly statusLabel = orderStatusLabel;
   readonly statusTone = orderStatusTone;
   readonly lineStatusLabel = lineStatusLabel;
@@ -123,21 +115,22 @@ export class OrderDetailPage implements OnInit {
     return `${line?.skuCode ?? `Line ${entry.orderLineId}`}: ${transition}`;
   }
 
-  readonly canCancel = computed(() => {
-    const order = this.order();
-    if (!order) {
-      return false;
-    }
-    const empId = Number(this.authService.session()?.empId);
-    const ownsOrder = Number.isFinite(empId) && empId === order.employeeId;
-    return ownsOrder && CANCELLABLE_STATUSES.includes(order.status);
-  });
-
   ngOnInit(): void {
     if (!this.isBrowser) {
       return;
     }
     this.load();
+  }
+
+  ngAfterViewInit(): void {
+    // Same reasoning as checkout's own scroll-to-top — guarded since jsdom
+    // (used in tests) doesn't implement `scrollIntoView` at all. Matters
+    // most arriving straight from Place order: without it, the page can
+    // land mid-scroll from wherever checkout happened to be.
+    const target = this.hostElementRef.nativeElement;
+    if (typeof target.scrollIntoView === 'function') {
+      target.scrollIntoView({ behavior: 'auto', block: 'start' });
+    }
   }
 
   private load(): void {
@@ -169,46 +162,5 @@ export class OrderDetailPage implements OnInit {
         this.error.set('We could not load this order.');
       },
     });
-  }
-
-  cancelOrder(): void {
-    const order = this.order();
-    if (!order || this.cancelling()) {
-      return;
-    }
-
-    this.confirmService
-      .ask({
-        title: 'Cancel order',
-        message: `Cancel order ${order.orderNumber}? Any allotment it used will be returned.`,
-        confirmLabel: 'Cancel order',
-        danger: true,
-      })
-      .subscribe((confirmed) => {
-        if (!confirmed) {
-          return;
-        }
-
-        this.cancelling.set(true);
-        this.cancelError.set(null);
-
-        this.orderService.cancel(order.orderId).subscribe({
-          next: (result) => {
-            this.cancelling.set(false);
-            if (!result.success) {
-              this.cancelError.set(result.message);
-              return;
-            }
-            // Re-fetch rather than optimistically patching the status —
-            // cancelling can also touch `paidFrom`/the timeline, and the
-            // server is the source of truth for all of it.
-            this.load();
-          },
-          error: () => {
-            this.cancelling.set(false);
-            this.cancelError.set('We could not cancel this order. Please try again.');
-          },
-        });
-      });
   }
 }

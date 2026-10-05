@@ -336,7 +336,7 @@ a.cart-page__thumb-link {
   border-radius: 10px;
   padding: 24px;
   position: sticky;
-  top: 88px;
+  top: 120px;
 }
 .cart-page__summary-title {
   font-family: var(--font-display);

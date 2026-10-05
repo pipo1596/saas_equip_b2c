@@ -12,7 +12,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
@@ -29,6 +29,26 @@ import { LocationSelectionService } from '../../core/location/location-selection
 import { OrderService } from '../../core/order/order';
 import { Footer } from '../../shared/footer/footer';
 import { Header } from '../../shared/header/header';
+
+// Reformats to "(780) 555-0142" as digits are typed. Always ends in a
+// digit (never a bare "(", ") " or "-"), so reformatting fresh from the
+// digit count on every keystroke can't get stuck re-inserting a separator
+// the user just deleted — unlike the expiry-date formatter this checkout
+// page used to have, which needed an explicit "is this a delete" guard
+// because its last character legitimately could be the literal "/".
+function formatPhoneNumber(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 10);
+  if (digits.length === 0) {
+    return '';
+  }
+  if (digits.length <= 3) {
+    return `(${digits}`;
+  }
+  if (digits.length <= 6) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  }
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
 
 @Component({
   selector: 'app-checkout-page',
@@ -48,13 +68,12 @@ export class CheckoutPage implements OnInit, AfterViewInit {
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
   private readonly hostElementRef = inject(ElementRef<HTMLElement>);
 
-  // Pre-filled from the logged-in session where it already has the answer
-  // (name) — email/phone have no such source yet, so those start blank.
+  // Pre-filled from the logged-in session, which now has all four.
   readonly contactForm = this.formBuilder.nonNullable.group({
-    email: ['', [Validators.required, Validators.email]],
+    email: [this.authService.session()?.email ?? '', [Validators.required, Validators.email]],
     firstName: [this.authService.session()?.firstName ?? '', Validators.required],
     lastName: [this.authService.session()?.lastName ?? '', Validators.required],
-    phone: ['', Validators.required],
+    phone: [formatPhoneNumber(this.authService.session()?.phone ?? ''), Validators.required],
     extension: [''],
   });
 
@@ -67,6 +86,19 @@ export class CheckoutPage implements OnInit, AfterViewInit {
   private readonly contactFormStatus = toSignal(this.contactForm.statusChanges, {
     initialValue: this.contactForm.status,
   });
+
+  // Subscribes to `valueChanges` (not an `(input)` handler) so it doesn't
+  // race with ReactiveFormsModule's own value accessor — `emitEvent: false`
+  // on the write-back stops that write from re-triggering this same
+  // subscription.
+  private readonly reformatPhoneOnChange = this.contactForm.controls.phone.valueChanges
+    .pipe(takeUntilDestroyed())
+    .subscribe((value) => {
+      const formatted = formatPhoneNumber(value);
+      if (formatted !== value) {
+        this.contactForm.controls.phone.setValue(formatted, { emitEvent: false });
+      }
+    });
 
   @ViewChild('addressDialogEl') private readonly addressDialogEl?: ElementRef<HTMLDialogElement>;
 

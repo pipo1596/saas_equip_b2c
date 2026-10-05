@@ -8,6 +8,7 @@ import {
   OrderPage,
   OrderService,
   OrderWriteResult,
+  PRODUCT_IMAGE_PLACEHOLDER,
   historySourceLabel,
   historyStatusLabel,
   lineStatusLabel,
@@ -19,7 +20,7 @@ import {
 const RAW_ORDER = {
   orderId: 42,
   orderNumber: 'EQ100001',
-  status: 'SUBMITTED' as const,
+  status: 'PROCESSING' as const,
   placedTs: '2026-09-30 10:00:00',
   employeeId: 1001,
   locationId: 18,
@@ -67,6 +68,7 @@ const RAW_ORDER = {
       skuCode: 'ABC-100-BLK-M',
       productTitle: "Men's Trail Jacket",
       optionDesc: 'BLACK / M',
+      imageUrl: 'https://cdn.example.com/black-m.jpg',
       qtyOrdered: 2,
       qtyShipped: 0,
       qtyCancelled: 0,
@@ -84,7 +86,7 @@ const RAW_ORDER = {
   paidFrom: [{ ruleId: 99, ruleName: 'General Allotment', amountType: 'DOLLARS' as const, amount: 179.98, state: 'CHARGED' as const }],
   shipments: [] as never[],
   history: [
-    { fromStatus: null, toStatus: 'SUBMITTED', source: 'PORTAL' as const, note: null, orderLineId: null, ts: '2026-09-30 10:00:00', by: null },
+    { fromStatus: null, toStatus: 'PROCESSING', source: 'PORTAL' as const, note: null, orderLineId: null, ts: '2026-09-30 10:00:00', by: null },
   ],
 };
 
@@ -129,7 +131,7 @@ describe('OrderService', () => {
         lastName: 'Doe',
         phone: '555-0100',
       });
-      req.flush({ success: true, message: 'Order EQ100001 placed.', orderId: 42, orderNumber: 'EQ100001', status: 'SUBMITTED' });
+      req.flush({ success: true, message: 'Order EQ100001 placed.', orderId: 42, orderNumber: 'EQ100001', status: 'PROCESSING' });
     });
 
     it('passes a failure straight through, with its code intact', () => {
@@ -240,9 +242,13 @@ describe('OrderService', () => {
     const SUMMARY = {
       orderId: 42,
       orderNumber: 'EQ100001',
-      status: 'SUBMITTED' as const,
+      status: 'PROCESSING' as const,
       placedTs: '2026-09-30 10:00:00',
       itemCount: 2,
+      lineCount: 1,
+      thumbnails: [
+        { lineNo: 1, skuId: 9001, productTitle: "Men's Trail Jacket", imageUrl: 'https://cdn.example.com/black-m.jpg' },
+      ],
       orderTotal: 221.28,
       allotDollarsUsed: 179.98,
       allotUnitsUsed: 0,
@@ -271,7 +277,7 @@ describe('OrderService', () => {
 
     it('passes a failure straight through', () => {
       let result: OrderPage | ApiError | undefined;
-      service.list({ status: 'SUBMITTED', page: 1, pageSize: 25 }).subscribe((res) => (result = res));
+      service.list({ status: 'PROCESSING', page: 1, pageSize: 25 }).subscribe((res) => (result = res));
 
       httpMock
         .expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER')
@@ -279,32 +285,44 @@ describe('OrderService', () => {
 
       expect(result).toEqual({ success: false, code: 'ERR', message: 'Not logged in.' });
     });
+
+    it('normalizes a null thumbnails array on a row to []', () => {
+      let result: OrderPage | ApiError | undefined;
+      service.list({ status: '', page: 1, pageSize: 25 }).subscribe((res) => (result = res));
+
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER').flush({
+        pagination: { page: 1, pageSize: 25, totalRows: 1, totalPages: 1 },
+        data: [{ ...SUMMARY, thumbnails: null }],
+      });
+
+      expect((result as OrderPage).data[0].thumbnails).toEqual([]);
+    });
+  });
+});
+
+describe('PRODUCT_IMAGE_PLACEHOLDER', () => {
+  it('is a data URI usable as an <img> src', () => {
+    expect(PRODUCT_IMAGE_PLACEHOLDER).toMatch(/^data:image\/svg\+xml,/);
   });
 });
 
 describe('order label/tone helpers', () => {
   it('labels every order status', () => {
-    expect(orderStatusLabel('PENDING_APPROVAL')).toBe('Awaiting approval');
-    expect(orderStatusLabel('REJECTED')).toBe('Rejected');
-    expect(orderStatusLabel('SUBMITTED')).toBe('Processing');
-    expect(orderStatusLabel('SEND_FAILED')).toBe('Processing');
-    expect(orderStatusLabel('SENT')).toBe('Sent to warehouse');
+    expect(orderStatusLabel('PENDING_APPROVAL')).toBe('Pending approval');
+    expect(orderStatusLabel('PROCESSING')).toBe('Processing');
     expect(orderStatusLabel('PARTIALLY_SHIPPED')).toBe('Partially shipped');
     expect(orderStatusLabel('SHIPPED')).toBe('Shipped');
-    expect(orderStatusLabel('DELIVERED')).toBe('Delivered');
     expect(orderStatusLabel('CANCELLED')).toBe('Cancelled');
+    expect(orderStatusLabel('REJECTED')).toBe('Rejected');
   });
 
   it('tones every order status', () => {
     expect(orderStatusTone('PENDING_APPROVAL')).toBe('amber');
-    expect(orderStatusTone('REJECTED')).toBe('red');
-    expect(orderStatusTone('SUBMITTED')).toBe('blue');
-    expect(orderStatusTone('SEND_FAILED')).toBe('blue');
-    expect(orderStatusTone('SENT')).toBe('blue');
+    expect(orderStatusTone('PROCESSING')).toBe('blue');
     expect(orderStatusTone('PARTIALLY_SHIPPED')).toBe('teal');
     expect(orderStatusTone('SHIPPED')).toBe('green');
-    expect(orderStatusTone('DELIVERED')).toBe('green');
     expect(orderStatusTone('CANCELLED')).toBe('grey');
+    expect(orderStatusTone('REJECTED')).toBe('red');
   });
 
   it('has no label for an OPEN line, and a label for every other line status', () => {
@@ -332,7 +350,7 @@ describe('order label/tone helpers', () => {
   });
 
   it('uses the known label for a real order status, and humanizes an unknown line-level token otherwise', () => {
-    expect(historyStatusLabel('SUBMITTED')).toBe('Processing');
+    expect(historyStatusLabel('PROCESSING')).toBe('Processing');
     expect(historyStatusLabel('SHORT_SHIPPED')).toBe('Short shipped');
   });
 });

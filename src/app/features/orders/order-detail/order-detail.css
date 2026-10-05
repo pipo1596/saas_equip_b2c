@@ -146,6 +146,14 @@
   border-bottom: none;
   padding-bottom: 0;
 }
+.order-detail__item-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex: none;
+  background: #edf1f6;
+}
 .order-detail__item-body {
   flex: 1;
   min-width: 0;
@@ -241,25 +249,13 @@
 /* Summary */
 .order-detail__summary {
   position: sticky;
-  top: 88px;
+  top: 120px;
 }
 .order-detail__summary-note {
   font-size: 12px;
   font-weight: 400;
   color: var(--slate-500);
 }
-.order-detail__amount-due {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: 10px 14px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--good) 8%, white);
-  border: 1.5px solid var(--good);
-  font-weight: 700;
-  color: var(--good);
-}
-
 @media (max-width: 991.98px) {
   .order-detail__item {
     flex-wrap: wrap;

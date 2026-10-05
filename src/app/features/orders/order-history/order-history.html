@@ -44,6 +44,14 @@
       <div class="order-history__list">
         @for (order of orders(); track order.orderId) {
           <a class="order-history__row" [routerLink]="['/orders', order.orderId]">
+            <div class="order-history__thumbs">
+              @for (thumb of order.thumbnails; track thumb.lineNo) {
+                <img class="order-history__thumb" [src]="thumb.imageUrl ?? placeholderImage" [alt]="thumb.productTitle" />
+              }
+              @if (moreThumbsCount(order) > 0) {
+                <span class="order-history__thumb-more">+{{ moreThumbsCount(order) }} more</span>
+              }
+            </div>
             <div class="order-history__row-main">
               <div class="order-history__row-head">
                 <span class="order-history__order-number">{{ order.orderNumber }}</span>

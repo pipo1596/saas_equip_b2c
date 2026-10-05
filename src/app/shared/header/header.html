@@ -30,11 +30,15 @@
         </button>
         <div class="dept-menu dropdown-menu dropdown-menu-end shadow-lg" data-bs-popper [class.show]="deptMenuOpen()">
           <div class="dropdown-header">Switch location</div>
+          @if (cartBlocksLocationChange()) {
+            <div class="dept-menu__note">Clear your cart to switch locations.</div>
+          }
           @for (location of locations(); track location.empLocId) {
             <button
               type="button"
               class="dept-opt dropdown-item d-flex align-items-center gap-2 rounded"
               [class.active]="location.locationId === activeLocation()?.locationId"
+              [disabled]="cartBlocksLocationChange()"
               (click)="selectLocation(location)"
             >
               <span class="dept-opt__dot">

@@ -11,6 +11,10 @@ const SUMMARY = {
   status: 'SHIPPED' as const,
   placedTs: '2026-09-30 10:00:00',
   itemCount: 2,
+  lineCount: 1,
+  thumbnails: [
+    { lineNo: 1, skuId: 9001, productTitle: "Men's Trail Jacket", imageUrl: 'https://cdn.example.com/black-m.jpg' },
+  ],
   orderTotal: 221.28,
   allotDollarsUsed: 179.98,
   allotUnitsUsed: 0,
@@ -98,6 +102,40 @@ describe('OrderHistoryPage', () => {
     expect(row.textContent).toContain('Paid by allotment: $179.98');
     expect(row.textContent).toContain('1 shipment');
     expect(row.getAttribute('href')).toBe('/orders/42');
+
+    const thumb = row.querySelector<HTMLImageElement>('.order-history__thumb')!;
+    expect(thumb.src).toBe('https://cdn.example.com/black-m.jpg');
+    expect(thumb.alt).toBe("Men's Trail Jacket");
+    expect(row.querySelector('.order-history__thumb-more')).toBeNull();
+  });
+
+  it('shows a placeholder for a thumbnail with no image, and a "+N more" badge beyond the first 4', () => {
+    const fixture = TestBed.createComponent(OrderHistoryPage);
+    fixture.detectChanges();
+    flushOrdersList(httpMock, {
+      pagination: { page: 1, pageSize: 25, totalRows: 1, totalPages: 1 },
+      data: [
+        {
+          ...SUMMARY,
+          lineCount: 6,
+          thumbnails: [
+            { lineNo: 1, skuId: 9001, productTitle: "Men's Trail Jacket", imageUrl: null },
+            { lineNo: 2, skuId: 9044, productTitle: 'Tactical Boot', imageUrl: 'https://cdn.example.com/boot.jpg' },
+          ],
+        },
+      ],
+    });
+    fixture.detectChanges();
+
+    const row: HTMLElement = fixture.nativeElement.querySelector('.order-history__row');
+    const thumbs = Array.from(row.querySelectorAll<HTMLImageElement>('.order-history__thumb'));
+    expect(thumbs).toHaveLength(2);
+    expect(thumbs[0].src).toMatch(/^data:image\/svg\+xml,/);
+    expect(thumbs[0].alt).toBe("Men's Trail Jacket");
+    expect(thumbs[1].src).toBe('https://cdn.example.com/boot.jpg');
+
+    // 6 distinct products, only 2 thumbnails sent — 4 more than shown.
+    expect(row.querySelector('.order-history__thumb-more')?.textContent?.trim()).toBe('+4 more');
   });
 
   it('shows the unit count alongside dollars when units were also used', () => {

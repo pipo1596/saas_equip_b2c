@@ -22,7 +22,7 @@
 
 /* ---------- facets ---------- */
 .product-list__facets {
-  top: 88px;
+  top: 120px;
   /* Bootstrap's `.sticky-top` defaults to z-index:1020 — meant for things
      that should float above the whole page, but this sidebar is still
      regular page content. Left at that value it would render in front of
