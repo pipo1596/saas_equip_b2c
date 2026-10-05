@@ -3,6 +3,8 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideRouter } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 
+import { CartService } from '../../../core/cart/cart';
+import { POINTS_ONLY_ALLOTMENT } from '../../../core/cart/cart.testing';
 import { OrderHistoryPage } from './order-history';
 
 const SUMMARY = {
@@ -107,6 +109,25 @@ describe('OrderHistoryPage', () => {
     expect(thumb.src).toBe('https://cdn.example.com/black-m.jpg');
     expect(thumb.alt).toBe("Men's Trail Jacket");
     expect(row.querySelector('.order-history__thumb-more')).toBeNull();
+  });
+
+  it("should hide the order total, and the 'paid by allotment' dollar figure, when the employee's allotment is points-only", () => {
+    TestBed.inject(CartService).cart.update((cart) => ({ ...cart, allotment: POINTS_ONLY_ALLOTMENT }));
+
+    const fixture = TestBed.createComponent(OrderHistoryPage);
+    fixture.detectChanges();
+    flushOrdersList(httpMock, {
+      pagination: { page: 1, pageSize: 25, totalRows: 1, totalPages: 1 },
+      data: [{ ...SUMMARY, allotDollarsUsed: 0, allotUnitsUsed: 2 }],
+    });
+    fixture.detectChanges();
+
+    const row: HTMLElement = fixture.nativeElement.querySelector('.order-history__row');
+    expect(row.querySelector('.order-history__row-total')).toBeNull();
+    expect(row.textContent).not.toContain('$');
+    // No points-used figure exists on this list endpoint — falls back to
+    // just the units part rather than a misleading "$0.00".
+    expect(row.textContent).toContain('Paid by allotment: 2 units');
   });
 
   it('shows a placeholder for a thumbnail with no image, and a "+N more" badge beyond the first 4', () => {

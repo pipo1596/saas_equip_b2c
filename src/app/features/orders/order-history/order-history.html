@@ -63,7 +63,9 @@
                 {{ orderDate(order.placedTs) }} · {{ order.itemCount }} item{{ order.itemCount === 1 ? '' : 's' }} ·
                 {{ order.shipMethodName }}
               </span>
-              <span class="order-history__row-meta">{{ paidByAllotmentLabel(order) }}</span>
+              @if (paidByAllotmentLabel(order); as label) {
+                <span class="order-history__row-meta">{{ label }}</span>
+              }
               @if (order.trackingCount > 0) {
                 <span class="order-history__row-meta order-history__row-tracking">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -75,7 +77,9 @@
                 </span>
               }
             </div>
-            <span class="order-history__row-total">{{ order.orderTotal | currency }}</span>
+            @if (!pointsOnly()) {
+              <span class="order-history__row-total">{{ order.orderTotal | currency }}</span>
+            }
           </a>
         }
       </div>

@@ -165,7 +165,22 @@
                         }
                       </div>
                     }
-                    <p class="fw-bold mt-auto mb-0 product-card__price">{{ product.price | currency }}</p>
+                    @if (!pointsOnly() && product.priceRange; as range) {
+                      <p class="fw-bold mt-auto mb-0 product-card__price">
+                        {{ range.min | currency }}
+                        @if (range.max !== range.min) {
+                          – {{ range.max | currency }}
+                        }
+                      </p>
+                    } @else if (pointsOnly() && product.pointsRange; as range) {
+                      <p class="fw-bold mt-auto mb-0 product-card__price">
+                        {{ range.min }}
+                        @if (range.max !== range.min) {
+                          – {{ range.max }}
+                        }
+                        pts
+                      </p>
+                    }
                   </div>
                 </a>
               </div>

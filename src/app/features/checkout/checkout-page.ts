@@ -116,6 +116,7 @@ export class CheckoutPage implements OnInit, AfterViewInit {
   @ViewChild('addressDialogEl') private readonly addressDialogEl?: ElementRef<HTMLDialogElement>;
 
   readonly cart = this.cartService.cart;
+  readonly pointsOnly = this.cartService.pointsOnly;
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
 
@@ -196,7 +197,11 @@ export class CheckoutPage implements OnInit, AfterViewInit {
 
   readonly placeOrderSubtitle = computed(() => {
     if (this.orderTotal() > 0) {
-      return 'Balance must be $0.00 to continue';
+      // No dollar figure for a points-only employee — they never pay in
+      // dollars at all, so naming a balance here wouldn't mean anything.
+      return this.pointsOnly()
+        ? "This order isn't fully covered by your points allotment yet"
+        : 'Balance must be $0.00 to continue';
     }
     if (this.submitting()) {
       return 'Submitting your order…';

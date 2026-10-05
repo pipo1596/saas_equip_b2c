@@ -100,23 +100,35 @@
 
             <div class="product-detail__price-block mb-3">
               @if (resolvedSku(); as sku) {
-                <div class="d-flex align-items-baseline gap-2">
-                  <span class="product-detail__price">{{ sku.basePrice | currency }}</span>
-                  @if (sku.comparePrice > sku.basePrice) {
-                    <span class="text-secondary text-decoration-line-through">
-                      {{ sku.comparePrice | currency }}
-                    </span>
-                  }
-                </div>
+                @if (!pointsOnly()) {
+                  <div class="d-flex align-items-baseline gap-2">
+                    <span class="product-detail__price">{{ sku.basePrice | currency }}</span>
+                    @if (sku.comparePrice > sku.basePrice) {
+                      <span class="text-secondary text-decoration-line-through">
+                        {{ sku.comparePrice | currency }}
+                      </span>
+                    }
+                  </div>
+                } @else {
+                  <span class="product-detail__price">{{ sku.basePoints }} pts</span>
+                }
 
                 <p class="text-secondary small mb-0">SKU: {{ sku.skuCode }}</p>
               } @else {
-                @if (priceRange(); as range) {
+                @if (!pointsOnly() && priceRange(); as range) {
                   <span class="product-detail__price">
                     {{ range.min | currency }}
                     @if (range.max !== range.min) {
                       – {{ range.max | currency }}
                     }
+                  </span>
+                } @else if (pointsOnly() && pointsRange(); as range) {
+                  <span class="product-detail__price">
+                    {{ range.min }}
+                    @if (range.max !== range.min) {
+                      – {{ range.max }}
+                    }
+                    pts
                   </span>
                 }
                 @if (resolvingSku()) {
@@ -124,8 +136,10 @@
                 } @else {
                   <p class="text-secondary small mb-0">
                     {{
-                      priceRange()
-                        ? 'Select options to see the exact price.'
+                      (pointsOnly() ? pointsRange() : priceRange())
+                        ? (pointsOnly()
+                            ? 'Select options to see the exact points cost.'
+                            : 'Select options to see the exact price.')
                         : 'Select options to see price and availability.'
                     }}
                   </p>

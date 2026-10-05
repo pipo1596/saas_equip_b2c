@@ -156,6 +156,21 @@
           @if (allotmentBarRenewsOn(); as renewsOn) {
             <span class="af"><i>Renews</i><b>{{ renewsOn | date: 'MMM d' }}</b></span>
           }
+        } @else if (pointsBarRule(); as rule) {
+          <span class="af af--heading"><b>{{ rule.ruleName }}</b></span>
+          <span class="tb-sep" aria-hidden="true"></span>
+          @if (pointsBarBalance(); as balance) {
+            <span class="af"><i>Total</i><b>{{ balance.total }} pts</b></span>
+            <span class="af"><i>Used</i><b>{{ balance.used }} pts</b></span>
+            <span class="af"><i>In cart</i><b>{{ balance.inCart }} pts</b></span>
+            <span class="af">
+              <i>Available</i>
+              <b [class.good]="balance.available >= 0" [class.warn]="balance.available < 0">{{ balance.available }} pts</b>
+            </span>
+          }
+          @if (rule.cycle.renewsOn; as renewsOn) {
+            <span class="af"><i>Renews</i><b>{{ renewsOn | date: 'MMM d' }}</b></span>
+          }
         }
         <div class="allot-rules-wrap dropdown">
           <button
@@ -292,14 +307,18 @@
               <app-pay-tag [tag]="lineTag(item.cartItemId)" />
               @if (item.isAvailable === 'N') {
                 <p class="cart-item__flag text-danger">No longer available</p>
-              } @else if (item.priceChanged === 'Y') {
+              } @else if (item.priceChanged === 'Y' && !pointsOnly()) {
                 <p class="cart-item__flag">Price updated to {{ item.currentPrice | currency }} since you added this.</p>
               }
               <div class="cart-item__qtyrow">
                 <span class="qty">
                   <span>{{ item.quantity }}</span>
                 </span>
-                <span class="cart-item__price">{{ item.lineTotalPrice | currency }}</span>
+                @if (!pointsOnly()) {
+                  <span class="cart-item__price">{{ item.lineTotalPrice | currency }}</span>
+                } @else if (item.lineTotalPoints !== null) {
+                  <span class="cart-item__price">{{ item.lineTotalPoints }} pts</span>
+                }
               </div>
               <div class="cart-item__actions">
                 <a
@@ -327,10 +346,17 @@
       }
     </div>
     <div class="border-top pt-3 mt-2">
-      <div class="drawer__sub d-flex justify-content-between align-items-baseline mb-2">
-        <span>Subtotal</span>
-        <b>{{ cartSubtotal() | currency }}</b>
-      </div>
+      @if (!pointsOnly()) {
+        <div class="drawer__sub d-flex justify-content-between align-items-baseline mb-2">
+          <span>Subtotal</span>
+          <b>{{ cartSubtotal() | currency }}</b>
+        </div>
+      } @else if (cart().subtotalPoints !== null) {
+        <div class="drawer__sub d-flex justify-content-between align-items-baseline mb-2">
+          <span>Subtotal</span>
+          <b>{{ cart().subtotalPoints }} pts</b>
+        </div>
+      }
       <button
         type="button"
         class="btn btn-primary w-100"

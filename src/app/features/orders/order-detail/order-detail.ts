@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-import { formatBalanceAmount } from '../../../core/cart/cart';
+import { CartService, formatBalanceAmount } from '../../../core/cart/cart';
 import {
   HistoryEntry,
   OrderDetail,
@@ -40,8 +40,14 @@ import { Header } from '../../../shared/header/header';
 })
 export class OrderDetailPage implements OnInit, AfterViewInit {
   private readonly orderService = inject(OrderService);
+  private readonly cartService = inject(CartService);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
   private readonly hostElementRef = inject(ElementRef<HTMLElement>);
+
+  // Based on the employee's *current* allotment — applied retroactively to
+  // past orders too, so a points-only employee never sees a dollar figure,
+  // including on an order they placed before switching programs.
+  readonly pointsOnly = this.cartService.pointsOnly;
 
   // Bound from the route (`/orders/:orderId`, see app.routes.ts).
   readonly orderId = input('');

@@ -80,10 +80,17 @@
           <div class="col-lg-4">
             <div class="cart-page__summary">
               <h2 class="cart-page__summary-title mb-3">Order summary</h2>
-              <div class="d-flex justify-content-between align-items-baseline mb-2">
-                <span>Order value ({{ cart().itemCount }} items)</span>
-                <b>{{ cart().subtotalPrice | currency }}</b>
-              </div>
+              @if (!pointsOnly()) {
+                <div class="d-flex justify-content-between align-items-baseline mb-2">
+                  <span>Order value ({{ cart().itemCount }} items)</span>
+                  <b>{{ cart().subtotalPrice | currency }}</b>
+                </div>
+              } @else if (cart().subtotalPoints !== null) {
+                <div class="d-flex justify-content-between align-items-baseline mb-2">
+                  <span>Order value ({{ cart().itemCount }} items)</span>
+                  <b>{{ cart().subtotalPoints }} pts</b>
+                </div>
+              }
 
               @if (paidFromLines().length > 0) {
                 <hr />
@@ -99,11 +106,13 @@
                     </b>
                   </div>
                 }
-                <hr />
-                <div class="d-flex justify-content-between align-items-baseline mb-3">
-                  <span>To pay at checkout</span>
-                  <b>{{ amountDueAtCheckout() | currency }}</b>
-                </div>
+                @if (!pointsOnly()) {
+                  <hr />
+                  <div class="d-flex justify-content-between align-items-baseline mb-3">
+                    <span>To pay at checkout</span>
+                    <b>{{ amountDueAtCheckout() | currency }}</b>
+                  </div>
+                }
               } @else if (cart().subtotalPoints !== null) {
                 <div class="d-flex justify-content-between align-items-baseline mb-2">
                   <span>Points</span>
@@ -114,7 +123,13 @@
               <a routerLink="/checkout" class="cart-page__checkout">
                 <span class="cart-page__checkout-title">Checkout</span>
                 <span class="cart-page__checkout-sub">
-                  {{ amountDueAtCheckout() === 0 ? 'Nothing to pay' : (amountDueAtCheckout() | currency) + ' due' }}
+                  {{
+                    pointsOnly()
+                      ? 'Continue to checkout'
+                      : amountDueAtCheckout() === 0
+                        ? 'Nothing to pay'
+                        : (amountDueAtCheckout() | currency) + ' due'
+                  }}
                 </span>
               </a>
               <a routerLink="/products/full-catalog" class="btn btn-outline-secondary w-100 mt-2">
@@ -158,7 +173,7 @@
       }
       @if (item.isAvailable === 'N') {
         <p class="cart-page__flag text-danger">No longer available</p>
-      } @else if (item.priceChanged === 'Y') {
+      } @else if (item.priceChanged === 'Y' && !pointsOnly()) {
         <p class="cart-page__flag">
           Price updated to {{ item.currentPrice | currency }} since you added this.
         </p>
@@ -222,9 +237,11 @@
           <span class="cart-page__linetotal">{{ item.lineTotalPrice | currency }}</span>
         } @else {
           <span class="cart-page__linetotal">{{ formatAmount(primary.amount, primary.payUnit) }}</span>
-          <span class="cart-page__value-note">{{ item.lineTotalPrice | currency }} value</span>
+          @if (!pointsOnly()) {
+            <span class="cart-page__value-note">{{ item.lineTotalPrice | currency }} value</span>
+          }
         }
-        @if (item.quantity > 1) {
+        @if (item.quantity > 1 && !pointsOnly()) {
           <span class="cart-page__unit-price">{{ item.currentPrice | currency }} each</span>
         }
         @for (allocation of splitAllocations(item); track allocation.ruleId) {
@@ -232,13 +249,18 @@
             {{ formatAmount(allocation.amount, allocation.payUnit) }} {{ ruleNameFor(allocation.ruleId) }}
           </span>
         }
-      } @else {
+      } @else if (!pointsOnly()) {
         <span class="cart-page__linetotal">{{ item.lineTotalPrice | currency }}</span>
         @if (item.quantity > 1) {
           <span class="cart-page__unit-price">{{ item.currentPrice | currency }} each</span>
         }
         @if (item.lineTotalPoints !== null) {
           <span class="cart-page__points">{{ item.lineTotalPoints }} pts</span>
+        }
+      } @else if (item.lineTotalPoints !== null) {
+        <span class="cart-page__linetotal">{{ item.lineTotalPoints }} pts</span>
+        @if (item.quantity > 1 && item.currentPoints !== null) {
+          <span class="cart-page__unit-price">{{ item.currentPoints }} pts each</span>
         }
       }
     </div>

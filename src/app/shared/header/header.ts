@@ -19,7 +19,7 @@ import { NavigationStart, Router, RouterLink } from '@angular/router';
 import { filter } from 'rxjs';
 
 import { AuthService, EmployeeLocation } from '../../core/auth/auth';
-import { CartItem, CartService, PayTag, formatCartItemOptions } from '../../core/cart/cart';
+import { CartItem, CartService, PayTag, formatCartItemOptions, tileBalance } from '../../core/cart/cart';
 import { CatalogCategory, CatalogMenu, CatalogViewService } from '../../core/catalog/catalog-view';
 import { LocationSelectionService } from '../../core/location/location-selection';
 import { TenantSettings, TenantSettingsService } from '../../core/tenant/tenant-settings';
@@ -320,6 +320,7 @@ export class Header implements OnInit {
   });
 
   readonly cart = this.cartService.cart;
+  readonly pointsOnly = this.cartService.pointsOnly;
   readonly cartCount = computed(() => this.cart().itemCount);
   // Switching locations re-scopes the allotment breakdown (and the catalog
   // itself) to a different program — with items already in the cart, that'd
@@ -333,7 +334,8 @@ export class Header implements OnInit {
   readonly allotment = computed(() => this.cart().allotment);
   // `null` here means "no dollar rule" (units/points only, or none at all)
   // — the bar itself hides, but the Rules link/panel stays if there's at
-  // least one rule to show.
+  // least one rule to show. When every rule pays in points, `pointsBarRule`
+  // below picks up the slack so the top summary still shows.
   readonly allotmentBar = computed(() => this.allotment()?.allotmentBar ?? null);
   readonly ruleCount = computed(() => this.allotment()?.ruleCount ?? 0);
   readonly allotmentRules = computed(() => this.allotment()?.rules ?? []);
@@ -345,6 +347,22 @@ export class Header implements OnInit {
       return null;
     }
     return this.allotmentRules().find((rule) => rule.ruleId === bar.ruleId)?.cycle.renewsOn ?? null;
+  });
+  // `allotmentBar` is dollar-only, so a points-only employee never gets one
+  // from the API — synthesize the same top summary locally from whichever
+  // rule is flagged as the bar rule (falling back to the first rule, since
+  // `pointsOnly` already guarantees at least one exists) instead of hiding
+  // it entirely.
+  readonly pointsBarRule = computed(() => {
+    if (!this.pointsOnly()) {
+      return null;
+    }
+    const rules = this.allotmentRules();
+    return rules.find((rule) => rule.isBarRule === 'Y') ?? rules[0] ?? null;
+  });
+  readonly pointsBarBalance = computed(() => {
+    const rule = this.pointsBarRule();
+    return rule ? tileBalance(rule) : null;
   });
 
   lineTag(cartItemId: number): PayTag | null {

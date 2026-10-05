@@ -84,6 +84,16 @@ const DOLLAR_RULE = {
   allowCcFallback: 'Y' as const,
 };
 
+const POINTS_RULE = {
+  ...DOLLAR_RULE,
+  ruleId: 12,
+  ruleName: 'Points Allowance',
+  allotType: 'POINTS' as const,
+  primaryUnit: 'POINTS' as const,
+  dollars: null,
+  points: { total: 1000, used: 300, inCart: 150, available: 550 },
+};
+
 describe('CartService', () => {
   let service: CartService;
   let httpMock: HttpTestingController;
@@ -482,6 +492,46 @@ describe('CartService', () => {
       httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush(emptied);
 
       expect(service.cart()).toEqual(emptied);
+    });
+  });
+
+  describe('pointsOnly', () => {
+    function cartWithRules(rules: object[]): Cart {
+      return {
+        ...CART,
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: rules.length,
+          allotExclTaxFreight: 'N',
+          rules,
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [],
+          productTag: null,
+        },
+      } as Cart;
+    }
+
+    it('is false when there is no allotment at all (falls back to showing dollars)', () => {
+      service.cart.set(CART);
+      expect(service.pointsOnly()).toBe(false);
+    });
+
+    it('is false when there are allotment rules but none of them (or not all of them) are points', () => {
+      service.cart.set(cartWithRules([DOLLAR_RULE]));
+      expect(service.pointsOnly()).toBe(false);
+
+      service.cart.set(cartWithRules([DOLLAR_RULE, POINTS_RULE]));
+      expect(service.pointsOnly()).toBe(false);
+    });
+
+    it('is true only once every allotment rule is points', () => {
+      service.cart.set(cartWithRules([POINTS_RULE]));
+      expect(service.pointsOnly()).toBe(true);
+
+      service.cart.set(cartWithRules([POINTS_RULE, { ...POINTS_RULE, ruleId: 13 }]));
+      expect(service.pointsOnly()).toBe(true);
     });
   });
 });

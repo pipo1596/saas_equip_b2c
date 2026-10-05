@@ -6,6 +6,7 @@ import { TestBed } from '@angular/core/testing';
 import { AuthService } from '../../../core/auth/auth';
 import { FAKE_SESSION } from '../../../core/auth/auth.testing';
 import { CartService } from '../../../core/cart/cart';
+import { POINTS_ONLY_ALLOTMENT } from '../../../core/cart/cart.testing';
 import { ProductDetailInfo } from '../../../core/catalog/product-detail';
 import { ProductDetail } from './product-detail';
 
@@ -34,6 +35,8 @@ const PRODUCT: ProductDetailInfo = {
   techSpecImg: '',
   minPrice: 79.99,
   maxPrice: 94.99,
+  minPoints: 800,
+  maxPoints: 950,
 };
 
 // `*GET` no longer ships a SKU matrix — just the header, images, and every
@@ -63,6 +66,7 @@ const WHITE_M_SKU = {
   skuCode: 'ABC-100-WHT-M',
   basePrice: 94.99,
   comparePrice: 110,
+  basePoints: 950,
   msrp: 110,
   weight: 1.2,
   weightUnit: 'lb',
@@ -482,6 +486,63 @@ describe('ProductDetail', () => {
 
     const priceEl = fixture.nativeElement.querySelector('.product-detail__price');
     expect(priceEl.textContent.trim()).toBe('$89.99');
+  });
+
+  it("should show the points range instead of the dollar range when the employee's allotment is points-only", () => {
+    TestBed.inject(CartService).cart.update((cart) => ({ ...cart, allotment: POINTS_ONLY_ALLOTMENT }));
+
+    const fixture = TestBed.createComponent(ProductDetail);
+    fixture.componentRef.setInput('productPk', '12345');
+    fixture.detectChanges();
+    expectRequest(httpMock, '*GET').flush({
+      ...RESPONSE,
+      product: { ...PRODUCT, minPrice: 79.99, maxPrice: 94.99, minPoints: 800, maxPoints: 950 },
+    });
+    fixture.detectChanges();
+    expectRequest(httpMock, '*AVAIL').flush(AVAIL_EVERYTHING);
+    fixture.detectChanges();
+
+    const priceEl: HTMLElement = fixture.nativeElement.querySelector('.product-detail__price');
+    expect(priceEl.textContent).toContain('800');
+    expect(priceEl.textContent).toContain('950');
+    expect(priceEl.textContent).toContain('pts');
+    expect(priceEl.textContent).not.toContain('$');
+    expect(fixture.nativeElement.textContent).toContain('Select options to see the exact points cost.');
+  });
+
+  it('should fall back to the generic prompt when the employee is points-only but the product has no points range yet', () => {
+    TestBed.inject(CartService).cart.update((cart) => ({ ...cart, allotment: POINTS_ONLY_ALLOTMENT }));
+
+    const fixture = TestBed.createComponent(ProductDetail);
+    fixture.componentRef.setInput('productPk', '12345');
+    fixture.detectChanges();
+    expectRequest(httpMock, '*GET').flush({
+      ...RESPONSE,
+      product: { ...PRODUCT, minPoints: null, maxPoints: null },
+    });
+    fixture.detectChanges();
+    expectRequest(httpMock, '*AVAIL').flush(AVAIL_EVERYTHING);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.product-detail__price')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Select options to see price and availability.');
+  });
+
+  it("should show the resolved sku's points cost instead of its dollar price when the employee's allotment is points-only", () => {
+    TestBed.inject(CartService).cart.update((cart) => ({ ...cart, allotment: POINTS_ONLY_ALLOTMENT }));
+
+    const fixture = TestBed.createComponent(ProductDetail);
+    fixture.componentRef.setInput('productPk', '12345');
+    fixture.detectChanges();
+    expectRequest(httpMock, '*GET').flush(RESPONSE);
+    fixture.detectChanges();
+    expectRequest(httpMock, '*AVAIL').flush({ resolvedSkuId: 9002, axes: [] });
+    fixture.detectChanges();
+    expectRequest(httpMock, '*GET_SKU').flush(WHITE_M_SKU);
+    fixture.detectChanges();
+
+    const priceEl: HTMLElement = fixture.nativeElement.querySelector('.product-detail__price');
+    expect(priceEl.textContent?.trim()).toBe('950 pts');
   });
 
   it('should fall back to the generic prompt (no range shown) when the product has no price range yet', () => {

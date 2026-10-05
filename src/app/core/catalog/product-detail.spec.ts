@@ -35,6 +35,8 @@ const PRODUCT: ProductDetailInfo = {
   techSpecImg: '',
   minPrice: 79.99,
   maxPrice: 94.99,
+  minPoints: 800,
+  maxPoints: 950,
 };
 
 const LOCATION_ID = 18;
@@ -360,6 +362,7 @@ describe('ProductDetailService', () => {
         skuCode: 'ABC-100-BLK-M',
         basePrice: 89.99,
         comparePrice: 110,
+        basePoints: 900,
         msrp: 110,
         weight: 1.2,
         weightUnit: 'lb',
@@ -371,6 +374,7 @@ describe('ProductDetailService', () => {
 
       expect(result?.skuCode).toBe('ABC-100-BLK-M');
       expect(result?.basePrice).toBe(89.99);
+      expect(result?.basePoints).toBe(900);
     });
 
     it('errors with the API message when the response carries no skuId', () => {

@@ -1,5 +1,5 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, finalize, map, tap } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
@@ -115,6 +115,16 @@ export class CartService {
   // True only while a `*GET` is in flight — the header can use this to show
   // a loading state on first load without it firing on every add/remove.
   readonly loading = signal(false);
+
+  // True only once the employee actually has allotment rules and every one
+  // of them pays in points — no rules at all (e.g. no location resolved
+  // yet) falls back to showing dollars like everyone else. Read site-wide
+  // to suppress dollar pricing for an employee whose allotment can only
+  // ever pay in points, never dollars.
+  readonly pointsOnly = computed(() => {
+    const rules = this.cart().allotment?.rules ?? [];
+    return rules.length > 0 && rules.every((rule) => rule.primaryUnit === 'POINTS');
+  });
   // Owned here (not by the header) so any component with a "success" moment
   // — e.g. product detail after `addItem` resolves — can pop the header's
   // cart drawer open as confirmation, without reaching into the header.

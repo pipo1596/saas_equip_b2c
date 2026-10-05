@@ -2,7 +2,7 @@ import { CurrencyPipe, isPlatformBrowser } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnInit, PLATFORM_ID, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-import { formatBalanceAmount } from '../../../core/cart/cart';
+import { CartService, formatBalanceAmount } from '../../../core/cart/cart';
 import {
   OrderPage,
   OrderService,
@@ -35,7 +35,13 @@ const STATUS_CHIPS: { label: string; value: string }[] = [
 })
 export class OrderHistoryPage implements OnInit {
   private readonly orderService = inject(OrderService);
+  private readonly cartService = inject(CartService);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
+
+  // Based on the employee's *current* allotment — applied retroactively to
+  // past orders too, so a points-only employee never sees a dollar figure
+  // anywhere, including their own order history.
+  readonly pointsOnly = this.cartService.pointsOnly;
 
   readonly statusChips = STATUS_CHIPS;
   readonly statusFilter = signal('');
@@ -77,7 +83,18 @@ export class OrderHistoryPage implements OnInit {
     this.load();
   }
 
-  paidByAllotmentLabel(order: OrderSummary): string {
+  // `null` means nothing worth showing on this row — for a points-only
+  // employee there's no points-used aggregate on this list endpoint (only
+  // `allotDollarsUsed`/`allotUnitsUsed`), so a dollar figure (which would
+  // misleadingly show "$0.00") is omitted rather than shown.
+  paidByAllotmentLabel(order: OrderSummary): string | null {
+    if (this.pointsOnly()) {
+      if (order.allotUnitsUsed <= 0) {
+        return null;
+      }
+      const units = order.allotUnitsUsed === 1 ? '1 unit' : `${order.allotUnitsUsed} units`;
+      return `Paid by allotment: ${units}`;
+    }
     const dollars = formatBalanceAmount(order.allotDollarsUsed, 'DOLLARS');
     if (order.allotUnitsUsed <= 0) {
       return `Paid by allotment: ${dollars}`;

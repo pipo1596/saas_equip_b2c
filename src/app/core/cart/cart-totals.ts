@@ -28,7 +28,12 @@ export function resolvedAllocations(item: CartItem, tag: LineTag | undefined): L
     {
       ruleId: tag.ruleId,
       payUnit: tag.payUnit,
-      amount: tag.payUnit === 'DOLLARS' ? item.lineTotalPrice : item.quantity,
+      amount:
+        tag.payUnit === 'DOLLARS'
+          ? item.lineTotalPrice
+          : tag.payUnit === 'POINTS'
+            ? (item.lineTotalPoints ?? item.quantity)
+            : item.quantity,
     },
   ];
 }

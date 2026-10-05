@@ -36,6 +36,9 @@ export interface ProductDetailInfo {
   // no SKUs yet. Equal when every SKU shares one price.
   minPrice: number | null;
   maxPrice: number | null;
+  // Same deal, in points — both `null` on the same "no SKUs yet" terms.
+  minPoints: number | null;
+  maxPoints: number | null;
 }
 
 // `skuId: null` is a product-level/gallery image; a populated `skuId` is
@@ -132,6 +135,7 @@ export interface ProductSkuDetail {
   skuCode: string;
   basePrice: number;
   comparePrice: number;
+  basePoints: number;
   msrp: number;
   weight: number;
   weightUnit: string;

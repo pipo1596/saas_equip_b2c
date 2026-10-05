@@ -6,6 +6,7 @@ import { TestBed } from '@angular/core/testing';
 import { AuthService } from '../../core/auth/auth';
 import { FAKE_SESSION } from '../../core/auth/auth.testing';
 import { Cart } from '../../core/cart/cart';
+import { POINTS_ONLY_ALLOTMENT } from '../../core/cart/cart.testing';
 import { CheckoutPage } from './checkout-page';
 
 const CART: Cart = {
@@ -300,6 +301,32 @@ describe('CheckoutPage', () => {
 
     expect(rows[1].querySelector('.checkout-page__item-linetotal')?.textContent).toContain('89.99');
     expect(rows[1].querySelector('.checkout-page__item-unit-price')).toBeNull();
+  });
+
+  it("should show points instead of dollars, and hide the shipping/tax/total breakdown, when the employee's allotment is points-only", () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    fixture.detectChanges();
+    flushInitialCartLoads(httpMock, {
+      ...CART,
+      subtotalPoints: 300,
+      allotment: POINTS_ONLY_ALLOTMENT,
+      items: [{ ...CART.items[0], lineTotalPoints: 300, currentPoints: 150 }],
+    });
+    flushCheckoutData(httpMock, { cust_addrs: [], ship_addrs: [], ship_mthds: [], tax_rates: [] });
+    fixture.detectChanges();
+
+    const row: HTMLElement = fixture.nativeElement.querySelector('.checkout-page__item-price');
+    expect(row.querySelector('.checkout-page__item-linetotal')?.textContent).toContain('300 pts');
+    expect(row.querySelector('.checkout-page__item-unit-price')?.textContent).toContain('150 pts each');
+
+    // Scoped to the checkout summary card itself — the header's own Rules
+    // panel legitimately uses the word "Total" for a points balance too,
+    // which isn't what this is testing.
+    const summary: HTMLElement = fixture.nativeElement.querySelector('.checkout-page__summary');
+    expect(summary.textContent).not.toContain('$');
+    expect(summary.textContent).not.toContain('Subtotal due');
+    expect(summary.textContent).not.toContain('Total');
+    expect(summary.textContent).toContain('300 pts');
   });
 
   it('should load the cart and checkout data, defaulting to the primary address and default shipping method', () => {

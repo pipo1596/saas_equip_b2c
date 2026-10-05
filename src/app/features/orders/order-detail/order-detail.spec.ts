@@ -3,6 +3,8 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideRouter } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 
+import { CartService } from '../../../core/cart/cart';
+import { POINTS_ONLY_ALLOTMENT } from '../../../core/cart/cart.testing';
 import { OrderDetailPage } from './order-detail';
 
 const BASE_ORDER = {
@@ -263,6 +265,33 @@ describe('OrderDetailPage', () => {
     expect(fixture.nativeElement.querySelector('.order-detail__item-price')?.textContent).toContain(
       'Covered by 2 units',
     );
+  });
+
+  it("should show points instead of dollars, and hide the order summary's dollar breakdown, when the employee's allotment is points-only", () => {
+    TestBed.inject(CartService).cart.update((cart) => ({ ...cart, allotment: POINTS_ONLY_ALLOTMENT }));
+
+    const { fixture } = createPage();
+    fixture.detectChanges();
+    flushOrderGet(httpMock, {
+      ...BASE_ORDER,
+      totals: { ...BASE_ORDER.totals, subtotalPoints: 300 },
+      lines: [{ ...BASE_ORDER.lines[0], lineTotal: 0, linePoints: 300, unitPoints: 150 }],
+      paidFrom: [
+        { ruleId: 90, ruleName: 'Points Allowance', amountType: 'POINTS' as const, amount: 300, state: 'CHARGED' as const },
+      ],
+    });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.order-detail__item-price')?.textContent).toContain('300 pts');
+
+    // Scoped to the summary card — "Shipping address"/"Shipping method"
+    // legitimately still show elsewhere on the page; it's only the
+    // dollar-denominated shipping *cost* row in this card that hides.
+    const summary: HTMLElement = fixture.nativeElement.querySelector('.order-detail__summary');
+    expect(summary.textContent).not.toContain('$');
+    expect(summary.textContent).not.toContain('Shipping');
+    expect(summary.textContent).not.toContain('Billed to company');
+    expect(summary.textContent).toContain('300 pts');
   });
 
   it('labels shipping/tax "(covered by allotment)" when allotExclTaxFreight is N, and shows no separate billed-to-company row', () => {

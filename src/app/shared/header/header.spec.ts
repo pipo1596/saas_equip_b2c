@@ -1181,6 +1181,44 @@ describe('Header', () => {
       expect(fixture.nativeElement.textContent).toContain('Rules (1)');
     });
 
+    it('synthesizes the top summary in points when every rule pays in points', () => {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+      const pointsRule = {
+        ...DOLLAR_RULE,
+        ruleName: 'Points Allowance',
+        allotType: 'POINTS' as const,
+        primaryUnit: 'POINTS' as const,
+        isBarRule: 'Y' as const,
+        dollars: null,
+        points: { total: 1000, used: 300, inCart: 50, available: 650 },
+      };
+      header.cart.set({
+        ...EMPTY_ALLOTMENT_CART,
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 1,
+          allotExclTaxFreight: 'N',
+          rules: [pointsRule],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [],
+          productTag: null,
+        },
+      });
+      fixture.detectChanges();
+
+      const text = fixture.nativeElement.textContent;
+      expect(text).toContain('Points Allowance');
+      expect(text).toContain('1000 pts');
+      expect(text).toContain('300 pts');
+      expect(text).toContain('50 pts');
+      expect(text).toContain('650 pts');
+      expect(text).toContain('Renews');
+      expect(text).toContain('Rules (1)');
+    });
+
     it('hides the whole allotment section when there are no rules at all', () => {
       const fixture = TestBed.createComponent(Header);
       const header = fixture.componentInstance;

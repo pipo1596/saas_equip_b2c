@@ -66,6 +66,7 @@ export class CartPage implements OnInit, AfterViewInit {
   private readonly hostElementRef = inject(ElementRef<HTMLElement>);
 
   readonly cart = this.cartService.cart;
+  readonly pointsOnly = this.cartService.pointsOnly;
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   // Which sku a quantity change or remove is currently in flight for — lets

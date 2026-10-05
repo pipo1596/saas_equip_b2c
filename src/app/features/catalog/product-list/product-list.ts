@@ -14,6 +14,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
+import { CartService } from '../../../core/cart/cart';
 import { Breadcrumb, hasCrumbs } from '../../../core/catalog/breadcrumb';
 import {
   CatalogProductsService,
@@ -71,8 +72,13 @@ export class ProductList implements AfterViewInit {
   private readonly catalogProductsService = inject(CatalogProductsService);
   private readonly catalogViewService = inject(CatalogViewService);
   private readonly locationSelectionService = inject(LocationSelectionService);
+  private readonly cartService = inject(CartService);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
   private readonly hostElementRef = inject(ElementRef<HTMLElement>);
+
+  // An employee whose allotment is points-only never pays in dollars — the
+  // card shows `pointsRange` instead of `priceRange` for them.
+  readonly pointsOnly = this.cartService.pointsOnly;
 
   @ViewChild('resultsTop') private readonly resultsTop?: ElementRef<HTMLElement>;
 

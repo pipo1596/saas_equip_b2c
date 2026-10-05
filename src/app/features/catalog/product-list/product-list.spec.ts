@@ -5,6 +5,8 @@ import { TestBed } from '@angular/core/testing';
 
 import { AuthService } from '../../../core/auth/auth';
 import { FAKE_SESSION } from '../../../core/auth/auth.testing';
+import { CartService } from '../../../core/cart/cart';
+import { POINTS_ONLY_ALLOTMENT } from '../../../core/cart/cart.testing';
 import { ProductSearchResult } from '../../../core/catalog/catalog-products';
 import { ProductList } from './product-list';
 
@@ -20,7 +22,8 @@ const SAMPLE: ProductSearchResult = {
       productId: 'SFD-SHRT-214',
       title: 'Sworn duty shirt, long sleeve',
       skuCode: 'SFD-SHRT-214-BLK-M',
-      price: 54,
+      priceRange: { min: 49.99, max: 64.99 },
+      pointsRange: { min: 500, max: 650 },
       imageUrl: '',
       colors: [
         { valueDesc: 'Black', valueCode: 'BLACK', valueSwtchColor: 'black', valueSwtchImage: '' },
@@ -175,6 +178,53 @@ describe('ProductList', () => {
     expect(card.getAttribute('href')).toBe(
       '/product/4021?name=Sworn%20duty%20shirt,%20long%20sleeve&categoryId=5510',
     );
+  });
+
+  it('should show the dollar price range on the card', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', '5510');
+    auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush(SAMPLE);
+    fixture.detectChanges();
+
+    const priceEl: HTMLElement = fixture.nativeElement.querySelector('.product-card__price');
+    expect(priceEl.textContent).toContain('$49.99');
+    expect(priceEl.textContent).toContain('$64.99');
+  });
+
+  it('should show a single value (no dash) when the price range is a single price', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', '5510');
+    auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush({
+      ...SAMPLE,
+      products: [{ ...SAMPLE.products[0], priceRange: { min: 54, max: 54 } }],
+    });
+    fixture.detectChanges();
+
+    const priceEl: HTMLElement = fixture.nativeElement.querySelector('.product-card__price');
+    expect(priceEl.textContent?.trim()).toBe('$54.00');
+  });
+
+  it("should show the points range instead of the dollar range when the employee's allotment is points-only", () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    TestBed.inject(CartService).cart.update((cart) => ({ ...cart, allotment: POINTS_ONLY_ALLOTMENT }));
+    fixture.componentRef.setInput('categoryId', '5510');
+    auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
+    fixture.detectChanges();
+    expectProductsRequest(httpMock).flush(SAMPLE);
+    fixture.detectChanges();
+
+    const priceEl: HTMLElement = fixture.nativeElement.querySelector('.product-card__price');
+    expect(priceEl.textContent).toContain('500');
+    expect(priceEl.textContent).toContain('650');
+    expect(priceEl.textContent).toContain('pts');
+    expect(priceEl.textContent).not.toContain('$');
   });
 
   it('should omit categoryId from the product link on a bucket/full-catalog page (no real category)', () => {

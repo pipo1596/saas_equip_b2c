@@ -17,14 +17,33 @@ export interface ProductColor {
   valueSwtchImage: string;
 }
 
+// Low/high across the product's SKUs — `null` for both only if it somehow
+// has no SKUs yet. Equal `min`/`max` means every SKU shares one value.
+export interface PriceRange {
+  min: number;
+  max: number;
+}
+
+export interface PointsRange {
+  min: number;
+  max: number;
+}
+
 export interface Product {
   productPk: number;
   productId: string;
   title: string;
   skuCode: string;
-  price: number;
+  priceRange: PriceRange | null;
+  pointsRange: PointsRange | null;
   imageUrl: string;
   colors: ProductColor[];
+}
+
+interface RawProduct extends Omit<Product, 'priceRange' | 'pointsRange' | 'colors'> {
+  priceRange: PriceRange | null | undefined;
+  pointsRange: PointsRange | null | undefined;
+  colors: ProductColor[] | null;
 }
 
 export interface CategoryFacet {
@@ -63,8 +82,9 @@ export interface ProductSearchResult {
   optionFacets: OptionFacetGroup[];
 }
 
-interface RawProductSearchResult extends Omit<ProductSearchResult, 'breadcrumb'> {
+interface RawProductSearchResult extends Omit<ProductSearchResult, 'breadcrumb' | 'products'> {
   breadcrumb: RawBreadcrumb | null;
+  products: RawProduct[] | null;
 }
 
 export interface ProductSearchParams {
@@ -110,6 +130,8 @@ function normalizeSearchResult(result: RawProductSearchResult): ProductSearchRes
     breadcrumb: normalizeBreadcrumb(result.breadcrumb),
     products: (result.products ?? []).map((product) => ({
       ...product,
+      priceRange: product.priceRange ?? null,
+      pointsRange: product.pointsRange ?? null,
       colors: (product.colors ?? []).map((color) => ({
         ...color,
         valueSwtchColor: color.valueSwtchColor ?? '',

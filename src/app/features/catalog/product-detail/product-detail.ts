@@ -59,6 +59,12 @@ export class ProductDetail implements OnInit, AfterViewInit {
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
   private readonly hostElementRef = inject(ElementRef<HTMLElement>);
 
+  // An employee whose allotment is points-only never pays in dollars —
+  // the SKU/price-range API has no points price to show instead (unlike
+  // the cart, which does once this product is actually added), so the
+  // price block is just omitted here.
+  readonly pointsOnly = this.cartService.pointsOnly;
+
   @ViewChild('thumbTrack') private readonly thumbTrack?: ElementRef<HTMLElement>;
 
   // Bound from the route: `productPk` is the path param, `name` an optional
@@ -184,6 +190,16 @@ export class ProductDetail implements OnInit, AfterViewInit {
       return null;
     }
     return { min: product.minPrice, max: product.maxPrice };
+  });
+
+  // Same shape, in points — shown instead of `priceRange` for a points-only
+  // employee (see `pointsOnly` below).
+  readonly pointsRange = computed(() => {
+    const product = this.product();
+    if (!product || product.minPoints === null || product.maxPoints === null) {
+      return null;
+    }
+    return { min: product.minPoints, max: product.maxPoints };
   });
 
   // Needs a real, fully-resolved SKU (not just a complete-looking

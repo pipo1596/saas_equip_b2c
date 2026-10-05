@@ -4,6 +4,7 @@ import { provideRouter } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 
 import { Cart } from '../../core/cart/cart';
+import { POINTS_ONLY_ALLOTMENT } from '../../core/cart/cart.testing';
 import { ConfirmService } from '../../shared/confirm/confirm';
 import { CartPage } from './cart-page';
 
@@ -127,6 +128,24 @@ describe('CartPage', () => {
     expect(fixture.nativeElement.textContent).toContain('Black, M');
     expect(fixture.nativeElement.textContent).toContain('Duty Belt');
     expect(fixture.nativeElement.querySelectorAll('.cart-page__row').length).toBe(2);
+  });
+
+  it("should show points instead of dollars everywhere when the employee's allotment is points-only", () => {
+    const fixture = TestBed.createComponent(CartPage);
+    fixture.detectChanges();
+
+    flushInitialCartLoads(httpMock, { ...CART, allotment: POINTS_ONLY_ALLOTMENT });
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).not.toContain('$');
+
+    const summary: HTMLElement = fixture.nativeElement.querySelector('.cart-page__summary');
+    expect(summary.textContent).toContain('450 pts');
+
+    const rows: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('.cart-page__row'));
+    expect(rows[0].querySelector('.cart-page__linetotal')?.textContent?.trim()).toBe('300 pts');
+    expect(rows[0].querySelector('.cart-page__unit-price')?.textContent?.trim()).toBe('150 pts each');
   });
 
   it('should show the unit price for a multi-quantity line, and omit it when quantity is 1', () => {

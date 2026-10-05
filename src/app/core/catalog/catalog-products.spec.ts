@@ -12,7 +12,8 @@ const SAMPLE: ProductSearchResult = {
       productId: 'SFD-SHRT-214',
       title: 'Sworn duty shirt, long sleeve',
       skuCode: 'SFD-SHRT-214-BLK-M',
-      price: 54,
+      priceRange: { min: 54, max: 54 },
+      pointsRange: { min: 540, max: 540 },
       imageUrl: '',
       colors: [
         { valueDesc: 'Black', valueCode: '#0B0B0B', valueSwtchColor: '#0B0B0B', valueSwtchImage: '' },
@@ -138,7 +139,6 @@ describe('CatalogProductsService', () => {
           productId: 'SFD-SHRT-215',
           title: 'Sworn duty shirt (no colors)',
           skuCode: 'SFD-SHRT-215-M',
-          price: 54,
           imageUrl: '',
           colors: null,
         },
@@ -151,6 +151,9 @@ describe('CatalogProductsService', () => {
     } as never);
 
     expect(result?.products[0].colors).toEqual([]);
+    // Neither range is sent at all for a product with no SKUs yet.
+    expect(result?.products[0].priceRange).toBeNull();
+    expect(result?.products[0].pointsRange).toBeNull();
     expect(result?.categoryFacets).toEqual([]);
     expect(result?.optionFacets).toEqual([]);
   });
