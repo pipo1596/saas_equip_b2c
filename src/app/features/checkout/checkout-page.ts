@@ -174,11 +174,19 @@ export class CheckoutPage implements OnInit, AfterViewInit {
     () => this.cart().allotment?.allotExclTaxFreight === 'N',
   );
 
-  readonly orderTotal = computed(() =>
-    this.shippingAndTaxCoveredByAllotment()
+  // A points-only employee never pays shipping/tax in dollars at all — only
+  // `subtotalDue` (itself already 0 once points cover the order) gates
+  // checkout for them. Folding the dollar shipping/tax figure in here too
+  // would silently block an order points fully cover, over a balance the
+  // employee was never shown in the first place.
+  readonly orderTotal = computed(() => {
+    if (this.pointsOnly()) {
+      return this.subtotalDue();
+    }
+    return this.shippingAndTaxCoveredByAllotment()
       ? this.subtotalDue()
-      : this.subtotalDue() + this.shippingCost() + this.taxAmount(),
-  );
+      : this.subtotalDue() + this.shippingCost() + this.taxAmount();
+  });
 
   readonly submitting = signal(false);
   readonly placeOrderError = signal<string | null>(null);

@@ -162,6 +162,62 @@ const CART_WITH_SHIPPING_AND_TAX_COVERED: Cart = {
   allotment: { ...FULLY_COVERED_CART.allotment!, allotExclTaxFreight: 'N' },
 };
 
+// CART, fully covered by a points-only allotment that excludes shipping/tax
+// from that coverage (`allotExclTaxFreight: 'Y'`, same as FULLY_COVERED_CART)
+// — used to check that the leftover dollar shipping/tax figure, which a
+// points-only employee never sees or pays, doesn't block placing the order.
+const POINTS_FULLY_COVERED_CART: Cart = {
+  ...CART,
+  subtotalPoints: 8,
+  items: [{ ...CART.items[0], pointsAtAdd: 8, lineTotalPoints: 8, currentPoints: 4 }],
+  allotment: {
+    programId: 3,
+    allotmentBar: null,
+    ruleCount: 1,
+    allotExclTaxFreight: 'Y',
+    rules: [
+      {
+        ruleId: 90,
+        ruleName: 'Points Allowance',
+        allotType: 'POINTS',
+        primaryUnit: 'POINTS',
+        isBarRule: 'N',
+        dollars: null,
+        units: null,
+        points: { total: 1000, used: 10, inCart: 8, available: 982 },
+        cycle: {
+          renewalBasis: 'FIXED',
+          renewalPeriodMonths: 12,
+          cycleStart: null,
+          cycleEnd: null,
+          renewsOn: null,
+          expirationDate: null,
+          onExpiration: 'SUSPEND',
+        },
+        covers: { allAssortments: 'Y', categories: [], unitGrants: [] },
+        carryover: { type: 'FORFEIT', pct: null, capAmount: null, carriedIn: null },
+        quotas: [],
+        requireApproval: 'N',
+        allowCcFallback: 'N',
+        fallbackRuleIds: [],
+      },
+    ],
+    approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+    openOrders: null,
+    lineTags: [
+      {
+        cartItemId: 9001,
+        skuId: 9001,
+        ruleId: 90,
+        payUnit: 'POINTS',
+        tagLabel: 'Points Allowance',
+        allocations: [{ ruleId: 90, payUnit: 'POINTS', amount: 8 }],
+      },
+    ],
+    productTag: null,
+  },
+};
+
 function flushInitialCartLoads(httpMock: HttpTestingController, response: object) {
   const matches = httpMock.match(
     (req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCCART' && req.body?.action === '*GET',
@@ -648,6 +704,29 @@ describe('CheckoutPage', () => {
 
     expect(fixture.nativeElement.querySelector('.alert-warning')).toBeNull();
     expect(fixture.nativeElement.textContent).toContain('(covered by allotment)');
+  });
+
+  it('should not block a points-only order over leftover dollar shipping/tax it never sees or pays', () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    const page = fixture.componentInstance;
+    fixture.detectChanges();
+    flushInitialCartLoads(httpMock, POINTS_FULLY_COVERED_CART);
+    flushCheckoutData(httpMock, {
+      cust_addrs: [PRIMARY_ADDRESS],
+      ship_addrs: [PRIMARY_ADDRESS],
+      ship_mthds: [DEFAULT_SHIP_METHOD],
+      tax_rates: [QC_TAX_RATE],
+    });
+    fixture.detectChanges();
+
+    // The goods are fully covered by points, but tax still applies to the
+    // dollar subtotal underneath, same as the non-points case above — a
+    // points-only employee never pays dollars at all, so that figure must
+    // not block the order the way it would for a dollar-paying employee.
+    expect(page.subtotalDue()).toBe(0);
+    expect(page.taxAmount()).toBeGreaterThan(0);
+    expect(page.orderTotal()).toBe(0);
+    expect(fixture.nativeElement.querySelector('.alert-warning')).toBeNull();
   });
 
   it('should show empty-state notes when there are no addresses or shipping methods on file', () => {

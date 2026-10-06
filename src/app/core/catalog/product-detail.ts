@@ -135,7 +135,7 @@ export interface ProductSkuDetail {
   skuCode: string;
   basePrice: number;
   comparePrice: number;
-  basePoints: number;
+  points: number;
   msrp: number;
   weight: number;
   weightUnit: string;
@@ -143,6 +143,19 @@ export interface ProductSkuDetail {
   requiresShip: string;
   isTaxable: string;
   variantImageUrl: string;
+}
+
+// The sku's own list price/points — `customerPrice`, when present, is what
+// *this* employee actually pays (e.g. a price list assigned to their
+// account) and takes priority over all three fields it parallels.
+interface RawProductSkuDetail extends ProductSkuDetail {
+  customerPrice: {
+    price: number;
+    points: number;
+    compareAtPrice: number | null;
+    source: string;
+    priceListId: number;
+  } | null;
 }
 
 interface ApiFailure {
@@ -263,13 +276,22 @@ export class ProductDetailService {
   // there's nothing to fetch before that.
   getSku(skuId: number, locationId: number | null): Observable<ProductSkuDetail> {
     return this.http
-      .post<ProductSkuDetail | ApiFailure>(this.dispatchUrl, { action: '*GET_SKU', skuId, locationId })
+      .post<RawProductSkuDetail | ApiFailure>(this.dispatchUrl, { action: '*GET_SKU', skuId, locationId })
       .pipe(
         map((response) => {
           if (!('skuId' in response) || !response.skuId) {
             throw new Error((response as ApiFailure).message ?? 'We could not load this option.');
           }
-          return response;
+          const { customerPrice, ...sku } = response;
+          if (!customerPrice) {
+            return sku;
+          }
+          return {
+            ...sku,
+            basePrice: customerPrice.price,
+            points: customerPrice.points,
+            comparePrice: customerPrice.compareAtPrice ?? sku.comparePrice,
+          };
         }),
       );
   }

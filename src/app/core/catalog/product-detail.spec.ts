@@ -362,7 +362,7 @@ describe('ProductDetailService', () => {
         skuCode: 'ABC-100-BLK-M',
         basePrice: 89.99,
         comparePrice: 110,
-        basePoints: 900,
+        points: 900,
         msrp: 110,
         weight: 1.2,
         weightUnit: 'lb',
@@ -374,7 +374,38 @@ describe('ProductDetailService', () => {
 
       expect(result?.skuCode).toBe('ABC-100-BLK-M');
       expect(result?.basePrice).toBe(89.99);
-      expect(result?.basePoints).toBe(900);
+      expect(result?.points).toBe(900);
+    });
+
+    it("prefers customerPrice's price/points over the sku's own list price/points when present", () => {
+      let result: ProductSkuDetail | undefined;
+      service.getSku(65498, LOCATION_ID).subscribe((data) => (result = data));
+
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCPRDDTL').flush({
+        skuId: 65498,
+        productPk: 4668,
+        skuCode: 'COE-6277-EFD-S-M',
+        basePrice: 25,
+        comparePrice: null,
+        points: 10,
+        msrp: null,
+        weight: null,
+        weightUnit: 'LB',
+        isDefault: 'N',
+        requiresShip: 'Y',
+        isTaxable: 'Y',
+        variantImageUrl: null,
+        customerPrice: {
+          price: 10,
+          points: 5,
+          compareAtPrice: null,
+          source: 'PRICE_LIST',
+          priceListId: 8,
+        },
+      });
+
+      expect(result?.basePrice).toBe(10);
+      expect(result?.points).toBe(5);
     });
 
     it('errors with the API message when the response carries no skuId', () => {

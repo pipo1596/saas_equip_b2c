@@ -66,7 +66,7 @@ const WHITE_M_SKU = {
   skuCode: 'ABC-100-WHT-M',
   basePrice: 94.99,
   comparePrice: 110,
-  basePoints: 950,
+  points: 950,
   msrp: 110,
   weight: 1.2,
   weightUnit: 'lb',
