@@ -59,19 +59,26 @@
             <div class="order-detail__item-list">
               @for (line of order.lines; track line.orderLineId) {
                 <div class="order-detail__item">
-                  <img
-                    class="order-detail__item-thumb"
-                    [src]="line.imageUrl ?? placeholderImage"
-                    [alt]="line.productTitle"
-                  />
+                  <a
+                    class="order-detail__item-thumb-link"
+                    [routerLink]="['/product', line.productPk]"
+                    [attr.aria-label]="'View ' + line.productTitle"
+                  >
+                    <img
+                      class="order-detail__item-thumb"
+                      [src]="line.imageUrl ?? placeholderImage"
+                      [alt]="line.productTitle"
+                    />
+                  </a>
                   <div class="order-detail__item-body">
-                    <span class="order-detail__item-name">{{ line.productTitle }}</span>
+                    <a class="order-detail__item-name" [routerLink]="['/product', line.productPk]">
+                      {{ line.productTitle }}
+                    </a>
                     <span class="order-detail__item-sku">
                       {{ line.skuCode }}
                       @if (line.optionDesc) {
                         · {{ line.optionDesc }}
                       }
-                      · Qty {{ line.qtyOrdered }}
                     </span>
                     @if (lineStatusNote(line); as note) {
                       <span class="order-detail__item-status">{{ note }}</span>
@@ -79,11 +86,21 @@
                   </div>
                   <span class="order-detail__item-price">
                     @if (line.unitsUsed === line.qtyOrdered && line.lineTotal === 0) {
-                      Covered by {{ line.unitsUsed }} unit{{ line.unitsUsed === 1 ? '' : 's' }}
+                      <span class="order-detail__item-linetotal">
+                        Covered by {{ line.unitsUsed }} unit{{ line.unitsUsed === 1 ? '' : 's' }}
+                      </span>
                     } @else if (!pointsOnly()) {
-                      {{ line.lineTotal | currency }}
+                      <span class="order-detail__item-linetotal">{{ line.lineTotal | currency }}</span>
+                      <span class="order-detail__item-unit-price">
+                        {{ line.qtyOrdered }} × {{ line.unitPrice | currency }}
+                      </span>
                     } @else if (line.linePoints !== null) {
-                      {{ line.linePoints }} pts
+                      <span class="order-detail__item-linetotal">{{ line.linePoints }} pts</span>
+                      @if (line.unitPoints !== null) {
+                        <span class="order-detail__item-unit-price">
+                          {{ line.qtyOrdered }} × {{ line.unitPoints }} pts
+                        </span>
+                      }
                     }
                   </span>
                 </div>

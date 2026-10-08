@@ -52,6 +52,9 @@ export interface OrderLine {
   orderLineId: number;
   lineNo: number;
   skuId: number | null;
+  // What `/product/:productPk` takes — links the line's thumbnail/name back
+  // to the product page it was ordered from.
+  productPk: number;
   skuCode: string;
   productTitle: string;
   optionDesc: string | null;
@@ -205,8 +208,12 @@ export interface OrderSummary {
   // says how many more there are).
   thumbnails: OrderThumb[];
   orderTotal: number;
+  // `null` on the same "nothing points-eligible" terms as the cart/checkout
+  // subtotal fields — not shown at all in that case, rather than as `0`.
+  subtotalPoints: number | null;
   allotDollarsUsed: number;
   allotUnitsUsed: number;
+  allotPointsUsed: number;
   shipMethodName: string;
   trackingCount: number;
   // Only present on the `*APPRQ` (approver queue) response, not `*LIST`.
@@ -220,14 +227,45 @@ export interface OrderPagination {
   totalPages: number;
 }
 
+export type OrderDatePreset = 'ALL' | 'LAST30' | 'LAST90';
+export type OrderSort = 'NEWEST' | 'OLDEST';
+
+// What the server actually applied, echoed back — a resolved preset's own
+// dateFrom/dateTo (so the date inputs can display the concrete range it
+// expanded to) and `datePreset` as `'CUSTOM'` whenever the match came from a
+// manually-typed range rather than one of the three preset buttons.
+export interface OrderListFilters {
+  status: string;
+  orderNumber: string;
+  dateFrom: string;
+  dateTo: string;
+  datePreset: OrderDatePreset | 'CUSTOM';
+  sort: OrderSort;
+}
+
+// One count per status, plus `ALL` for the unfiltered total — always
+// present, even on a response with zero matching rows, so the status chips
+// stay populated no matter what the current filter is.
+export type OrderStatusCounts = Record<'ALL' | OrderStatus, number>;
+
 export interface OrderPage {
   pagination: OrderPagination;
   data: OrderSummary[];
+  statusCounts: OrderStatusCounts;
+  filters: OrderListFilters;
 }
 
 export interface ListOrdersParams {
   // '' lists every status; anything else is an exact `OrderStatus` match.
   status: string;
+  // Every field below is optional — blank/omitted leaves it unset, same as
+  // the API itself treats them. `datePreset` of `LAST30`/`LAST90` overrides
+  // `dateFrom`/`dateTo` server-side, so there's no need to send both.
+  orderNumber?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  datePreset?: OrderDatePreset;
+  sort?: OrderSort;
   page: number;
   pageSize: number;
 }
@@ -236,14 +274,37 @@ interface RawOrderSummary extends Omit<OrderSummary, 'thumbnails'> {
   thumbnails: OrderThumb[] | null;
 }
 
-interface RawOrderPage extends Omit<OrderPage, 'data'> {
+interface RawOrderPage extends Omit<OrderPage, 'data' | 'statusCounts' | 'filters'> {
   data: RawOrderSummary[] | null;
+  statusCounts: OrderStatusCounts | null;
+  filters: OrderListFilters | null;
 }
+
+const EMPTY_STATUS_COUNTS: OrderStatusCounts = {
+  ALL: 0,
+  PENDING_APPROVAL: 0,
+  PROCESSING: 0,
+  PARTIALLY_SHIPPED: 0,
+  SHIPPED: 0,
+  CANCELLED: 0,
+  REJECTED: 0,
+};
+
+const DEFAULT_FILTERS: OrderListFilters = {
+  status: '',
+  orderNumber: '',
+  dateFrom: '',
+  dateTo: '',
+  datePreset: 'ALL',
+  sort: 'NEWEST',
+};
 
 function normalizeOrderPage(raw: RawOrderPage): OrderPage {
   return {
     ...raw,
     data: (raw.data ?? []).map((row) => ({ ...row, thumbnails: row.thumbnails ?? [] })),
+    statusCounts: raw.statusCounts ?? EMPTY_STATUS_COUNTS,
+    filters: raw.filters ?? DEFAULT_FILTERS,
   };
 }
 
@@ -370,10 +431,22 @@ export class OrderService {
 
   // Newest first, same "no `success` key means real data" rule as `get`.
   // An empty result (`data: []`, `totalRows: 0`) isn't a failure — that's
-  // just an employee with no orders yet.
+  // just an employee with no orders yet. Every optional field is left out
+  // entirely unless actually in use, rather than sent blank — keeps the
+  // request (and the request-shape assertions in tests) minimal.
   list(params: ListOrdersParams): Observable<OrderPage | ApiError> {
     return this.http
-      .post<RawOrderPage | ApiError>(this.dispatchUrl, { action: '*LIST', ...params })
+      .post<RawOrderPage | ApiError>(this.dispatchUrl, {
+        action: '*LIST',
+        status: params.status,
+        page: params.page,
+        pageSize: params.pageSize,
+        ...(params.orderNumber ? { orderNumber: params.orderNumber } : {}),
+        ...(params.dateFrom ? { dateFrom: params.dateFrom } : {}),
+        ...(params.dateTo ? { dateTo: params.dateTo } : {}),
+        ...(params.datePreset ? { datePreset: params.datePreset } : {}),
+        ...(params.sort && params.sort !== 'NEWEST' ? { sort: params.sort } : {}),
+      })
       .pipe(map((response) => ('success' in response ? response : normalizeOrderPage(response))));
   }
 }

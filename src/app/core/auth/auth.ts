@@ -77,6 +77,18 @@ export class AuthService {
   readonly session = signal<Session | null>(this.restoreSession());
   readonly pendingMfa = signal<PendingMfa | null>(this.restorePendingMfa());
 
+  // Only `pendingMfa` (empId/sessionId) survives a refresh, in
+  // sessionStorage — the password itself is kept in memory only, for as
+  // long as this tab's challenge is in progress, so a resend can replay
+  // `login` (the call that actually sends the code) without asking the
+  // employee to type their password again. It never reaches
+  // localStorage/sessionStorage, and is cleared the moment the challenge
+  // resolves (or the employee cancels), so it doesn't linger once it's no
+  // longer needed. Lost on refresh, same as any other in-memory state —
+  // resend after a refresh falls back to asking the employee to sign in
+  // again instead.
+  private pendingCredentials: { email: string; password: string } | null = null;
+
   readonly isAuthenticated = computed(() => this.session() !== null);
   readonly mfaPending = computed(() => this.pendingMfa() !== null);
 
@@ -96,9 +108,20 @@ export class AuthService {
   readonly locations = computed(() => this.session()?.locations ?? []);
 
   login(email: string, password: string): Observable<LoginResponse> {
+    this.pendingCredentials = { email, password };
     return this.http
       .post<LoginResponse>(this.dispatchUrl, { email, password, action: ACTION.login })
       .pipe(tap((response) => this.applyLoginResponse(response)));
+  }
+
+  // Replays `login` with the same credentials — there's no dedicated resend
+  // action, and `login` (LOGIN1) is what actually sends the code in the
+  // first place. `null` when the credentials aren't held anymore (e.g. the
+  // tab was refreshed mid-challenge) — the caller needs to send the
+  // employee back to sign in again rather than attempt a resend.
+  resendMfa(): Observable<LoginResponse> | null {
+    const pending = this.pendingCredentials;
+    return pending ? this.login(pending.email, pending.password) : null;
   }
 
   verifyMfa(code: string): Observable<LoginResponse> {
@@ -132,6 +155,7 @@ export class AuthService {
   logout(): void {
     this.session.set(null);
     this.pendingMfa.set(null);
+    this.pendingCredentials = null;
     this.employeeService.clear();
     this.clearPendingMfa();
     if (this.isBrowser) {
@@ -173,6 +197,7 @@ export class AuthService {
       locations: [],
     };
     this.pendingMfa.set(null);
+    this.pendingCredentials = null;
     this.clearPendingMfa();
     this.session.set(session);
     this.persistSession(session);

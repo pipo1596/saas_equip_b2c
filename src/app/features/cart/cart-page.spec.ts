@@ -145,18 +145,18 @@ describe('CartPage', () => {
 
     const rows: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('.cart-page__row'));
     expect(rows[0].querySelector('.cart-page__linetotal')?.textContent?.trim()).toBe('300 pts');
-    expect(rows[0].querySelector('.cart-page__unit-price')?.textContent?.trim()).toBe('150 pts each');
+    expect(rows[0].querySelector('.cart-page__unit-price')?.textContent?.trim()).toBe('2 × 150 pts');
   });
 
-  it('should show the unit price for a multi-quantity line, and omit it when quantity is 1', () => {
+  it('should show the quantity × unit-price math for every line, regardless of quantity', () => {
     const fixture = TestBed.createComponent(CartPage);
     fixture.detectChanges();
     flushInitialCartLoads(httpMock, CART);
     fixture.detectChanges();
 
     const rows: HTMLElement[] = fixture.nativeElement.querySelectorAll('.cart-page__row');
-    expect(rows[0].querySelector('.cart-page__unit-price')?.textContent?.trim()).toBe('$89.99 each');
-    expect(rows[1].querySelector('.cart-page__unit-price')).toBeNull();
+    expect(rows[0].querySelector('.cart-page__unit-price')?.textContent?.trim()).toBe('2 × $89.99');
+    expect(rows[1].querySelector('.cart-page__unit-price')?.textContent?.trim()).toBe('1 × $89.99');
   });
 
   it("should link each line's thumbnail and name to a plain (non-edit) product view", () => {

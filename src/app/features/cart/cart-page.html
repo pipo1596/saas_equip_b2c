@@ -241,8 +241,8 @@
             <span class="cart-page__value-note">{{ item.lineTotalPrice | currency }} value</span>
           }
         }
-        @if (item.quantity > 1 && !pointsOnly()) {
-          <span class="cart-page__unit-price">{{ item.currentPrice | currency }} each</span>
+        @if (!pointsOnly()) {
+          <span class="cart-page__unit-price">{{ item.quantity }} × {{ item.currentPrice | currency }}</span>
         }
         @for (allocation of splitAllocations(item); track allocation.ruleId) {
           <span class="cart-page__split" [class.cart-page__split--fallback]="allocation.ruleId !== primary.ruleId">
@@ -251,16 +251,14 @@
         }
       } @else if (!pointsOnly()) {
         <span class="cart-page__linetotal">{{ item.lineTotalPrice | currency }}</span>
-        @if (item.quantity > 1) {
-          <span class="cart-page__unit-price">{{ item.currentPrice | currency }} each</span>
-        }
+        <span class="cart-page__unit-price">{{ item.quantity }} × {{ item.currentPrice | currency }}</span>
         @if (item.lineTotalPoints !== null) {
           <span class="cart-page__points">{{ item.lineTotalPoints }} pts</span>
         }
       } @else if (item.lineTotalPoints !== null) {
         <span class="cart-page__linetotal">{{ item.lineTotalPoints }} pts</span>
-        @if (item.quantity > 1 && item.currentPoints !== null) {
-          <span class="cart-page__unit-price">{{ item.currentPoints }} pts each</span>
+        @if (item.currentPoints !== null) {
+          <span class="cart-page__unit-price">{{ item.quantity }} × {{ item.currentPoints }} pts</span>
         }
       }
     </div>

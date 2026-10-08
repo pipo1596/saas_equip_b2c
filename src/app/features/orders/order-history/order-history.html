@@ -11,18 +11,89 @@
 
     <h1 class="order-history__title mb-3">Order history</h1>
 
-    <div class="order-history__chips mb-3" role="group" aria-label="Filter by status">
-      @for (chip of statusChips; track chip.value) {
+    <div class="order-history__filters">
+      <div class="order-history__filter-row">
+        <div class="order-history__field">
+          <label for="order-number-filter" class="order-history__field-label">Order number</label>
+          <div class="order-history__search">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M21 21l-4-4" />
+            </svg>
+            <input
+              id="order-number-filter"
+              type="search"
+              placeholder="e.g. EQ100381"
+              [formControl]="orderNumberControl"
+            />
+          </div>
+        </div>
+        <div class="order-history__field">
+          <label for="order-date-from" class="order-history__field-label">Order date from</label>
+          <input
+            id="order-date-from"
+            type="date"
+            [value]="dateFrom()"
+            (change)="onDateFromChange($any($event.target).value)"
+          />
+        </div>
+        <div class="order-history__field">
+          <label for="order-date-to" class="order-history__field-label">To</label>
+          <input
+            id="order-date-to"
+            type="date"
+            [value]="dateTo()"
+            (change)="onDateToChange($any($event.target).value)"
+          />
+        </div>
+      </div>
+
+      <div class="order-history__date-presets" role="group" aria-label="Quick date filters">
         <button
           type="button"
-          class="order-history__chip"
-          [class.order-history__chip--active]="statusFilter() === chip.value"
-          [attr.aria-pressed]="statusFilter() === chip.value"
-          (click)="setFilter(chip.value)"
+          class="order-history__preset-btn"
+          [class.order-history__preset-btn--active]="activeDatePreset() === 'LAST30'"
+          (click)="setDatePreset('LAST30')"
         >
-          {{ chip.label }}
+          Last 30 days
         </button>
-      }
+        <button
+          type="button"
+          class="order-history__preset-btn"
+          [class.order-history__preset-btn--active]="activeDatePreset() === 'LAST90'"
+          (click)="setDatePreset('LAST90')"
+        >
+          Last 90 days
+        </button>
+        <button
+          type="button"
+          class="order-history__preset-btn"
+          [class.order-history__preset-btn--active]="activeDatePreset() === 'ALL'"
+          (click)="setDatePreset('ALL')"
+        >
+          All time
+        </button>
+      </div>
+
+      <div class="order-history__status-row">
+        <span class="order-history__field-label">Status</span>
+        <div class="order-history__chips" role="group" aria-label="Filter by status">
+          @for (chip of statusChips; track chip.value) {
+            <button
+              type="button"
+              class="order-history__chip"
+              [class.order-history__chip--active]="statusFilter() === chip.value"
+              [attr.aria-pressed]="statusFilter() === chip.value"
+              (click)="setFilter(chip.value)"
+            >
+              {{ chip.label }}
+              @if (chipCount(chip.value); as count) {
+                <span class="order-history__chip-count">{{ count }}</span>
+              }
+            </button>
+          }
+        </div>
+      </div>
     </div>
 
     @if (loading()) {
@@ -41,28 +112,33 @@
         </a>
       </div>
     } @else {
-      <div class="order-history__list">
+      <div class="order-history__toolbar">
+        @if (pagination(); as p) {
+          <span class="order-history__count">
+            Showing <b>{{ orders().length }}</b> of <b>{{ p.totalRows }}</b> order{{ p.totalRows === 1 ? '' : 's' }}
+          </span>
+        }
+        <div class="order-history__sort">
+          <label for="order-sort" class="order-history__field-label">Sort</label>
+          <select id="order-sort" [value]="sort()" (change)="setSort($any($event.target).value)">
+            <option value="NEWEST">Newest first</option>
+            <option value="OLDEST">Oldest first</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="order-history__table">
+        <div class="order-history__table-head">
+          <span>Order</span>
+          <span>Items</span>
+          <span>Status</span>
+          <span>{{ pointsOnly() ? 'Points' : 'Total' }}</span>
+        </div>
         @for (order of orders(); track order.orderId) {
           <a class="order-history__row" [routerLink]="['/orders', order.orderId]">
-            <div class="order-history__thumbs">
-              @for (thumb of order.thumbnails; track thumb.lineNo) {
-                <img class="order-history__thumb" [src]="thumb.imageUrl ?? placeholderImage" [alt]="thumb.productTitle" />
-              }
-              @if (moreThumbsCount(order) > 0) {
-                <span class="order-history__thumb-more">+{{ moreThumbsCount(order) }} more</span>
-              }
-            </div>
-            <div class="order-history__row-main">
-              <div class="order-history__row-head">
-                <span class="order-history__order-number">{{ order.orderNumber }}</span>
-                <span [class]="'order-history__status-chip order-history__status-chip--' + statusTone(order.status)">
-                  {{ statusLabel(order.status) }}
-                </span>
-              </div>
-              <span class="order-history__row-meta">
-                {{ orderDate(order.placedTs) }} · {{ order.itemCount }} item{{ order.itemCount === 1 ? '' : 's' }} ·
-                {{ order.shipMethodName }}
-              </span>
+            <div class="order-history__row-order">
+              <span class="order-history__order-number">{{ order.orderNumber }}</span>
+              <span class="order-history__row-meta">{{ orderDate(order.placedTs) }} · {{ order.shipMethodName }}</span>
               @if (paidByAllotmentLabel(order); as label) {
                 <span class="order-history__row-meta">{{ label }}</span>
               }
@@ -77,9 +153,36 @@
                 </span>
               }
             </div>
+
+            <div class="order-history__row-items">
+              <div class="order-history__thumbs">
+                @for (thumb of displayedThumbs(order); track thumb.lineNo) {
+                  <img class="order-history__thumb" [src]="thumb.imageUrl ?? placeholderImage" [alt]="thumb.productTitle" />
+                }
+              </div>
+              <span class="order-history__items-count">
+                @if (moreThumbsCount(order) > 0) {
+                  <b>+{{ moreThumbsCount(order) }}</b>
+                }
+                {{ order.itemCount }} item{{ order.itemCount === 1 ? '' : 's' }}
+              </span>
+            </div>
+
+            <span [class]="'order-history__status-chip order-history__status-chip--' + statusTone(order.status)">
+              {{ statusLabel(order.status) }}
+            </span>
+
             @if (!pointsOnly()) {
               <span class="order-history__row-total">{{ order.orderTotal | currency }}</span>
+            } @else if (order.subtotalPoints !== null) {
+              <span class="order-history__row-total">{{ order.subtotalPoints }} pts</span>
+            } @else {
+              <span class="order-history__row-total"></span>
             }
+
+            <svg class="order-history__row-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 6l6 6-6 6" />
+            </svg>
           </a>
         }
       </div>

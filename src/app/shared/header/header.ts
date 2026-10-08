@@ -97,6 +97,26 @@ function buildDisplayCategories(
   });
 }
 
+// A catalog whose whole top level collapses into one section (e.g.
+// "Clothing" -> just "Apparel", with everything else nested underneath it)
+// would otherwise render as a single, very tall column instead of spreading
+// across the grid — unwrap a lone section into its own children (repeating
+// as long as there's still only one) so the grid actually has more than one
+// section to lay out side by side. The section's own label is dropped in
+// the process; the nav button above the menu (e.g. "Clothing") already
+// names the bucket, so nothing meaningful is lost.
+function widenSingleSection(categories: readonly DisplayCategory[]): readonly DisplayCategory[] {
+  let current = categories;
+  while (current.length === 1 && current[0].children.length > 0) {
+    current = current[0].children;
+  }
+  // Only worth it once there's actually more than one section to spread
+  // across the grid — a chain that bottoms out at another lone section (or
+  // a leaf) gains nothing by trading the original, more descriptive label
+  // (e.g. "Footwear") for an equally-lonely descendant's (e.g. "Boot").
+  return current.length > 1 ? current : categories;
+}
+
 @Component({
   selector: 'app-header',
   imports: [
@@ -257,7 +277,7 @@ export class Header implements OnInit {
     }
     const tenant = this.tenantSettingsService.settings();
     return CATALOG_NAV_LABELS.map((item) => {
-      const categories = buildDisplayCategories(menu[item.key]);
+      const categories = widenSingleSection(buildDisplayCategories(menu[item.key]));
       return {
         ...item,
         categories,

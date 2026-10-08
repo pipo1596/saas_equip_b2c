@@ -421,6 +421,68 @@ describe('Header', () => {
     ]);
   });
 
+  it("should widen a single collapsed section into its own children, instead of one very tall column", () => {
+    const fixture = TestBed.createComponent(Header);
+    const auth = TestBed.inject(AuthService);
+    const httpMock = TestBed.inject(HttpTestingController);
+
+    auth.session.set({
+      ...FAKE_SESSION,
+      locations: [
+        { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Edmonton Fire Dept Chief' },
+      ],
+    });
+    TestBed.tick();
+
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS').flush({} as never);
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPCVEW').flush({
+      viewId: 6,
+      programId: 28,
+      categoryCount: 1,
+      menu: {
+        // "Apparel" has a direct leaf child ("Sweater"), so it becomes the
+        // *only* top-level section — without widening, every other category
+        // below would nest inside that one section instead of getting its
+        // own column.
+        clothing: [
+          {
+            progCatId: 308,
+            categoryName: 'Apparel',
+            ...CATEGORY,
+            children: [
+              { progCatId: 340, categoryName: 'Sweater', ...CATEGORY },
+              {
+                progCatId: 320,
+                categoryName: 'Outerwear',
+                ...CATEGORY,
+                children: [{ progCatId: 334, categoryName: 'Jacket', ...CATEGORY }],
+              },
+              { progCatId: 319, categoryName: 'Pant', ...CATEGORY, children: [{ progCatId: 339, categoryName: 'Trouser', ...CATEGORY }] },
+            ],
+          },
+        ],
+        footwear: [],
+        gear: [],
+      },
+    } satisfies CatalogView);
+
+    const item = fixture.componentInstance.catalogNavItems()[0];
+    expect(item.categories).toEqual([
+      { progCatId: 340, categoryName: 'Sweater', children: [] },
+      {
+        progCatId: 320,
+        categoryName: 'Outerwear',
+        children: [{ progCatId: 334, categoryName: 'Jacket', children: [] }],
+      },
+      {
+        progCatId: 319,
+        categoryName: 'Pant',
+        children: [{ progCatId: 339, categoryName: 'Trouser', children: [] }],
+      },
+    ]);
+    expect(item.columnCount).toBe(3);
+  });
+
   it('should size the grid to the section count, capped at 4', () => {
     const fixture = TestBed.createComponent(Header);
     const auth = TestBed.inject(AuthService);

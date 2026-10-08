@@ -188,36 +188,6 @@
               }
             </section>
 
-            @if (orderTotal() > 0) {
-              <div class="alert alert-warning mb-0" role="alert">
-                @if (pointsOnly()) {
-                  This order isn't fully covered by your points allotment, so it can't be placed yet — adjust
-                  items or shipping method to bring it down.
-                } @else {
-                  Credit card payment isn't available yet. This order has a
-                  {{ orderTotal() | currency }} balance that isn't covered by an allotment, so it can't be placed
-                  until that balance is $0.00 — adjust items or shipping method to bring it down.
-                }
-              </div>
-            }
-            @if (placeOrderWarning(); as warning) {
-              <div class="alert alert-warning mb-0" role="alert">{{ warning }}</div>
-            }
-            @if (placeOrderError(); as message) {
-              <div class="alert alert-danger mb-0" role="alert">{{ message }}</div>
-            }
-
-            <button
-              type="button"
-              class="checkout-page__place-order"
-              [disabled]="!canPlaceOrder()"
-              (click)="placeOrder()"
-            >
-              <span class="checkout-page__place-order-title">Place order</span>
-              @if (placeOrderSubtitle(); as subtitle) {
-                <span class="checkout-page__place-order-sub">{{ subtitle }}</span>
-              }
-            </button>
           </div>
 
           <div class="col-lg-4">
@@ -238,19 +208,20 @@
                         @if (item.options.length > 0) {
                           · {{ formatOptions(item) }}
                         }
-                        · Qty {{ item.quantity }}
                       </span>
                     </div>
                     <span class="checkout-page__item-price">
                       @if (!pointsOnly()) {
                         <span class="checkout-page__item-linetotal">{{ item.lineTotalPrice | currency }}</span>
-                        @if (item.quantity > 1) {
-                          <span class="checkout-page__item-unit-price">{{ item.currentPrice | currency }} each</span>
-                        }
+                        <span class="checkout-page__item-unit-price">
+                          {{ item.quantity }} × {{ item.currentPrice | currency }}
+                        </span>
                       } @else if (item.lineTotalPoints !== null) {
                         <span class="checkout-page__item-linetotal">{{ item.lineTotalPoints }} pts</span>
-                        @if (item.quantity > 1 && item.currentPoints !== null) {
-                          <span class="checkout-page__item-unit-price">{{ item.currentPoints }} pts each</span>
+                        @if (item.currentPoints !== null) {
+                          <span class="checkout-page__item-unit-price">
+                            {{ item.quantity }} × {{ item.currentPoints }} pts
+                          </span>
                         }
                       }
                     </span>
@@ -321,7 +292,38 @@
                   <b>{{ orderTotal() | currency }}</b>
                 </div>
               }
-              <a routerLink="/cart" class="btn btn-outline-secondary w-100">Back to cart</a>
+
+              @if (orderTotal() > 0) {
+                <div class="alert alert-warning mb-3" role="alert">
+                  @if (pointsOnly()) {
+                    This order isn't fully covered by your points allotment, so it can't be placed yet — adjust
+                    items or shipping method to bring it down.
+                  } @else {
+                    Credit card payment isn't available yet. This order has a
+                    {{ orderTotal() | currency }} balance that isn't covered by an allotment, so it can't be
+                    placed until that balance is $0.00 — adjust items or shipping method to bring it down.
+                  }
+                </div>
+              }
+              @if (placeOrderWarning(); as warning) {
+                <div class="alert alert-warning mb-3" role="alert">{{ warning }}</div>
+              }
+              @if (placeOrderError(); as message) {
+                <div class="alert alert-danger mb-3" role="alert">{{ message }}</div>
+              }
+
+              <button
+                type="button"
+                class="checkout-page__place-order"
+                [disabled]="!canPlaceOrder()"
+                (click)="placeOrder()"
+              >
+                <span class="checkout-page__place-order-title">Place order</span>
+                @if (placeOrderSubtitle(); as subtitle) {
+                  <span class="checkout-page__place-order-sub">{{ subtitle }}</span>
+                }
+              </button>
+              <a routerLink="/cart" class="btn btn-outline-secondary w-100 mt-2">Back to cart</a>
             </div>
           </div>
         </div>

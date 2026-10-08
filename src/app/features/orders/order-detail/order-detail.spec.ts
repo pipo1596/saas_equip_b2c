@@ -55,6 +55,7 @@ const BASE_ORDER = {
       orderLineId: 9001,
       lineNo: 1,
       skuId: 9001,
+      productPk: 12345,
       skuCode: 'ABC-100-BLK-M',
       productTitle: "Men's Trail Jacket",
       optionDesc: 'BLACK / M',
@@ -230,6 +231,19 @@ describe('OrderDetailPage', () => {
     expect(img.alt).toBe("Men's Trail Jacket");
   });
 
+  it("links each line's thumbnail and name to its product page", () => {
+    const { fixture } = createPage();
+    fixture.detectChanges();
+    flushOrderGet(httpMock, BASE_ORDER);
+    fixture.detectChanges();
+
+    const thumbLink: HTMLAnchorElement = fixture.nativeElement.querySelector('.order-detail__item-thumb-link');
+    const nameLink: HTMLAnchorElement = fixture.nativeElement.querySelector('.order-detail__item-name');
+    expect(thumbLink.getAttribute('href')).toBe('/product/12345');
+    expect(nameLink.getAttribute('href')).toBe('/product/12345');
+    expect(nameLink.textContent?.trim()).toBe("Men's Trail Jacket");
+  });
+
   it('shows a placeholder image when a line has no imageUrl', () => {
     const { fixture } = createPage();
     fixture.detectChanges();
@@ -251,6 +265,19 @@ describe('OrderDetailPage', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('.order-detail__item-status')?.textContent).toBe('1 shipped · 1 backordered');
+  });
+
+  it("shows each line's quantity × unit-price math, with no separate Qty label", () => {
+    const { fixture } = createPage();
+    fixture.detectChanges();
+    flushOrderGet(httpMock, BASE_ORDER);
+    fixture.detectChanges();
+
+    const price = fixture.nativeElement.querySelector('.order-detail__item-price');
+    expect(price.querySelector('.order-detail__item-linetotal')?.textContent).toContain('179.98');
+    expect(price.querySelector('.order-detail__item-unit-price')?.textContent?.trim()).toBe('2 × $89.99');
+
+    expect(fixture.nativeElement.querySelector('.order-detail__item-sku')?.textContent).not.toContain('Qty');
   });
 
   it('shows "Covered by N unit(s)" instead of a price when a line is fully unit-covered', () => {
@@ -282,7 +309,9 @@ describe('OrderDetailPage', () => {
     });
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('.order-detail__item-price')?.textContent).toContain('300 pts');
+    const price = fixture.nativeElement.querySelector('.order-detail__item-price');
+    expect(price.querySelector('.order-detail__item-linetotal')?.textContent).toContain('300 pts');
+    expect(price.querySelector('.order-detail__item-unit-price')?.textContent?.trim()).toBe('2 × 150 pts');
 
     // Scoped to the summary card — "Shipping address"/"Shipping method"
     // legitimately still show elsewhere on the page; it's only the

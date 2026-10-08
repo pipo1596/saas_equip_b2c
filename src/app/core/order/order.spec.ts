@@ -272,7 +272,20 @@ describe('OrderService', () => {
         .expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER')
         .flush({ pagination: { page: 1, pageSize: 25, totalRows: 0, totalPages: 0 }, data: null });
 
-      expect(result).toEqual({ pagination: { page: 1, pageSize: 25, totalRows: 0, totalPages: 0 }, data: [] });
+      expect(result).toEqual({
+        pagination: { page: 1, pageSize: 25, totalRows: 0, totalPages: 0 },
+        data: [],
+        statusCounts: {
+          ALL: 0,
+          PENDING_APPROVAL: 0,
+          PROCESSING: 0,
+          PARTIALLY_SHIPPED: 0,
+          SHIPPED: 0,
+          CANCELLED: 0,
+          REJECTED: 0,
+        },
+        filters: { status: '', orderNumber: '', dateFrom: '', dateTo: '', datePreset: 'ALL', sort: 'NEWEST' },
+      });
     });
 
     it('passes a failure straight through', () => {
@@ -284,6 +297,92 @@ describe('OrderService', () => {
         .flush({ success: false, code: 'ERR', message: 'Not logged in.' });
 
       expect(result).toEqual({ success: false, code: 'ERR', message: 'Not logged in.' });
+    });
+
+    it('a BOP failure (e.g. an invalid date range) comes through the same way as any other', () => {
+      let result: OrderPage | ApiError | undefined;
+      service
+        .list({ status: '', dateFrom: '2026-02-01', dateTo: '2026-01-01', page: 1, pageSize: 25 })
+        .subscribe((res) => (result = res));
+
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER')
+        .flush({ success: false, code: 'BOP', message: '"From" must be on or before "To".' });
+
+      expect(result).toEqual({ success: false, code: 'BOP', message: '"From" must be on or before "To".' });
+    });
+
+    it('only includes the optional filter fields that are actually set', () => {
+      service
+        .list({
+          status: 'PROCESSING',
+          orderNumber: '1003',
+          dateFrom: '2026-01-01',
+          dateTo: '2026-02-01',
+          sort: 'OLDEST',
+          page: 1,
+          pageSize: 25,
+        })
+        .subscribe();
+
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      expect(req.request.body).toEqual({
+        action: '*LIST',
+        status: 'PROCESSING',
+        orderNumber: '1003',
+        dateFrom: '2026-01-01',
+        dateTo: '2026-02-01',
+        sort: 'OLDEST',
+        page: 1,
+        pageSize: 25,
+      });
+      req.flush({ pagination: { page: 1, pageSize: 25, totalRows: 0, totalPages: 0 }, data: [] });
+    });
+
+    it('leaves NEWEST (the default sort) out of the request entirely', () => {
+      service.list({ status: '', datePreset: 'LAST30', sort: 'NEWEST', page: 1, pageSize: 25 }).subscribe();
+
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      expect(req.request.body).toEqual({
+        action: '*LIST',
+        status: '',
+        datePreset: 'LAST30',
+        page: 1,
+        pageSize: 25,
+      });
+      req.flush({ pagination: { page: 1, pageSize: 25, totalRows: 0, totalPages: 0 }, data: [] });
+    });
+
+    it('passes statusCounts and the resolved filters straight through when present', () => {
+      let result: OrderPage | ApiError | undefined;
+      service.list({ status: '', page: 1, pageSize: 25 }).subscribe((res) => (result = res));
+
+      const statusCounts = {
+        ALL: 11,
+        PENDING_APPROVAL: 1,
+        PROCESSING: 6,
+        PARTIALLY_SHIPPED: 1,
+        SHIPPED: 1,
+        CANCELLED: 1,
+        REJECTED: 1,
+      };
+      const filters = {
+        status: '',
+        orderNumber: '',
+        dateFrom: '2026-09-09',
+        dateTo: '2026-10-08',
+        datePreset: 'LAST30' as const,
+        sort: 'NEWEST' as const,
+      };
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER').flush({
+        pagination: { page: 1, pageSize: 25, totalRows: 11, totalPages: 1 },
+        data: [SUMMARY],
+        statusCounts,
+        filters,
+      });
+
+      expect((result as OrderPage).statusCounts).toEqual(statusCounts);
+      expect((result as OrderPage).filters).toEqual(filters);
     });
 
     it('normalizes a null thumbnails array on a row to []', () => {

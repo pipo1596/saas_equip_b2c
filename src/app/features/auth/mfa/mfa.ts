@@ -38,6 +38,8 @@ export class Mfa implements AfterViewInit {
   readonly submitting = signal(false);
   readonly submitted = signal(false);
   readonly error = signal<string | null>(null);
+  readonly resending = signal(false);
+  readonly resent = signal(false);
 
   readonly form = this.formBuilder.group({
     digits: this.formBuilder.nonNullable.array(
@@ -67,6 +69,7 @@ export class Mfa implements AfterViewInit {
   }
 
   onDigitInput(event: Event, index: number): void {
+    this.resent.set(false);
     const input = event.target as HTMLInputElement;
     const digit = input.value.replace(/\D/g, '').slice(-1);
     this.digits.at(index).setValue(digit, { emitEvent: false });
@@ -90,6 +93,7 @@ export class Mfa implements AfterViewInit {
   }
 
   onPaste(event: ClipboardEvent): void {
+    this.resent.set(false);
     event.preventDefault();
     const digits = (event.clipboardData?.getData('text') ?? '')
       .replace(/\D/g, '')
@@ -102,6 +106,56 @@ export class Mfa implements AfterViewInit {
   cancel(): void {
     this.authService.logout();
     this.router.navigateByUrl('/');
+  }
+
+  // There's no dedicated resend action — this replays the original `login`
+  // call instead, since that's what actually sends the code in the first
+  // place. `resendMfa` comes back `null` once the credentials it needs are
+  // no longer held in memory (e.g. this tab was refreshed mid-challenge);
+  // there's nothing to replay at that point, so send the employee back to
+  // sign in properly instead of leaving them stuck on a resend that can
+  // never succeed.
+  async resendCode(): Promise<void> {
+    this.error.set(null);
+    this.resent.set(false);
+
+    const resend = this.authService.resendMfa();
+    if (!resend) {
+      this.error.set('Your session has expired. Please sign in again.');
+      this.cancel();
+      return;
+    }
+
+    this.resending.set(true);
+
+    try {
+      const response = await firstValueFrom(resend);
+
+      if (!response.success) {
+        this.error.set(response.message ?? 'We could not send a new code.');
+        return;
+      }
+
+      if (!response.mfaRequired) {
+        // The backend didn't ask for a code at all this time — nothing left
+        // to verify, so finish the same way a successful code entry would.
+        this.router.navigateByUrl('/home');
+        return;
+      }
+
+      // The old code is no longer valid once a new one's been sent — clear
+      // the entered digits so the employee can't resubmit it by mistake.
+      this.digits.reset();
+      this.submitted.set(false);
+      this.resent.set(true);
+      if (this.isBrowser) {
+        this.focusInput(0);
+      }
+    } catch {
+      this.error.set('We could not reach the sign-in service. Please try again.');
+    } finally {
+      this.resending.set(false);
+    }
   }
 
   async onSubmit(): Promise<void> {

@@ -341,7 +341,7 @@ describe('CheckoutPage', () => {
     expect(scrollIntoViewSpy).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' });
   });
 
-  it('should show each item\'s unit price alongside its line total, only when more than one was ordered', () => {
+  it("should show each item's quantity × unit-price math alongside its line total, for every line", () => {
     const fixture = TestBed.createComponent(CheckoutPage);
     fixture.detectChanges();
     flushInitialCartLoads(httpMock, {
@@ -353,10 +353,10 @@ describe('CheckoutPage', () => {
 
     const rows: HTMLElement[] = fixture.nativeElement.querySelectorAll('.checkout-page__item-price');
     expect(rows[0].querySelector('.checkout-page__item-linetotal')?.textContent).toContain('179.98');
-    expect(rows[0].querySelector('.checkout-page__item-unit-price')?.textContent).toContain('89.99');
+    expect(rows[0].querySelector('.checkout-page__item-unit-price')?.textContent?.trim()).toBe('2 × $89.99');
 
     expect(rows[1].querySelector('.checkout-page__item-linetotal')?.textContent).toContain('89.99');
-    expect(rows[1].querySelector('.checkout-page__item-unit-price')).toBeNull();
+    expect(rows[1].querySelector('.checkout-page__item-unit-price')?.textContent?.trim()).toBe('1 × $89.99');
   });
 
   it("should show points instead of dollars, and hide the shipping/tax/total breakdown, when the employee's allotment is points-only", () => {
@@ -373,7 +373,7 @@ describe('CheckoutPage', () => {
 
     const row: HTMLElement = fixture.nativeElement.querySelector('.checkout-page__item-price');
     expect(row.querySelector('.checkout-page__item-linetotal')?.textContent).toContain('300 pts');
-    expect(row.querySelector('.checkout-page__item-unit-price')?.textContent).toContain('150 pts each');
+    expect(row.querySelector('.checkout-page__item-unit-price')?.textContent?.trim()).toBe('2 × 150 pts');
 
     // Scoped to the checkout summary card itself — the header's own Rules
     // panel legitimately uses the word "Total" for a points balance too,
@@ -626,6 +626,22 @@ describe('CheckoutPage', () => {
     expect(placeOrder.querySelector('.checkout-page__place-order-sub')?.textContent).toContain(
       'Balance must be $0.00',
     );
+  });
+
+  it('should put Place order in the summary card, directly above Back to cart', () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    fixture.detectChanges();
+    flushInitialCartLoads(httpMock, CART);
+    flushCheckoutData(httpMock, { cust_addrs: [], ship_addrs: [], ship_mthds: [], tax_rates: [] });
+    fixture.detectChanges();
+
+    const summary: HTMLElement = fixture.nativeElement.querySelector('.checkout-page__summary');
+    const children = Array.from(summary.children) as HTMLElement[];
+    const placeOrderIndex = children.findIndex((el) => el.classList.contains('checkout-page__place-order'));
+    const backToCartIndex = children.findIndex((el) => el.textContent?.trim() === 'Back to cart');
+
+    expect(placeOrderIndex).toBeGreaterThan(-1);
+    expect(backToCartIndex).toBe(placeOrderIndex + 1);
   });
 
   it('should show no balance warning once nothing at all is owed by card, but still require the other fields', () => {

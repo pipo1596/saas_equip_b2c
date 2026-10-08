@@ -15,12 +15,99 @@
   color: var(--slate-600);
 }
 
+/* ---------- filters card ---------- */
+.order-history__filters {
+  background: #fff;
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+.order-history__filter-row {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.order-history__field {
+  border: 1px solid var(--slate-200);
+  border-radius: 8px;
+  padding: 8px 14px;
+}
+.order-history__field:focus-within {
+  border-color: var(--action);
+}
+.order-history__field-label {
+  display: block;
+  font-size: 12px;
+  color: var(--slate-500);
+  margin: 0 0 2px;
+}
+.order-history__field input {
+  display: block;
+  width: 100%;
+  border: none;
+  outline: none;
+  padding: 0;
+  background: transparent;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--slate-900);
+}
+.order-history__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--slate-400);
+}
+.order-history__search input {
+  font-weight: 400;
+}
+
+.order-history__date-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.order-history__preset-btn {
+  border: 1.5px solid var(--slate-200);
+  background: #fff;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--slate-600);
+  cursor: pointer;
+}
+.order-history__preset-btn:hover {
+  border-color: var(--slate-400);
+}
+.order-history__preset-btn--active {
+  border-color: var(--action);
+  background: color-mix(in srgb, var(--action) 10%, white);
+  color: var(--action);
+}
+
+.order-history__status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.order-history__status-row .order-history__field-label {
+  margin: 0;
+  flex: none;
+}
+
 .order-history__chips {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 .order-history__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 1.5px solid var(--slate-200);
   background: #fff;
   border-radius: 999px;
@@ -38,16 +125,68 @@
   background: color-mix(in srgb, var(--action) 10%, white);
   color: var(--action);
 }
+.order-history__chip-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: inherit;
+  opacity: 0.75;
+}
 
-.order-history__list {
+/* ---------- toolbar ---------- */
+.order-history__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.order-history__count {
+  font-size: 13px;
+  color: var(--slate-600);
+}
+.order-history__sort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.order-history__sort .order-history__field-label {
+  margin: 0;
+}
+.order-history__sort select {
+  border: 1.5px solid var(--slate-200);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--slate-900);
+  background: #fff;
+}
+.order-history__sort select:focus {
+  outline: none;
+  border-color: var(--action);
+}
+
+/* ---------- table ---------- */
+.order-history__table {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+}
+.order-history__table-head {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.6fr) minmax(200px, 1.8fr) 150px 110px 20px;
+  gap: 16px;
+  padding: 0 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--slate-500);
 }
 
 .order-history__row {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(160px, 1.6fr) minmax(200px, 1.8fr) 150px 110px 20px;
   align-items: center;
   gap: 16px;
   background: #fff;
@@ -60,54 +199,11 @@
   box-shadow: var(--shadow);
 }
 
-.order-history__thumbs {
-  display: flex;
-  align-items: center;
-  /* Fixed to the widest case (4 overlapping thumbnails + a "+N more"
-     badge) so the columns after it never shift based on how many of the
-     up-to-4 thumbnails + badge a given row actually has. */
-  width: 160px;
-  flex: none;
-}
-.order-history__thumb {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  object-fit: cover;
-  background: #edf1f6;
-  border: 2px solid #fff;
-  margin-left: -10px;
-}
-.order-history__thumb:first-child {
-  margin-left: 0;
-}
-.order-history__thumb-more {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--slate-600);
-  background: var(--slate-100);
-  border: 2px solid #fff;
-  border-radius: 8px;
-  width: 40px;
-  height: 40px;
-  margin-left: -10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  line-height: 1.1;
-}
-
-.order-history__row-main {
+.order-history__row-order {
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
-}
-.order-history__row-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 .order-history__order-number {
   font-family: var(--font-display);
@@ -124,15 +220,45 @@
   align-items: center;
   gap: 4px;
 }
-.order-history__row-total {
+
+.order-history__row-items {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.order-history__thumbs {
+  display: flex;
+  align-items: center;
+  /* Fixed to the max 3 shown thumbnails so columns after it never shift
+     based on how many a given row actually has. */
+  width: 120px;
   flex: none;
-  font-weight: 700;
-  font-size: 15px;
-  color: var(--navy);
+}
+.order-history__thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #edf1f6;
+  border: 2px solid #fff;
+  margin-left: -10px;
+}
+.order-history__thumb:first-child {
+  margin-left: 0;
+}
+.order-history__items-count {
+  font-size: 13px;
+  color: var(--slate-600);
+  white-space: nowrap;
+}
+.order-history__items-count b {
+  color: var(--slate-900);
 }
 
 .order-history__status-chip {
   display: inline-block;
+  justify-self: start;
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -164,6 +290,18 @@
   color: var(--slate-600);
 }
 
+.order-history__row-total {
+  justify-self: end;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--navy);
+}
+
+.order-history__row-chevron {
+  color: var(--slate-400);
+  justify-self: end;
+}
+
 .order-history__pager {
   display: flex;
   align-items: center;
@@ -176,12 +314,20 @@
   color: var(--slate-600);
 }
 
-@media (max-width: 575.98px) {
-  .order-history__row {
-    flex-direction: column;
-    align-items: flex-start;
+@media (max-width: 860px) {
+  .order-history__filter-row {
+    grid-template-columns: 1fr;
   }
-  .order-history__row-total {
-    align-self: flex-end;
+  .order-history__table-head {
+    display: none;
+  }
+  .order-history__row {
+    grid-template-columns: 1fr;
+    justify-items: start;
+    gap: 10px;
+  }
+  .order-history__row-total,
+  .order-history__row-chevron {
+    justify-self: start;
   }
 }

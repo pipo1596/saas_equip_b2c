@@ -191,6 +191,61 @@ describe('AuthService', () => {
     expect(service.mfaPending()).toBe(true);
   });
 
+  it('replays the original login call to resend the code, reusing the same credentials', () => {
+    service.login('jane.doe@example.com', 'TestPass123!').subscribe();
+    httpMock
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN')
+      .flush({ success: true, mfaRequired: true, empId: FAKE_EMP_ID, sessionId: FAKE_SESSION_ID, message: null });
+
+    const resend = service.resendMfa();
+    expect(resend).not.toBeNull();
+    resend!.subscribe();
+
+    const resendReq = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN');
+    expect(resendReq.request.body).toEqual({
+      email: 'jane.doe@example.com',
+      password: 'TestPass123!',
+      action: 'LOGIN1',
+    });
+    resendReq.flush({
+      success: true,
+      mfaRequired: true,
+      empId: FAKE_EMP_ID,
+      sessionId: FAKE_SESSION_ID,
+      message: null,
+    } satisfies LoginResponse);
+
+    expect(service.mfaPending()).toBe(true);
+  });
+
+  it('returns null from resendMfa once the credentials are no longer held (e.g. no login call this session)', () => {
+    expect(service.resendMfa()).toBeNull();
+  });
+
+  it('forgets the held credentials once the challenge resolves, logs out, or never asked for MFA', () => {
+    service.login('jane.doe@example.com', 'TestPass123!').subscribe();
+    httpMock
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN')
+      .flush({ success: true, mfaRequired: true, empId: FAKE_EMP_ID, sessionId: FAKE_SESSION_ID, message: null });
+
+    service.verifyMfa('123456').subscribe();
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN').flush({
+      success: true,
+      mfaRequired: false,
+      empId: FAKE_EMP_ID,
+      sessionId: FAKE_SESSION_ID,
+      firstName: FAKE_FIRST_NAME,
+      lastName: FAKE_LAST_NAME,
+      message: null,
+    } satisfies LoginResponse);
+    httpMock
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
+      .flush({ empId: FAKE_EMP_ID, firstName: FAKE_FIRST_NAME, lastName: FAKE_LAST_NAME });
+
+    // Verification succeeded — nothing left to resend.
+    expect(service.resendMfa()).toBeNull();
+  });
+
   it('resolves the pending MFA state and sets the session once verified', () => {
     service.login('jane.doe@example.com', 'TestPass123!').subscribe();
     httpMock
@@ -342,5 +397,16 @@ describe('AuthService', () => {
     service.logout();
     expect(service.isAuthenticated()).toBe(false);
     expect(service.mfaPending()).toBe(false);
+  });
+
+  it('forgets the held credentials on logout, so a resend after signing back in cannot reuse a stale password', () => {
+    service.login('jane.doe@example.com', 'TestPass123!').subscribe();
+    httpMock
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN')
+      .flush({ success: true, mfaRequired: true, empId: FAKE_EMP_ID, sessionId: FAKE_SESSION_ID, message: null });
+
+    service.logout();
+
+    expect(service.resendMfa()).toBeNull();
   });
 });

@@ -13,6 +13,9 @@
     @if (error()) {
       <div class="alert alert-danger py-2 px-3 small" role="alert">{{ error() }}</div>
     }
+    @if (resent()) {
+      <div class="alert alert-success py-2 px-3 small" role="status">A new code is on its way.</div>
+    }
 
     <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
       <div class="otp d-flex gap-2 mb-2" formArrayName="digits" role="group" aria-label="Verification code">
@@ -45,6 +48,16 @@
     </form>
 
     <p class="text-center text-secondary small mt-4 mb-0">
+      Didn't get a code?
+      <button
+        type="button"
+        class="btn btn-link p-0 fw-medium"
+        [disabled]="resending()"
+        (click)="resendCode()"
+      >
+        {{ resending() ? 'Sending…' : 'Resend' }}
+      </button>
+      ·
       <button type="button" class="btn btn-link p-0 fw-medium" (click)="cancel()">Use a different account</button>
     </p>
   </section>
