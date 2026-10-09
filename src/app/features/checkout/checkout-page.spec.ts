@@ -383,6 +383,9 @@ describe('CheckoutPage', () => {
     const OVERDRAWN_POINTS_ALLOTMENT = {
       ...POINTS_ONLY_ALLOTMENT,
       rules: [{ ...POINTS_ONLY_ALLOTMENT.rules[0], points: { total: 400, used: 0, inCart: 1500, available: -1100 } }],
+      lineTags: [
+        { cartItemId: 9001, skuId: 9001, ruleId: 90, payUnit: 'POINTS' as const, tagLabel: 'Points Allowance', allocations: [] },
+      ],
     };
 
     flushInitialCartLoads(httpMock, {
@@ -413,6 +416,47 @@ describe('CheckoutPage', () => {
     const summary: HTMLElement = fixture.nativeElement.querySelector('.checkout-page__summary');
     expect(summary.textContent).toContain('Balance');
     expect(summary.textContent).toContain('1100 pts');
+  });
+
+  it('blocks a points-only order with a line no rule covers at all, even though no rule is over-drawn', () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    const page = fixture.componentInstance;
+    fixture.detectChanges();
+
+    // The rule itself is nowhere near over-drawn (17 of 30 used) — the
+    // problem is the second line, which has no points tag at all.
+    const ALLOTMENT_WITH_AN_UNCOVERED_LINE = {
+      ...POINTS_ONLY_ALLOTMENT,
+      rules: [{ ...POINTS_ONLY_ALLOTMENT.rules[0], points: { total: 30, used: 0, inCart: 17, available: 13 } }],
+      lineTags: [
+        { cartItemId: 9001, skuId: 9001, ruleId: 90, payUnit: 'POINTS' as const, tagLabel: 'Points Allowance', allocations: [] },
+      ],
+    };
+
+    flushInitialCartLoads(httpMock, {
+      ...CART,
+      subtotalPrice: 0,
+      subtotalPoints: 19,
+      allotment: ALLOTMENT_WITH_AN_UNCOVERED_LINE,
+      items: [
+        { ...CART.items[0], lineTotalPrice: 0, lineTotalPoints: 17, currentPoints: 17 },
+        { ...CART.items[0], cartItemId: 9002, skuId: 9002, lineTotalPrice: 0, lineTotalPoints: 2, currentPoints: 2 },
+      ],
+    });
+    flushCheckoutData(httpMock, {
+      cust_addrs: [PRIMARY_ADDRESS],
+      ship_addrs: [PRIMARY_ADDRESS],
+      ship_mthds: [DEFAULT_SHIP_METHOD],
+      tax_rates: [],
+    });
+    fixture.detectChanges();
+
+    expect(page.orderTotal()).toBe(2);
+    expect(page.canPlaceOrder()).toBe(false);
+
+    const summary: HTMLElement = fixture.nativeElement.querySelector('.checkout-page__summary');
+    expect(summary.textContent).toContain('Balance');
+    expect(summary.textContent).toContain('2 pts');
   });
 
   it('should load the cart and checkout data, defaulting to the primary address and default shipping method', () => {

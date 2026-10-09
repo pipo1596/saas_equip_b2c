@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-import { CartService } from '../../../core/cart/cart';
+import { CartService, PayTag, ruleForCategories } from '../../../core/cart/cart';
 import { Breadcrumb, hasCrumbs } from '../../../core/catalog/breadcrumb';
 import {
   CatalogProductsService,
@@ -24,6 +24,7 @@ import {
 import { CatalogViewService } from '../../../core/catalog/catalog-view';
 import { LocationSelectionService } from '../../../core/location/location-selection';
 import { BreadcrumbNav } from '../../../shared/breadcrumb/breadcrumb-nav';
+import { PayTagBadge } from '../../../shared/allotment/pay-tag';
 import { Footer } from '../../../shared/footer/footer';
 import { Header } from '../../../shared/header/header';
 
@@ -62,7 +63,7 @@ type CatalogScope =
 
 @Component({
   selector: 'app-product-list',
-  imports: [Header, Footer, RouterLink, CurrencyPipe, BreadcrumbNav],
+  imports: [Header, Footer, RouterLink, CurrencyPipe, BreadcrumbNav, PayTagBadge],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './product-list.html',
   styleUrls: ['../../../shared/shared.css', './product-list.css'],
@@ -77,6 +78,7 @@ export class ProductList {
   // An employee whose allotment is points-only never pays in dollars — the
   // card shows `pointsRange` instead of `priceRange` for them.
   readonly pointsOnly = this.cartService.pointsOnly;
+  private readonly allotmentRules = computed(() => this.cartService.cart().allotment?.rules ?? []);
 
   @ViewChild('resultsTop') private readonly resultsTop?: ElementRef<HTMLElement>;
 
@@ -243,6 +245,15 @@ export class ProductList {
         },
       });
   });
+
+  // A preview, not the authoritative tag — matches the product's own
+  // program categories against the active allotment's rules, same as the
+  // cart's own `lineTags` would once it's actually added. `null` when
+  // nothing covers it (or there's no allotment at all).
+  coverageTag(product: Product): PayTag | null {
+    const rule = ruleForCategories(this.allotmentRules(), product.progCatIds);
+    return rule ? { ruleId: rule.ruleId, payUnit: rule.primaryUnit, tagLabel: rule.ruleName } : null;
+  }
 
   toggleGroupCollapsed(optionName: string): void {
     this.collapsedGroups.update((current) => {

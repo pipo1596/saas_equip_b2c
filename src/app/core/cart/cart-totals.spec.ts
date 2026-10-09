@@ -142,8 +142,55 @@ describe('pointsShortfall', () => {
       dollars: { total: 100, used: 0, inCart: 150, available: -50 },
       points: null,
     };
-    const cart: Cart = { ...makeOverdrawnPointsCart(0), allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [dollarRule] } };
+    // Not points-priced at all — this cart's only rule pays in dollars, so
+    // there'd be nothing for a points allocation to mean here.
+    const base = makeOverdrawnPointsCart(0);
+    const cart: Cart = {
+      ...base,
+      items: [{ ...base.items[0], lineTotalPoints: null }],
+      allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [dollarRule] },
+    };
     expect(pointsShortfall(cart)).toBe(0);
+  });
+
+  it("adds a line's full points when nothing tags it to any rule at all, even though no rule is over-drawn", () => {
+    // Rule balance is fine on its own (13 of 30 left) — the problem is
+    // purely that the second line was never tagged to it (or anything).
+    const rule: AllotmentRule = {
+      ...POINTS_ONLY_ALLOTMENT.rules[0],
+      points: { total: 30, used: 0, inCart: 17, available: 13 },
+    };
+    const coveredItem = makeItem({ cartItemId: 81, lineTotalPrice: 0, lineTotalPoints: 17, quantity: 1 });
+    const uncoveredItem = makeItem({ cartItemId: 82, lineTotalPrice: 0, lineTotalPoints: 2, quantity: 1 });
+    const cart: Cart = {
+      cartId: 1,
+      itemCount: 2,
+      subtotalPrice: 0,
+      subtotalPoints: 19,
+      items: [coveredItem, uncoveredItem],
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        rules: [rule],
+        lineTags: [
+          { cartItemId: 81, skuId: 63416, ruleId: rule.ruleId, payUnit: 'POINTS', tagLabel: 'Points Allowance', allocations: [] },
+          // No entry at all for cartItemId 82 — nothing covers it.
+        ],
+      },
+    };
+
+    expect(pointsShortfall(cart)).toBe(2);
+  });
+
+  it('sums an uncovered line on top of a separate over-drawn rule, rather than one masking the other', () => {
+    const cart = makeOverdrawnPointsCart(250);
+    const uncoveredItem = makeItem({ cartItemId: 82, lineTotalPrice: 0, lineTotalPoints: 5, quantity: 1 });
+    const cartWithExtraUncoveredItem: Cart = {
+      ...cart,
+      items: [...cart.items, uncoveredItem],
+      subtotalPoints: (cart.subtotalPoints ?? 0) + 5,
+    };
+
+    expect(pointsShortfall(cartWithExtraUncoveredItem)).toBe(255);
   });
 });
 

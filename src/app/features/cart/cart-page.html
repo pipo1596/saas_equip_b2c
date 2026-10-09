@@ -203,7 +203,7 @@
       <button
         type="button"
         class="qty-stepper__btn"
-        [disabled]="updatingSkuId() === item.skuId || clearing()"
+        [disabled]="item.quantity <= 1 || updatingSkuId() === item.skuId || clearing()"
         (click)="setQuantity(item, item.quantity - 1)"
         aria-label="Decrease quantity"
       >
@@ -212,7 +212,7 @@
       <input
         type="number"
         class="qty-stepper__input"
-        min="0"
+        min="1"
         step="1"
         [value]="item.quantity"
         [disabled]="updatingSkuId() === item.skuId || clearing()"

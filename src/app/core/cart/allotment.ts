@@ -245,3 +245,23 @@ export function coverageLabel(rule: AllotmentRule): string {
   }
   return parts.join(' · ') || 'Nothing yet';
 }
+
+// Which rule (if any) a product is likely covered by, found by matching
+// its own program-category ids against each rule's covered categories — an
+// "all assortments" rule matches regardless of category. First match wins,
+// in the same order `rules` itself came back in. This is a client-computed
+// *preview* for browsing (e.g. a listing card, before anything's in the
+// cart) — the authoritative tag is always whatever the cart's own
+// `lineTags`/`productTag` says once the item is actually added.
+export function ruleForCategories(
+  rules: readonly AllotmentRule[],
+  progCatIds: readonly number[],
+): AllotmentRule | null {
+  return (
+    rules.find(
+      (rule) =>
+        rule.covers.allAssortments === 'Y' ||
+        rule.covers.categories.some((category) => progCatIds.includes(category.progCatId)),
+    ) ?? null
+  );
+}

@@ -165,6 +165,9 @@
                         }
                       </div>
                     }
+                    @if (coverageTag(product); as tag) {
+                      <div class="mb-2"><app-pay-tag [tag]="tag" /></div>
+                    }
                     @if (!pointsOnly() && product.priceRange; as range) {
                       <p class="fw-bold mt-auto mb-0 product-card__price">
                         {{ range.min | currency }}

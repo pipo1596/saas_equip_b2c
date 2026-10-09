@@ -145,6 +145,10 @@ describe('CartPage', () => {
     const OVERDRAWN_POINTS_ALLOTMENT = {
       ...POINTS_ONLY_ALLOTMENT,
       rules: [{ ...POINTS_ONLY_ALLOTMENT.rules[0], points: { total: 400, used: 0, inCart: 420, available: -20 } }],
+      lineTags: [
+        { cartItemId: 9001, skuId: 9001, ruleId: 90, payUnit: 'POINTS' as const, tagLabel: 'Points Allowance', allocations: [] },
+        { cartItemId: 9002, skuId: 9002, ruleId: 90, payUnit: 'POINTS' as const, tagLabel: 'Points Allowance', allocations: [] },
+      ],
     };
     flushInitialCartLoads(httpMock, { ...CART, allotment: OVERDRAWN_POINTS_ALLOTMENT });
     fixture.detectChanges();
@@ -156,15 +160,43 @@ describe('CartPage', () => {
     expect(summary.textContent).toContain('20 pts');
   });
 
-  it('shows no Balance line when the points allotment fully covers the order', () => {
+  it('shows no Balance line when every line is tagged and the points allotment fully covers the order', () => {
     const fixture = TestBed.createComponent(CartPage);
     fixture.detectChanges();
 
-    flushInitialCartLoads(httpMock, { ...CART, allotment: POINTS_ONLY_ALLOTMENT });
+    const FULLY_TAGGED_ALLOTMENT = {
+      ...POINTS_ONLY_ALLOTMENT,
+      lineTags: [
+        { cartItemId: 9001, skuId: 9001, ruleId: 90, payUnit: 'POINTS' as const, tagLabel: 'Points Allowance', allocations: [] },
+        { cartItemId: 9002, skuId: 9002, ruleId: 90, payUnit: 'POINTS' as const, tagLabel: 'Points Allowance', allocations: [] },
+      ],
+    };
+    flushInitialCartLoads(httpMock, { ...CART, allotment: FULLY_TAGGED_ALLOTMENT });
     fixture.detectChanges();
 
     const summary: HTMLElement = fixture.nativeElement.querySelector('.cart-page__summary');
     expect(summary.textContent).not.toContain('Balance');
+  });
+
+  it('shows the Balance line when a line has no points coverage at all, even though no rule is over-drawn', () => {
+    const fixture = TestBed.createComponent(CartPage);
+    fixture.detectChanges();
+
+    // Only the first line (300 pts) is tagged — the second (150 pts) isn't
+    // covered by anything, the same way an item with no allotment at all
+    // would fall to a credit-card balance in dollar mode.
+    const PARTIALLY_TAGGED_ALLOTMENT = {
+      ...POINTS_ONLY_ALLOTMENT,
+      lineTags: [
+        { cartItemId: 9001, skuId: 9001, ruleId: 90, payUnit: 'POINTS' as const, tagLabel: 'Points Allowance', allocations: [] },
+      ],
+    };
+    flushInitialCartLoads(httpMock, { ...CART, allotment: PARTIALLY_TAGGED_ALLOTMENT });
+    fixture.detectChanges();
+
+    const summary: HTMLElement = fixture.nativeElement.querySelector('.cart-page__summary');
+    expect(summary.textContent).toContain('Balance');
+    expect(summary.textContent).toContain('150 pts');
   });
 
   it('should show the quantity × unit-price math for every line, regardless of quantity', () => {
@@ -298,6 +330,23 @@ describe('CartPage', () => {
     page.setQuantity(CART.items[0], 2);
 
     expect(httpMock.match((req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCCART')).toHaveLength(0);
+  });
+
+  it('should not let the stepper take a line down to 0 — Remove is the only way to delete a line', () => {
+    const fixture = TestBed.createComponent(CartPage);
+    const page = fixture.componentInstance;
+    fixture.detectChanges();
+    // `CART.items[1]` already has a quantity of 1.
+    flushInitialCartLoads(httpMock, CART);
+    fixture.detectChanges();
+
+    page.setQuantity(CART.items[1], 0);
+
+    expect(httpMock.match((req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCCART')).toHaveLength(0);
+
+    const rows: HTMLElement[] = fixture.nativeElement.querySelectorAll('.cart-page__row');
+    const decrementBtn: HTMLButtonElement = rows[1].querySelector('.qty-stepper__btn[aria-label="Decrease quantity"]')!;
+    expect(decrementBtn.disabled).toBe(true);
   });
 
   it('should remove a line once the confirmation is accepted', () => {

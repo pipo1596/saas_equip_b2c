@@ -5,6 +5,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { AuthService } from '../../core/auth/auth';
 import { FAKE_SESSION } from '../../core/auth/auth.testing';
+import { CartService } from '../../core/cart/cart';
 import { CatalogView } from '../../core/catalog/catalog-view';
 import { TenantSettings, TenantSettingsService } from '../../core/tenant/tenant-settings';
 import { ConfirmService } from '../confirm/confirm';
@@ -1117,6 +1118,132 @@ describe('Header', () => {
     expect(header.userMenuOpen()).toBe(false);
   });
 
+  describe('click outside closes the open menu', () => {
+    it('closes the location menu on an outside click, but not a click inside it', () => {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+      fixture.detectChanges();
+
+      header.toggleDeptMenu();
+      expect(header.deptMenuOpen()).toBe(true);
+
+      fixture.nativeElement.querySelector('.dept-menu').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(header.deptMenuOpen()).toBe(true);
+
+      document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(header.deptMenuOpen()).toBe(false);
+    });
+
+    it('closes the Rules menu on an outside click, but not a click inside it', () => {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+      // `.allot-rules-wrap`/`.allot-rules-menu` only render once there's at
+      // least one rule to show.
+      header.cart.set({
+        cartId: null,
+        itemCount: 0,
+        subtotalPrice: 0,
+        subtotalPoints: null,
+        items: [],
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 1,
+          allotExclTaxFreight: 'N',
+          rules: [
+            {
+              ruleId: 11,
+              ruleName: 'ANB Employee Allowance',
+              allotType: 'DOLLAR',
+              primaryUnit: 'DOLLARS',
+              isBarRule: 'Y',
+              dollars: { total: 600, used: 180, inCart: 95, available: 325 },
+              units: null,
+              points: null,
+              cycle: {
+                renewalBasis: 'FIXED',
+                renewalPeriodMonths: 12,
+                cycleStart: '2026-01-01',
+                cycleEnd: '2026-12-31',
+                renewsOn: '2027-01-01',
+                expirationDate: null,
+                onExpiration: 'SUSPEND',
+              },
+              covers: { allAssortments: 'Y', categories: [], unitGrants: [] },
+              carryover: { type: 'FORFEIT', pct: null, capAmount: null, carriedIn: null },
+              quotas: [],
+              requireApproval: 'N',
+              allowCcFallback: 'N',
+              fallbackRuleIds: [],
+            },
+          ],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [],
+          productTag: null,
+        },
+      });
+      fixture.detectChanges();
+
+      header.toggleRulesMenu();
+      expect(header.rulesMenuOpen()).toBe(true);
+
+      fixture.nativeElement
+        .querySelector('.allot-rules-menu')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(header.rulesMenuOpen()).toBe(true);
+
+      document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(header.rulesMenuOpen()).toBe(false);
+    });
+
+    it('closes the user menu on an outside click, but not a click inside it', () => {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+      fixture.detectChanges();
+
+      header.toggleUserMenu();
+      expect(header.userMenuOpen()).toBe(true);
+
+      fixture.nativeElement.querySelector('.user-menu').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(header.userMenuOpen()).toBe(true);
+
+      document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(header.userMenuOpen()).toBe(false);
+    });
+
+    it("doesn't immediately re-close the Rules menu when it's opened externally (e.g. product detail's \"View rule\" link) on the same click that bubbles to document", () => {
+      vi.useFakeTimers();
+      try {
+        const fixture = TestBed.createComponent(Header);
+        const header = fixture.componentInstance;
+        const cartService = TestBed.inject(CartService);
+        fixture.detectChanges();
+
+        // Simulates the external trigger: a click elsewhere on the page
+        // that calls `cartService.openRulesMenu()` (deferred a tick)
+        // rather than `header.toggleRulesMenu()` directly.
+        const outsideButton = document.createElement('button');
+        document.body.appendChild(outsideButton);
+        outsideButton.addEventListener('click', () => cartService.openRulesMenu());
+
+        try {
+          outsideButton.click();
+          // The deferred open hasn't landed yet — the same click's bubble
+          // to `document` must see it as still closed, and do nothing.
+          expect(header.rulesMenuOpen()).toBe(false);
+
+          vi.runAllTimers();
+          expect(header.rulesMenuOpen()).toBe(true);
+        } finally {
+          outsideButton.remove();
+        }
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe('allotment', () => {
     const EMPTY_ALLOTMENT_CART = {
       cartId: null,
@@ -1220,7 +1347,7 @@ describe('Header', () => {
       expect(available?.querySelector('b')?.classList.contains('warn')).toBe(true);
     });
 
-    it('hides the bar but still shows Rules(N) when there is no dollar rule', () => {
+    it("synthesizes the top summary in units when there's a units rule but no dollar rule", () => {
       const fixture = TestBed.createComponent(Header);
       const header = fixture.componentInstance;
       header.cart.set({
@@ -1230,7 +1357,16 @@ describe('Header', () => {
           allotmentBar: null,
           ruleCount: 1,
           allotExclTaxFreight: 'N',
-          rules: [{ ...DOLLAR_RULE, allotType: 'UNITS', primaryUnit: 'UNITS', isBarRule: 'N' }],
+          rules: [
+            {
+              ...DOLLAR_RULE,
+              allotType: 'UNITS',
+              primaryUnit: 'UNITS',
+              isBarRule: 'N',
+              dollars: null,
+              units: { total: 12, used: 2, inCart: 1, available: 9 },
+            },
+          ],
           approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
           openOrders: null,
           lineTags: [],
@@ -1239,8 +1375,61 @@ describe('Header', () => {
       });
       fixture.detectChanges();
 
-      expect(fixture.nativeElement.querySelector('.af')).toBeNull();
-      expect(fixture.nativeElement.textContent).toContain('Rules (1)');
+      const text = fixture.nativeElement.textContent;
+      expect(text).toContain('ANB Employee Allowance');
+      expect(text).toContain('12 units');
+      expect(text).toContain('2 units');
+      expect(text).toContain('1 units');
+      expect(text).toContain('9 units');
+      expect(text).toContain('Rules (1)');
+    });
+
+    it('synthesizes the top summary from whichever rule is flagged as the bar rule, in its own unit, when the allotment mixes points and units rules', () => {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+      const pointsRule = {
+        ...DOLLAR_RULE,
+        ruleId: 90,
+        ruleName: 'Points Allowance',
+        allotType: 'POINTS' as const,
+        primaryUnit: 'POINTS' as const,
+        isBarRule: 'Y' as const,
+        dollars: null,
+        units: null,
+        points: { total: 400, used: 0, inCart: 17, available: 383 },
+      };
+      const unitsRule = {
+        ...DOLLAR_RULE,
+        ruleId: 91,
+        ruleName: 'Footwear units',
+        allotType: 'UNITS' as const,
+        primaryUnit: 'UNITS' as const,
+        isBarRule: 'N' as const,
+        dollars: null,
+        units: { total: 2, used: 0, inCart: 0, available: 2 },
+      };
+      header.cart.set({
+        ...EMPTY_ALLOTMENT_CART,
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 2,
+          allotExclTaxFreight: 'N',
+          rules: [unitsRule, pointsRule],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [],
+          productTag: null,
+        },
+      });
+      fixture.detectChanges();
+
+      const text = fixture.nativeElement.textContent;
+      expect(text).toContain('Points Allowance');
+      expect(text).toContain('400 pts');
+      expect(text).toContain('17 pts');
+      expect(text).toContain('383 pts');
+      expect(text).toContain('Rules (2)');
     });
 
     it('synthesizes the top summary in points when every rule pays in points', () => {

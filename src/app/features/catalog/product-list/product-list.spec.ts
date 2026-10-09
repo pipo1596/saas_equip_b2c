@@ -28,6 +28,7 @@ const SAMPLE: ProductSearchResult = {
       colors: [
         { valueDesc: 'Black', valueCode: 'BLACK', valueSwtchColor: 'black', valueSwtchImage: '' },
       ],
+      progCatIds: [5510],
     },
   ],
   totalCount: 32,
@@ -225,6 +226,78 @@ describe('ProductList', () => {
     expect(priceEl.textContent).toContain('650');
     expect(priceEl.textContent).toContain('pts');
     expect(priceEl.textContent).not.toContain('$');
+  });
+
+  describe('allotment coverage preview', () => {
+    const CATEGORY_RULE = {
+      ...POINTS_ONLY_ALLOTMENT.rules[0],
+      ruleId: 70,
+      ruleName: 'Footwear allotment',
+      allotType: 'DOLLAR' as const,
+      primaryUnit: 'DOLLARS' as const,
+      dollars: { total: 200, used: 0, inCart: 0, available: 200 },
+      points: null,
+      covers: { allAssortments: 'N' as const, categories: [{ progCatId: 5510, categoryName: 'Long sleeve' }], unitGrants: [] },
+    };
+
+    it('shows a coverage badge when the product\'s own progCatIds match a category-specific rule', () => {
+      const fixture = TestBed.createComponent(ProductList);
+      const auth = TestBed.inject(AuthService);
+      TestBed.inject(CartService).cart.update((cart) => ({
+        ...cart,
+        allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [CATEGORY_RULE] },
+      }));
+      fixture.componentRef.setInput('categoryId', '5510');
+      auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
+      fixture.detectChanges();
+      expectProductsRequest(httpMock).flush(SAMPLE);
+      fixture.detectChanges();
+
+      const tag: HTMLElement = fixture.nativeElement.querySelector('.pay-tag');
+      expect(tag?.textContent?.trim()).toBe('Footwear allotment');
+    });
+
+    it("shows no badge when the product's progCatIds don't match any rule's covered categories", () => {
+      const fixture = TestBed.createComponent(ProductList);
+      const auth = TestBed.inject(AuthService);
+      const otherCategoryRule = {
+        ...CATEGORY_RULE,
+        covers: { allAssortments: 'N' as const, categories: [{ progCatId: 999, categoryName: 'Gear' }], unitGrants: [] },
+      };
+      TestBed.inject(CartService).cart.update((cart) => ({
+        ...cart,
+        allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [otherCategoryRule] },
+      }));
+      fixture.componentRef.setInput('categoryId', '5510');
+      auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
+      fixture.detectChanges();
+      expectProductsRequest(httpMock).flush(SAMPLE);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.pay-tag')).toBeNull();
+    });
+
+    it("shows the badge for an all-assortments rule regardless of the product's own categories", () => {
+      const fixture = TestBed.createComponent(ProductList);
+      const auth = TestBed.inject(AuthService);
+      const allAssortmentsRule = {
+        ...CATEGORY_RULE,
+        ruleName: 'General Allotment',
+        covers: { allAssortments: 'Y' as const, categories: [], unitGrants: [] },
+      };
+      TestBed.inject(CartService).cart.update((cart) => ({
+        ...cart,
+        allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [allAssortmentsRule] },
+      }));
+      fixture.componentRef.setInput('categoryId', '5510');
+      auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
+      fixture.detectChanges();
+      expectProductsRequest(httpMock).flush(SAMPLE);
+      fixture.detectChanges();
+
+      const tag: HTMLElement = fixture.nativeElement.querySelector('.pay-tag');
+      expect(tag?.textContent?.trim()).toBe('General Allotment');
+    });
   });
 
   it('should omit categoryId from the product link on a bucket/full-catalog page (no real category)', () => {

@@ -38,12 +38,17 @@ export interface Product {
   pointsRange: PointsRange | null;
   imageUrl: string;
   colors: ProductColor[];
+  // Every program category this product belongs to — matched against an
+  // allotment rule's own `covers.categories` to show which rule (if any)
+  // is likely to cover it, before it's actually in the cart.
+  progCatIds: number[];
 }
 
-interface RawProduct extends Omit<Product, 'priceRange' | 'pointsRange' | 'colors'> {
+interface RawProduct extends Omit<Product, 'priceRange' | 'pointsRange' | 'colors' | 'progCatIds'> {
   priceRange: PriceRange | null | undefined;
   pointsRange: PointsRange | null | undefined;
   colors: ProductColor[] | null;
+  progCatIds: number[] | null;
 }
 
 export interface CategoryFacet {
@@ -137,6 +142,7 @@ function normalizeSearchResult(result: RawProductSearchResult): ProductSearchRes
         valueSwtchColor: color.valueSwtchColor ?? '',
         valueSwtchImage: color.valueSwtchImage ?? '',
       })),
+      progCatIds: product.progCatIds ?? [],
     })),
     categoryFacets: result.categoryFacets ?? [],
     optionFacets: (result.optionFacets ?? []).map((group) => ({

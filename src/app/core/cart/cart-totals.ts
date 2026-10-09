@@ -116,21 +116,37 @@ export function amountDueAtCheckout(cart: Cart): number {
   return Math.max(0, cart.subtotalPrice - covered + shortfall);
 }
 
-// How many points over the limit the cart currently sits, summed across
-// every points-type rule that's actually over-drawn. Kept in points rather
-// than folded into `amountDueAtCheckout`'s dollar figure — that shortfall
-// is prorated through each line's own `lineTotalPrice`, which is `0` for a
-// pure-points SKU with no dollar price at all, silently zeroing out the
-// estimate no matter how overdrawn the points rule really is. A rule's own
-// `available` balance already states the shortfall exactly; no per-line
-// proration is needed to stay in the same unit.
+// The points equivalent of `amountDueAtCheckout` — how many points, in
+// total, nothing in this cart's allotment can actually pay for. Two
+// contributions, neither needing `amountDueAtCheckout`'s dollar-value
+// proration (there's no unit conversion to estimate — points stay points):
+//   - a line with no points allocation at all (no rule covers it, the same
+//     case that would fall to a credit-card balance in dollar mode) adds
+//     its own `lineTotalPoints` straight to the total.
+//   - a points rule that's actually over-drawn adds the exact amount past
+//     its own `available` balance — that figure already states the
+//     shortfall directly, no per-line estimate needed.
 export function pointsShortfall(cart: Cart): number {
   const rules = cart.allotment?.rules ?? [];
-  return rules.reduce((sum, rule) => {
+  const byItemId = lineTagByItemId(cart);
+
+  const uncovered = cart.items.reduce((sum, item) => {
+    if (item.lineTotalPoints === null) {
+      return sum;
+    }
+    const hasPointsCoverage = resolvedAllocations(item, byItemId.get(item.cartItemId)).some(
+      (allocation) => allocation.payUnit === 'POINTS',
+    );
+    return hasPointsCoverage ? sum : sum + item.lineTotalPoints;
+  }, 0);
+
+  const ruleShortfall = rules.reduce((sum, rule) => {
     if (rule.primaryUnit !== 'POINTS') {
       return sum;
     }
     const balance = tileBalance(rule);
     return balance && balance.available < 0 ? sum - balance.available : sum;
   }, 0);
+
+  return uncovered + ruleShortfall;
 }

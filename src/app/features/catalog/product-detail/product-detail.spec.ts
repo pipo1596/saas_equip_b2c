@@ -1114,71 +1114,80 @@ describe('ProductDetail', () => {
   });
 
   it("should show the coverage card for the rule matching the product tag, and expand the header's rules panel from its View rule link", () => {
-    const fixture = TestBed.createComponent(ProductDetail);
-    const detail = fixture.componentInstance;
-    const cartService = TestBed.inject(CartService);
-    fixture.componentRef.setInput('productPk', '12345');
-    fixture.detectChanges();
+    vi.useFakeTimers();
+    try {
+      const fixture = TestBed.createComponent(ProductDetail);
+      const detail = fixture.componentInstance;
+      const cartService = TestBed.inject(CartService);
+      fixture.componentRef.setInput('productPk', '12345');
+      fixture.detectChanges();
 
-    expectRequest(httpMock, '*GET').flush(RESPONSE);
-    expectProductTagCartRequest(httpMock).flush({
-      cartId: null,
-      itemCount: 0,
-      subtotalPrice: 0,
-      subtotalPoints: null,
-      items: [],
-      allotment: {
-        programId: 3,
-        allotmentBar: null,
-        ruleCount: 1,
-        allotExclTaxFreight: 'N',
-        rules: [
-          {
-            ruleId: 12,
-            ruleName: 'Unit Allotment',
-            allotType: 'UNITS',
-            primaryUnit: 'UNITS',
-            isBarRule: 'N',
-            dollars: null,
-            units: { total: 5, used: 2, inCart: 0, available: 3 },
-            points: null,
-            cycle: {
-              renewalBasis: 'FIXED',
-              renewalPeriodMonths: 12,
-              cycleStart: '2026-09-09',
-              cycleEnd: '2027-09-08',
-              renewsOn: '2027-09-09',
-              expirationDate: null,
-              onExpiration: 'SUSPEND',
+      expectRequest(httpMock, '*GET').flush(RESPONSE);
+      expectProductTagCartRequest(httpMock).flush({
+        cartId: null,
+        itemCount: 0,
+        subtotalPrice: 0,
+        subtotalPoints: null,
+        items: [],
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 1,
+          allotExclTaxFreight: 'N',
+          rules: [
+            {
+              ruleId: 12,
+              ruleName: 'Unit Allotment',
+              allotType: 'UNITS',
+              primaryUnit: 'UNITS',
+              isBarRule: 'N',
+              dollars: null,
+              units: { total: 5, used: 2, inCart: 0, available: 3 },
+              points: null,
+              cycle: {
+                renewalBasis: 'FIXED',
+                renewalPeriodMonths: 12,
+                cycleStart: '2026-09-09',
+                cycleEnd: '2027-09-08',
+                renewsOn: '2027-09-09',
+                expirationDate: null,
+                onExpiration: 'SUSPEND',
+              },
+              covers: {
+                allAssortments: 'N',
+                categories: [],
+                unitGrants: [{ progCatId: 60, categoryName: 'Tactical', unitQty: 5 }],
+              },
+              carryover: { type: 'FORFEIT', pct: null, capAmount: null, carriedIn: null },
+              quotas: [],
+              requireApproval: 'N',
+              allowCcFallback: 'N',
             },
-            covers: {
-              allAssortments: 'N',
-              categories: [],
-              unitGrants: [{ progCatId: 60, categoryName: 'Tactical', unitQty: 5 }],
-            },
-            carryover: { type: 'FORFEIT', pct: null, capAmount: null, carriedIn: null },
-            quotas: [],
-            requireApproval: 'N',
-            allowCcFallback: 'N',
-          },
-        ],
-        approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
-        openOrders: null,
-        lineTags: [],
-        productTag: { productPk: 12345, ruleId: 12, payUnit: 'UNITS', tagLabel: 'uses units' },
-      },
-    });
-    fixture.detectChanges();
+          ],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [],
+          productTag: { productPk: 12345, ruleId: 12, payUnit: 'UNITS', tagLabel: 'uses units' },
+        },
+      });
+      fixture.detectChanges();
 
-    const card = fixture.nativeElement.querySelector('app-allotment-coverage-card');
-    expect(card).not.toBeNull();
-    expect(card.querySelector('.coverage-card__title')?.textContent?.trim()).toBe(
-      'Covered by your Unit Allotment',
-    );
+      const card = fixture.nativeElement.querySelector('app-allotment-coverage-card');
+      expect(card).not.toBeNull();
+      expect(card.querySelector('.coverage-card__title')?.textContent?.trim()).toBe(
+        'Covered by your Unit Allotment',
+      );
 
-    expect(cartService.rulesMenuOpen()).toBe(false);
-    card.querySelector('.coverage-card__view-rule').click();
-    expect(cartService.rulesMenuOpen()).toBe(true);
+      expect(cartService.rulesMenuOpen()).toBe(false);
+      card.querySelector('.coverage-card__view-rule').click();
+      // Deferred a tick — see `CartService.openRulesMenu`'s own comment:
+      // opening synchronously would have this same click immediately close
+      // the menu again via the header's own "click outside" listener.
+      vi.runAllTimers();
+      expect(cartService.rulesMenuOpen()).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('should not show the coverage card when there is no product tag', () => {

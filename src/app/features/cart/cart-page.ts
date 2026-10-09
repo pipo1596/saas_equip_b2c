@@ -252,10 +252,11 @@ export class CartPage implements OnInit {
     });
   }
 
-  // `*UPDATE_QT` deletes the line outright once `qty` reaches 0 — a
-  // stepper naturally lands there, so this doesn't special-case it.
+  // The stepper's own floor is 1, not 0 — `*UPDATE_QT` would delete the
+  // line outright at 0, which should only happen via the explicit Remove
+  // link, not an accidental extra click/scroll on the stepper.
   setQuantity(item: CartItem, qty: number): void {
-    if (qty === item.quantity || qty < 0 || this.updatingSkuId() !== null || this.clearing()) {
+    if (qty === item.quantity || qty < 1 || this.updatingSkuId() !== null || this.clearing()) {
       return;
     }
     this.updatingSkuId.set(item.skuId);

@@ -11,7 +11,7 @@
     
 
     <div class="tb-right">
-      <div class="dept-wrap dropdown">
+      <div class="dept-wrap dropdown" #deptWrap>
         <button
           class="dept"
           type="button"
@@ -74,7 +74,7 @@
           <path d="M2 3h3l2.4 12.4a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.6L23 7H6" />
         </svg>
       </button>
-      <div class="user-wrap dropdown">
+      <div class="user-wrap dropdown" #userWrap>
         <button
           class="avatar"
           type="button"
@@ -156,23 +156,25 @@
           @if (allotmentBarRenewsOn(); as renewsOn) {
             <span class="af"><i>Renews</i><b>{{ renewsOn | date: 'MMM d' }}</b></span>
           }
-        } @else if (pointsBarRule(); as rule) {
+        } @else if (nonDollarBarRule(); as rule) {
           <span class="af af--heading"><b>{{ rule.ruleName }}</b></span>
           <span class="tb-sep" aria-hidden="true"></span>
-          @if (pointsBarBalance(); as balance) {
-            <span class="af"><i>Total</i><b>{{ balance.total }} pts</b></span>
-            <span class="af"><i>Used</i><b>{{ balance.used }} pts</b></span>
-            <span class="af"><i>In cart</i><b>{{ balance.inCart }} pts</b></span>
+          @if (nonDollarBarBalance(); as balance) {
+            <span class="af"><i>Total</i><b>{{ formatAmount(balance.total, rule.primaryUnit) }}</b></span>
+            <span class="af"><i>Used</i><b>{{ formatAmount(balance.used, rule.primaryUnit) }}</b></span>
+            <span class="af"><i>In cart</i><b>{{ formatAmount(balance.inCart, rule.primaryUnit) }}</b></span>
             <span class="af">
               <i>Available</i>
-              <b [class.good]="balance.available >= 0" [class.warn]="balance.available < 0">{{ balance.available }} pts</b>
+              <b [class.good]="balance.available >= 0" [class.warn]="balance.available < 0">
+                {{ formatAmount(balance.available, rule.primaryUnit) }}
+              </b>
             </span>
           }
           @if (rule.cycle.renewsOn; as renewsOn) {
             <span class="af"><i>Renews</i><b>{{ renewsOn | date: 'MMM d' }}</b></span>
           }
         }
-        <div class="allot-rules-wrap dropdown">
+        <div class="allot-rules-wrap dropdown" #rulesWrap>
           <button
             class="allot-rules-btn"
             type="button"

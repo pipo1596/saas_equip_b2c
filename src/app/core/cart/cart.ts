@@ -22,7 +22,14 @@ export type {
   PayUnit,
   ProductTag,
 } from './allotment';
-export { coverageLabel, fallbackChain, formatBalanceAmount, meterPct, tileBalance } from './allotment';
+export {
+  coverageLabel,
+  fallbackChain,
+  formatBalanceAmount,
+  meterPct,
+  ruleForCategories,
+  tileBalance,
+} from './allotment';
 
 // Just the display labels for this line's variant (Color/Size/etc.) — for
 // building an actual selector UI for this sku, that's the product detail
@@ -143,8 +150,14 @@ export class CartService {
   // reaching into the header component itself.
   readonly rulesMenuOpen = signal(false);
 
+  // Deferred a tick — this is called from a click (e.g. product detail's
+  // "View rule" link) that also bubbles up to the header's own document-
+  // level "click outside closes the menu" listener. Setting the signal
+  // synchronously would have that same click immediately close the menu
+  // again, since the link that opened it isn't inside the header's own
+  // menu wrapper.
   openRulesMenu(): void {
-    this.rulesMenuOpen.set(true);
+    setTimeout(() => this.rulesMenuOpen.set(true));
   }
 
   closeRulesMenu(): void {

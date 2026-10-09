@@ -19,7 +19,14 @@ import { NavigationStart, Router, RouterLink } from '@angular/router';
 import { filter } from 'rxjs';
 
 import { AuthService, EmployeeLocation } from '../../core/auth/auth';
-import { CartItem, CartService, PayTag, formatCartItemOptions, tileBalance } from '../../core/cart/cart';
+import {
+  CartItem,
+  CartService,
+  PayTag,
+  formatBalanceAmount,
+  formatCartItemOptions,
+  tileBalance,
+} from '../../core/cart/cart';
 import { CatalogCategory, CatalogMenu, CatalogViewService } from '../../core/catalog/catalog-view';
 import { LocationSelectionService } from '../../core/location/location-selection';
 import { TenantSettings, TenantSettingsService } from '../../core/tenant/tenant-settings';
@@ -134,6 +141,7 @@ function widenSingleSection(categories: readonly DisplayCategory[]): readonly Di
   styleUrls: ['../shared.css', './header.css'],
   host: {
     '(document:keydown.escape)': 'closeCatalogNav()',
+    '(document:click)': 'onDocumentClick($event)',
   },
 })
 export class Header implements OnInit {
@@ -156,6 +164,9 @@ export class Header implements OnInit {
   });
 
   @ViewChild('cartDialogEl') private readonly cartDialogEl?: ElementRef<HTMLDialogElement>;
+  @ViewChild('deptWrap') private readonly deptWrapRef?: ElementRef<HTMLElement>;
+  @ViewChild('rulesWrap') private readonly rulesWrapRef?: ElementRef<HTMLElement>;
+  @ViewChild('userWrap') private readonly userWrapRef?: ElementRef<HTMLElement>;
 
   // Backstop for the drawer's own explicit close-on-navigate links below —
   // those only cover links *inside* the drawer; this catches everything
@@ -368,20 +379,20 @@ export class Header implements OnInit {
     }
     return this.allotmentRules().find((rule) => rule.ruleId === bar.ruleId)?.cycle.renewsOn ?? null;
   });
-  // `allotmentBar` is dollar-only, so a points-only employee never gets one
-  // from the API — synthesize the same top summary locally from whichever
-  // rule is flagged as the bar rule (falling back to the first rule, since
-  // `pointsOnly` already guarantees at least one exists) instead of hiding
-  // it entirely.
-  readonly pointsBarRule = computed(() => {
-    if (!this.pointsOnly()) {
+  // `allotmentBar` is dollar-only, so an employee with no dollar rule at
+  // all (points, units, or a mix of the two — never gets one from the API.
+  // Synthesize the same top summary locally from whichever rule is flagged
+  // as the bar rule (falling back to the first rule) instead of hiding it
+  // entirely whenever there's at least one rule to summarize.
+  readonly nonDollarBarRule = computed(() => {
+    const rules = this.allotmentRules();
+    if (this.allotmentBar() || rules.length === 0) {
       return null;
     }
-    const rules = this.allotmentRules();
-    return rules.find((rule) => rule.isBarRule === 'Y') ?? rules[0] ?? null;
+    return rules.find((rule) => rule.isBarRule === 'Y') ?? rules[0];
   });
-  readonly pointsBarBalance = computed(() => {
-    const rule = this.pointsBarRule();
+  readonly nonDollarBarBalance = computed(() => {
+    const rule = this.nonDollarBarRule();
     return rule ? tileBalance(rule) : null;
   });
 
@@ -481,6 +492,23 @@ export class Header implements OnInit {
     this.userMenuOpen.update((open) => !open);
   }
 
+  // Closes whichever of the three dropdowns is open on any click outside
+  // its own trigger+panel wrapper — a click on the trigger itself is
+  // "inside" (it's part of the same wrapper), and is left to that button's
+  // own (click) handler instead of being double-toggled here.
+  onDocumentClick(event: MouseEvent): void {
+    const target = event.target as Node;
+    if (this.deptMenuOpen() && !this.deptWrapRef?.nativeElement.contains(target)) {
+      this.deptMenuOpen.set(false);
+    }
+    if (this.rulesMenuOpen() && !this.rulesWrapRef?.nativeElement.contains(target)) {
+      this.rulesMenuOpen.set(false);
+    }
+    if (this.userMenuOpen() && !this.userWrapRef?.nativeElement.contains(target)) {
+      this.userMenuOpen.set(false);
+    }
+  }
+
   openCart(): void {
     this.cartService.openDrawer();
   }
@@ -517,6 +545,7 @@ export class Header implements OnInit {
   }
 
   readonly cartItemOptionsLabel = formatCartItemOptions;
+  readonly formatAmount = formatBalanceAmount;
 
   removeCartItem(item: CartItem): void {
     this.confirmService

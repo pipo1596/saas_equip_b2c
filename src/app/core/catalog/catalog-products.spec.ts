@@ -18,6 +18,7 @@ const SAMPLE: ProductSearchResult = {
       colors: [
         { valueDesc: 'Black', valueCode: '#0B0B0B', valueSwtchColor: '#0B0B0B', valueSwtchImage: '' },
       ],
+      progCatIds: [5510],
     },
   ],
   totalCount: 32,
@@ -141,6 +142,7 @@ describe('CatalogProductsService', () => {
           skuCode: 'SFD-SHRT-215-M',
           imageUrl: '',
           colors: null,
+          progCatIds: null,
         },
       ],
       totalCount: 1,
@@ -151,6 +153,7 @@ describe('CatalogProductsService', () => {
     } as never);
 
     expect(result?.products[0].colors).toEqual([]);
+    expect(result?.products[0].progCatIds).toEqual([]);
     // Neither range is sent at all for a product with no SKUs yet.
     expect(result?.products[0].priceRange).toBeNull();
     expect(result?.products[0].pointsRange).toBeNull();
