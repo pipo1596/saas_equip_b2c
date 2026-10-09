@@ -167,18 +167,6 @@ describe('ProductDetail', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it('should scroll to the top of the page on first render', () => {
-    const fixture = TestBed.createComponent(ProductDetail);
-    // jsdom doesn't implement scrollIntoView at all — stub it so we can
-    // assert it gets called, same pattern used for the product list page.
-    const scrollIntoViewSpy = vi.fn();
-    fixture.nativeElement.scrollIntoView = scrollIntoViewSpy;
-
-    fixture.detectChanges();
-
-    expect(scrollIntoViewSpy).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' });
-  });
-
   it('should fall back to a generic title when no product name is bound', () => {
     const fixture = TestBed.createComponent(ProductDetail);
     fixture.detectChanges();

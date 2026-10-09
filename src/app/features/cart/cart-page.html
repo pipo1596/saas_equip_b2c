@@ -81,10 +81,11 @@
             <div class="cart-page__summary">
               <h2 class="cart-page__summary-title mb-3">Order summary</h2>
               @if (!pointsOnly()) {
-                <div class="d-flex justify-content-between align-items-baseline mb-2">
+                <div class="d-flex justify-content-between align-items-baseline mb-1">
                   <span>Order value ({{ cart().itemCount }} items)</span>
                   <b>{{ cart().subtotalPrice | currency }}</b>
                 </div>
+                <p class="cart-page__summary-note mb-2">*does not include applicable Shipping and Taxes</p>
               } @else if (cart().subtotalPoints !== null) {
                 <div class="d-flex justify-content-between align-items-baseline mb-2">
                   <span>Order value ({{ cart().itemCount }} items)</span>
@@ -109,8 +110,14 @@
                 @if (!pointsOnly()) {
                   <hr />
                   <div class="d-flex justify-content-between align-items-baseline mb-3">
-                    <span>To pay at checkout</span>
+                    <span>Balance</span>
                     <b>{{ amountDueAtCheckout() | currency }}</b>
+                  </div>
+                } @else if (pointsShortfall() > 0) {
+                  <hr />
+                  <div class="d-flex justify-content-between align-items-baseline mb-3">
+                    <span>Balance</span>
+                    <b class="cart-page__summary-amount--shortfall">{{ pointsShortfall() }} pts</b>
                   </div>
                 }
               } @else if (cart().subtotalPoints !== null) {
@@ -122,15 +129,6 @@
 
               <a routerLink="/checkout" class="cart-page__checkout">
                 <span class="cart-page__checkout-title">Checkout</span>
-                <span class="cart-page__checkout-sub">
-                  {{
-                    pointsOnly()
-                      ? 'Continue to checkout'
-                      : amountDueAtCheckout() === 0
-                        ? 'Nothing to pay'
-                        : (amountDueAtCheckout() | currency) + ' due'
-                  }}
-                </span>
               </a>
               <a routerLink="/products/full-catalog" class="btn btn-outline-secondary w-100 mt-2">
                 Continue shopping

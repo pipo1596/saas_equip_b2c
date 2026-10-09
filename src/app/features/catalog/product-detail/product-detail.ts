@@ -1,6 +1,5 @@
 import { CurrencyPipe, isPlatformBrowser } from '@angular/common';
 import {
-  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
   ElementRef,
@@ -51,13 +50,12 @@ import { Header } from '../../../shared/header/header';
     '(window:resize)': 'updateThumbsOverflow()',
   },
 })
-export class ProductDetail implements OnInit, AfterViewInit {
+export class ProductDetail implements OnInit {
   private readonly productDetailService = inject(ProductDetailService);
   private readonly cartService = inject(CartService);
   private readonly locationSelectionService = inject(LocationSelectionService);
   private readonly router = inject(Router);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
-  private readonly hostElementRef = inject(ElementRef<HTMLElement>);
 
   // An employee whose allotment is points-only never pays in dollars —
   // the SKU/price-range API has no points price to show instead (unlike
@@ -449,18 +447,6 @@ export class ProductDetail implements OnInit, AfterViewInit {
   // than duplicating the full breakdown on this page.
   viewRule(): void {
     this.cartService.openRulesMenu();
-  }
-
-  ngAfterViewInit(): void {
-    // Landing on this route can otherwise leave the browser at whatever
-    // scroll position the previous page was at (e.g. coming from further
-    // down a product list) — jump all the way to the top of the page on
-    // first render, without a "smooth" animation. Guarded since jsdom
-    // (used in tests) doesn't implement `scrollIntoView` at all.
-    const target = this.hostElementRef.nativeElement;
-    if (typeof target.scrollIntoView === 'function') {
-      target.scrollIntoView({ behavior: 'auto', block: 'start' });
-    }
   }
 
   selectOption(optName: string, optId: number): void {

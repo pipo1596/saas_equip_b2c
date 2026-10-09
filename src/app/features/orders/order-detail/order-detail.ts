@@ -1,9 +1,7 @@
 import { CurrencyPipe, isPlatformBrowser } from '@angular/common';
 import {
-  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
-  ElementRef,
   OnInit,
   PLATFORM_ID,
   computed,
@@ -38,11 +36,10 @@ import { Header } from '../../../shared/header/header';
   templateUrl: './order-detail.html',
   styleUrls: ['../../../shared/shared.css', './order-detail.css'],
 })
-export class OrderDetailPage implements OnInit, AfterViewInit {
+export class OrderDetailPage implements OnInit {
   private readonly orderService = inject(OrderService);
   private readonly cartService = inject(CartService);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
-  private readonly hostElementRef = inject(ElementRef<HTMLElement>);
 
   // Based on the employee's *current* allotment — applied retroactively to
   // past orders too, so a points-only employee never sees a dollar figure,
@@ -126,17 +123,6 @@ export class OrderDetailPage implements OnInit, AfterViewInit {
       return;
     }
     this.load();
-  }
-
-  ngAfterViewInit(): void {
-    // Same reasoning as checkout's own scroll-to-top — guarded since jsdom
-    // (used in tests) doesn't implement `scrollIntoView` at all. Matters
-    // most arriving straight from Place order: without it, the page can
-    // land mid-scroll from wherever checkout happened to be.
-    const target = this.hostElementRef.nativeElement;
-    if (typeof target.scrollIntoView === 'function') {
-      target.scrollIntoView({ behavior: 'auto', block: 'start' });
-    }
   }
 
   private load(): void {

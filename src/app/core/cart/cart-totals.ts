@@ -52,11 +52,19 @@ export function paidFromLines(cart: Cart): PaidFromLine[] {
   return rules
     .map((rule) => ({ rule, balance: tileBalance(rule) }))
     .filter((entry) => !!entry.balance && entry.balance.inCart > 0)
-    .map((entry) => ({
-      ruleName: entry.rule.ruleName,
-      unit: entry.rule.primaryUnit,
-      amount: entry.balance!.inCart,
-    }));
+    .map((entry) => {
+      const balance = entry.balance!;
+      // `inCart` is what was *requested* against this rule, which can run
+      // past what it actually has left (a negative `available`) once
+      // there isn't enough to cover everything tagged to it — cap the
+      // claimed amount at the rule's real remaining balance so this line
+      // never states more than the rule can actually give. A dollar rule
+      // still has the "Balance" row to cover the true remainder by card;
+      // a points rule has no such fallback, so overstating it here would
+      // be the only number shown, and it'd be wrong.
+      const amount = Math.max(0, Math.min(balance.inCart, balance.total - balance.used));
+      return { ruleName: entry.rule.ruleName, unit: entry.rule.primaryUnit, amount };
+    });
 }
 
 // Subtotal minus whatever every line's own allocations cover, corrected
@@ -106,4 +114,23 @@ export function amountDueAtCheckout(cart: Cart): number {
   }, 0);
 
   return Math.max(0, cart.subtotalPrice - covered + shortfall);
+}
+
+// How many points over the limit the cart currently sits, summed across
+// every points-type rule that's actually over-drawn. Kept in points rather
+// than folded into `amountDueAtCheckout`'s dollar figure — that shortfall
+// is prorated through each line's own `lineTotalPrice`, which is `0` for a
+// pure-points SKU with no dollar price at all, silently zeroing out the
+// estimate no matter how overdrawn the points rule really is. A rule's own
+// `available` balance already states the shortfall exactly; no per-line
+// proration is needed to stay in the same unit.
+export function pointsShortfall(cart: Cart): number {
+  const rules = cart.allotment?.rules ?? [];
+  return rules.reduce((sum, rule) => {
+    if (rule.primaryUnit !== 'POINTS') {
+      return sum;
+    }
+    const balance = tileBalance(rule);
+    return balance && balance.available < 0 ? sum - balance.available : sum;
+  }, 0);
 }

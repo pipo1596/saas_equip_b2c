@@ -1,6 +1,5 @@
 import { CurrencyPipe, isPlatformBrowser } from '@angular/common';
 import {
-  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
   ElementRef,
@@ -68,13 +67,12 @@ type CatalogScope =
   templateUrl: './product-list.html',
   styleUrls: ['../../../shared/shared.css', './product-list.css'],
 })
-export class ProductList implements AfterViewInit {
+export class ProductList {
   private readonly catalogProductsService = inject(CatalogProductsService);
   private readonly catalogViewService = inject(CatalogViewService);
   private readonly locationSelectionService = inject(LocationSelectionService);
   private readonly cartService = inject(CartService);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
-  private readonly hostElementRef = inject(ElementRef<HTMLElement>);
 
   // An employee whose allotment is points-only never pays in dollars — the
   // card shows `pointsRange` instead of `priceRange` for them.
@@ -245,22 +243,6 @@ export class ProductList implements AfterViewInit {
         },
       });
   });
-
-  ngAfterViewInit(): void {
-    // Landing on this route can otherwise leave the browser at whatever
-    // scroll position the previous page was at (e.g. the router keeps
-    // scroll position, or this is a fresh category coming from a link
-    // further down the home page) — jump all the way to the top of the
-    // page (above even the header, unlike `scrollResultsIntoView`'s
-    // results-anchor used for later filter/page changes) on first render,
-    // without the "smooth" animation used for those later changes. Guarded
-    // the same way as `scrollResultsIntoView`, since jsdom (used in tests)
-    // doesn't implement `scrollIntoView` at all.
-    const target = this.hostElementRef.nativeElement;
-    if (typeof target.scrollIntoView === 'function') {
-      target.scrollIntoView({ behavior: 'auto', block: 'start' });
-    }
-  }
 
   toggleGroupCollapsed(optionName: string): void {
     this.collapsedGroups.update((current) => {

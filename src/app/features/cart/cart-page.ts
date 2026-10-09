@@ -1,15 +1,5 @@
 import { CurrencyPipe, DatePipe, NgTemplateOutlet, isPlatformBrowser } from '@angular/common';
-import {
-  AfterViewInit,
-  ChangeDetectionStrategy,
-  Component,
-  ElementRef,
-  OnInit,
-  PLATFORM_ID,
-  computed,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, PLATFORM_ID, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import {
@@ -29,6 +19,7 @@ import {
   amountDueAtCheckout,
   lineTagByItemId,
   paidFromLines,
+  pointsShortfall,
   resolvedAllocations,
 } from '../../core/cart/cart-totals';
 import { LocationSelectionService } from '../../core/location/location-selection';
@@ -58,12 +49,11 @@ const DATE_PIPE = new DatePipe('en-US');
   templateUrl: './cart-page.html',
   styleUrls: ['../../shared/shared.css', './cart-page.css'],
 })
-export class CartPage implements OnInit, AfterViewInit {
+export class CartPage implements OnInit {
   private readonly cartService = inject(CartService);
   private readonly confirmService = inject(ConfirmService);
   private readonly locationSelectionService = inject(LocationSelectionService);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
-  private readonly hostElementRef = inject(ElementRef<HTMLElement>);
 
   readonly cart = this.cartService.cart;
   readonly pointsOnly = this.cartService.pointsOnly;
@@ -122,6 +112,10 @@ export class CartPage implements OnInit, AfterViewInit {
   // shared with the checkout page so both show the exact same figures.
   readonly paidFromLines = computed(() => paidFromLines(this.cart()));
   readonly amountDueAtCheckout = computed(() => amountDueAtCheckout(this.cart()));
+  // The points equivalent of the above — how many points over the
+  // allotment's limit the cart currently sits, for a points-only employee
+  // (who has no card fallback, so this is their only "Balance" figure).
+  readonly pointsShortfall = computed(() => pointsShortfall(this.cart()));
 
   lineTag(cartItemId: number): PayTag | null {
     return this.tagsByItemId().get(cartItemId) ?? null;
@@ -256,18 +250,6 @@ export class CartPage implements OnInit, AfterViewInit {
         this.error.set(err instanceof Error ? err.message : 'We could not load your cart.');
       },
     });
-  }
-
-  ngAfterViewInit(): void {
-    // Landing on this route (e.g. from "Checkout" further down a long
-    // product list) can otherwise leave the browser at whatever scroll
-    // position the previous page was at — jump to the top on first render.
-    // Guarded since jsdom (used in tests) doesn't implement
-    // `scrollIntoView` at all.
-    const target = this.hostElementRef.nativeElement;
-    if (typeof target.scrollIntoView === 'function') {
-      target.scrollIntoView({ behavior: 'auto', block: 'start' });
-    }
   }
 
   // `*UPDATE_QT` deletes the line outright once `qty` reaches 0 — a

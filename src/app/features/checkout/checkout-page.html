@@ -258,6 +258,13 @@
                     </b>
                   </div>
                 }
+                @if (pointsOnly() && pointsShortfall() > 0) {
+                  <hr />
+                  <div class="d-flex justify-content-between align-items-baseline mb-3">
+                    <span>Balance</span>
+                    <b class="checkout-page__summary-amount--shortfall">{{ pointsShortfall() }} pts</b>
+                  </div>
+                }
               }
 
               @if (!pointsOnly()) {

@@ -55,6 +55,15 @@ describe('Home', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
+  it("links the 'View order history' button to order history", () => {
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+
+    const link: HTMLAnchorElement = fixture.nativeElement.querySelector('.hero__cta a');
+    expect(link.textContent?.trim()).toBe('View order history');
+    expect(link.getAttribute('href')).toBe('/orders');
+  });
+
   it('should load tenant settings on init', () => {
     const fixture = TestBed.createComponent(Home);
     const home = fixture.componentInstance;

@@ -271,6 +271,9 @@
 .checkout-page__summary-amount--units {
   color: var(--good);
 }
+.checkout-page__summary-amount--shortfall {
+  color: var(--bs-danger, #dc3545);
+}
 .checkout-page__summary-note {
   font-size: 12px;
   font-weight: 400;

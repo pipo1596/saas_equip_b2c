@@ -331,16 +331,6 @@ describe('CheckoutPage', () => {
     expect(host.querySelector<HTMLInputElement>('#contact-extension')).not.toBeNull();
   });
 
-  it('should scroll to the top of the page on first render', () => {
-    const fixture = TestBed.createComponent(CheckoutPage);
-    const scrollIntoViewSpy = vi.fn();
-    fixture.nativeElement.scrollIntoView = scrollIntoViewSpy;
-
-    fixture.detectChanges();
-
-    expect(scrollIntoViewSpy).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' });
-  });
-
   it("should show each item's quantity × unit-price math alongside its line total, for every line", () => {
     const fixture = TestBed.createComponent(CheckoutPage);
     fixture.detectChanges();
@@ -383,6 +373,46 @@ describe('CheckoutPage', () => {
     expect(summary.textContent).not.toContain('Subtotal due');
     expect(summary.textContent).not.toContain('Total');
     expect(summary.textContent).toContain('300 pts');
+  });
+
+  it("blocks a points-only order whose points rule is over-drawn, even when the SKU has no dollar price at all", () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    const page = fixture.componentInstance;
+    fixture.detectChanges();
+
+    const OVERDRAWN_POINTS_ALLOTMENT = {
+      ...POINTS_ONLY_ALLOTMENT,
+      rules: [{ ...POINTS_ONLY_ALLOTMENT.rules[0], points: { total: 400, used: 0, inCart: 1500, available: -1100 } }],
+    };
+
+    flushInitialCartLoads(httpMock, {
+      ...CART,
+      subtotalPrice: 0,
+      subtotalPoints: 1500,
+      allotment: OVERDRAWN_POINTS_ALLOTMENT,
+      items: [{ ...CART.items[0], lineTotalPrice: 0, lineTotalPoints: 1500, currentPoints: 3 }],
+    });
+    flushCheckoutData(httpMock, {
+      cust_addrs: [PRIMARY_ADDRESS],
+      ship_addrs: [PRIMARY_ADDRESS],
+      ship_mthds: [DEFAULT_SHIP_METHOD],
+      tax_rates: [],
+    });
+    fixture.detectChanges();
+
+    // The dollar-based math alone sees nothing due — this SKU has no
+    // dollar price at all — so `orderTotal` must fold in the points
+    // overage directly, not rely on `subtotalDue` alone.
+    expect(page.subtotalDue()).toBe(0);
+    expect(page.orderTotal()).toBe(1100);
+    expect(page.canPlaceOrder()).toBe(false);
+
+    const warning: HTMLElement = fixture.nativeElement.querySelector('.alert-warning');
+    expect(warning?.textContent).toContain("isn't fully covered by your points allotment");
+
+    const summary: HTMLElement = fixture.nativeElement.querySelector('.checkout-page__summary');
+    expect(summary.textContent).toContain('Balance');
+    expect(summary.textContent).toContain('1100 pts');
   });
 
   it('should load the cart and checkout data, defaulting to the primary address and default shipping method', () => {

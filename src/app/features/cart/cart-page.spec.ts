@@ -107,16 +107,6 @@ describe('CartPage', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it('should scroll to the top of the page on first render', () => {
-    const fixture = TestBed.createComponent(CartPage);
-    const scrollIntoViewSpy = vi.fn();
-    fixture.nativeElement.scrollIntoView = scrollIntoViewSpy;
-
-    fixture.detectChanges();
-
-    expect(scrollIntoViewSpy).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' });
-  });
-
   it('should load the cart on init and render its lines', () => {
     const fixture = TestBed.createComponent(CartPage);
     fixture.detectChanges();
@@ -146,6 +136,35 @@ describe('CartPage', () => {
     const rows: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('.cart-page__row'));
     expect(rows[0].querySelector('.cart-page__linetotal')?.textContent?.trim()).toBe('300 pts');
     expect(rows[0].querySelector('.cart-page__unit-price')?.textContent?.trim()).toBe('2 × 150 pts');
+  });
+
+  it("caps the 'Paid from' points amount at what the rule can really give, and shows the shortfall as a Balance line", () => {
+    const fixture = TestBed.createComponent(CartPage);
+    fixture.detectChanges();
+
+    const OVERDRAWN_POINTS_ALLOTMENT = {
+      ...POINTS_ONLY_ALLOTMENT,
+      rules: [{ ...POINTS_ONLY_ALLOTMENT.rules[0], points: { total: 400, used: 0, inCart: 420, available: -20 } }],
+    };
+    flushInitialCartLoads(httpMock, { ...CART, allotment: OVERDRAWN_POINTS_ALLOTMENT });
+    fixture.detectChanges();
+
+    const summary: HTMLElement = fixture.nativeElement.querySelector('.cart-page__summary');
+    expect(summary.textContent).toContain('400 pts');
+    expect(summary.textContent).not.toContain('420 pts');
+    expect(summary.textContent).toContain('Balance');
+    expect(summary.textContent).toContain('20 pts');
+  });
+
+  it('shows no Balance line when the points allotment fully covers the order', () => {
+    const fixture = TestBed.createComponent(CartPage);
+    fixture.detectChanges();
+
+    flushInitialCartLoads(httpMock, { ...CART, allotment: POINTS_ONLY_ALLOTMENT });
+    fixture.detectChanges();
+
+    const summary: HTMLElement = fixture.nativeElement.querySelector('.cart-page__summary');
+    expect(summary.textContent).not.toContain('Balance');
   });
 
   it('should show the quantity × unit-price math for every line, regardless of quantity', () => {
@@ -609,10 +628,8 @@ describe('CartPage', () => {
       expect(summary.textContent).toContain('$100.00');
       expect(summary.textContent).toContain('Footwear allotment');
       expect(summary.textContent).toContain('$160.00');
-      expect(summary.textContent).toContain('To pay at checkout');
-
-      const checkout: HTMLElement = fixture.nativeElement.querySelector('.cart-page__checkout');
-      expect(checkout.querySelector('.cart-page__checkout-sub')?.textContent?.trim()).toBe('Nothing to pay');
+      expect(summary.textContent).toContain('Balance');
+      expect(summary.textContent).toContain('$0.00');
     });
 
     it("groups and nets correctly from just the simple ruleId/payUnit tag, before the API sends a line's full allocations breakdown", () => {
@@ -666,8 +683,9 @@ describe('CartPage', () => {
       expect(groups[1].textContent).toContain('Cap');
       expect(fixture.nativeElement.querySelector('.cart-page__items')).toBeNull();
 
-      const checkout: HTMLElement = fixture.nativeElement.querySelector('.cart-page__checkout');
-      expect(checkout.querySelector('.cart-page__checkout-sub')?.textContent?.trim()).toBe('Nothing to pay');
+      const summary: HTMLElement = fixture.nativeElement.querySelector('.cart-page__summary');
+      expect(summary.textContent).toContain('Balance');
+      expect(summary.textContent).toContain('$0.00');
     });
 
     it("still shows a balance due when a rule's own balance is over-drawn, instead of trusting each line's tag blindly", () => {
@@ -722,9 +740,9 @@ describe('CartPage', () => {
       // the unit rule's 22-unit shortfall across its 26 requested units.
       expect(page.amountDueAtCheckout()).toBeCloseTo(529.9 + 2624.29 * (22 / 26), 2);
 
-      const checkout: HTMLElement = fixture.nativeElement.querySelector('.cart-page__checkout');
-      expect(checkout.querySelector('.cart-page__checkout-sub')?.textContent?.trim()).not.toBe('Nothing to pay');
-      expect(checkout.querySelector('.cart-page__checkout-sub')?.textContent).toContain('due');
+      const summary: HTMLElement = fixture.nativeElement.querySelector('.cart-page__summary');
+      expect(summary.textContent).toContain('Balance');
+      expect(summary.textContent).not.toContain('$0.00');
     });
 
     it('puts a line with no allotment coverage in a plain, ungrouped section', () => {

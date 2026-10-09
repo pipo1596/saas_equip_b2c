@@ -1,5 +1,11 @@
 import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
-import { RouteReuseStrategy, provideRouter, withComponentInputBinding, withRouterConfig } from '@angular/router';
+import {
+  RouteReuseStrategy,
+  provideRouter,
+  withComponentInputBinding,
+  withInMemoryScrolling,
+  withRouterConfig,
+} from '@angular/router';
 import { provideHttpClient, withFetch } from '@angular/common/http';
 
 import { NoRouteReuseStrategy } from './core/routing/no-reuse-route-strategy';
@@ -17,6 +23,12 @@ export const appConfig: ApplicationConfig = {
       // re-runs even if the user clearly wants to (e.g. re-clicking the
       // wordmark while already on /home, or the category already showing).
       withRouterConfig({ onSameUrlNavigation: 'reload' }),
+      // Scrolls to the top on every navigation to a new URL — without this,
+      // a page landed on mid-scroll from wherever the previous page left
+      // off (e.g. routing to order history from the bottom of the home
+      // page). Back/forward still restores the scroll position the browser
+      // had before navigating away, same as a plain (non-SPA) site.
+      withInMemoryScrolling({ scrollPositionRestoration: 'enabled', anchorScrolling: 'enabled' }),
     ),
     // Paired with the above: the default strategy would still reuse the
     // existing component instance whenever the route config/params are

@@ -1,6 +1,5 @@
 import { CurrencyPipe, isPlatformBrowser } from '@angular/common';
 import {
-  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
   ElementRef,
@@ -18,7 +17,7 @@ import { Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../../core/auth/auth';
 import { CartService, formatBalanceAmount, formatCartItemOptions } from '../../core/cart/cart';
-import { amountDueAtCheckout, paidFromLines } from '../../core/cart/cart-totals';
+import { amountDueAtCheckout, paidFromLines, pointsShortfall } from '../../core/cart/cart-totals';
 import {
   CheckoutService,
   CustomerAddress,
@@ -70,7 +69,7 @@ function generateCheckoutKey(): string {
   templateUrl: './checkout-page.html',
   styleUrls: ['../../shared/shared.css', './checkout-page.css'],
 })
-export class CheckoutPage implements OnInit, AfterViewInit {
+export class CheckoutPage implements OnInit {
   private readonly cartService = inject(CartService);
   private readonly checkoutService = inject(CheckoutService);
   private readonly orderService = inject(OrderService);
@@ -79,7 +78,6 @@ export class CheckoutPage implements OnInit, AfterViewInit {
   private readonly formBuilder = inject(FormBuilder);
   private readonly router = inject(Router);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
-  private readonly hostElementRef = inject(ElementRef<HTMLElement>);
 
   // Pre-filled from the logged-in session, which now has all four.
   readonly contactForm = this.formBuilder.nonNullable.group({
@@ -142,6 +140,10 @@ export class CheckoutPage implements OnInit, AfterViewInit {
   // disagree on what an allotment covers vs. what's left to pay.
   readonly paidFromLines = computed(() => paidFromLines(this.cart()));
   readonly subtotalDue = computed(() => amountDueAtCheckout(this.cart()));
+  // The points equivalent of `subtotalDue` — how many points over the
+  // allotment's limit the cart sits, for a points-only employee (who has
+  // no card fallback, so this is their only "Balance" figure).
+  readonly pointsShortfall = computed(() => pointsShortfall(this.cart()));
 
   // `FLAT` is the only rate type the API gives a cost for today — anything
   // else has nothing to show yet, so it's treated as "not costed" rather
@@ -178,10 +180,13 @@ export class CheckoutPage implements OnInit, AfterViewInit {
   // `subtotalDue` (itself already 0 once points cover the order) gates
   // checkout for them. Folding the dollar shipping/tax figure in here too
   // would silently block an order points fully cover, over a balance the
-  // employee was never shown in the first place.
+  // employee was never shown in the first place. `pointsShortfall` is
+  // folded in on top of that — `subtotalDue` alone can't see a points-only
+  // overage, since its dollar-based math zeroes out for a SKU with no
+  // dollar price at all (see `pointsShortfall`'s own comment).
   readonly orderTotal = computed(() => {
     if (this.pointsOnly()) {
-      return this.subtotalDue();
+      return this.subtotalDue() + pointsShortfall(this.cart());
     }
     return this.shippingAndTaxCoveredByAllotment()
       ? this.subtotalDue()
@@ -285,15 +290,6 @@ export class CheckoutPage implements OnInit, AfterViewInit {
         this.error.set(err instanceof Error ? err.message : 'We could not load checkout details.');
       },
     });
-  }
-
-  ngAfterViewInit(): void {
-    // Same reasoning as the cart page's own scroll-to-top — guarded since
-    // jsdom (used in tests) doesn't implement `scrollIntoView` at all.
-    const target = this.hostElementRef.nativeElement;
-    if (typeof target.scrollIntoView === 'function') {
-      target.scrollIntoView({ behavior: 'auto', block: 'start' });
-    }
   }
 
   selectAddress(addressId: number): void {

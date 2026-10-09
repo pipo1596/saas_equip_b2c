@@ -267,6 +267,11 @@ a.cart-page__thumb-link {
   border-bottom: none;
 }
 
+.cart-page__summary-note {
+  font-size: 11.5px;
+  color: var(--amber);
+  margin: 0;
+}
 .cart-page__summary-label {
   font-size: 11px;
   font-weight: 700;
@@ -280,6 +285,9 @@ a.cart-page__thumb-link {
 }
 .cart-page__summary-amount--units {
   color: var(--good);
+}
+.cart-page__summary-amount--shortfall {
+  color: var(--bs-danger, #dc3545);
 }
 
 .cart-page__checkout {
@@ -308,11 +316,6 @@ a.cart-page__thumb-link {
   font-weight: 700;
   font-size: 15px;
 }
-.cart-page__checkout-sub {
-  font-size: 12px;
-  opacity: 0.85;
-}
-
 .cart-page__clear {
   margin-top: 16px;
   border: none;

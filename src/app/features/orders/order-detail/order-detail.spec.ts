@@ -132,17 +132,6 @@ describe('OrderDetailPage', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it('should scroll to the top of the page on first render', () => {
-    const { fixture } = createPage();
-    const scrollIntoViewSpy = vi.fn();
-    fixture.nativeElement.scrollIntoView = scrollIntoViewSpy;
-
-    fixture.detectChanges();
-    flushOrderGet(httpMock, BASE_ORDER);
-
-    expect(scrollIntoViewSpy).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' });
-  });
-
   it('loads the order on init and exposes it', () => {
     const { fixture, page } = createPage();
     fixture.detectChanges();
