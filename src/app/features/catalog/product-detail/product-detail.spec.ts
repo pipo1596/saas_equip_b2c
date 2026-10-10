@@ -37,6 +37,7 @@ const PRODUCT: ProductDetailInfo = {
   maxPrice: 94.99,
   minPoints: 800,
   maxPoints: 950,
+  progCatIds: [310],
 };
 
 // `*GET` no longer ships a SKU matrix — just the header, images, and every
@@ -1113,7 +1114,7 @@ describe('ProductDetail', () => {
     });
   });
 
-  it("should show the coverage card for the rule matching the product tag, and expand the header's rules panel from its View rule link", () => {
+  it("should show the coverage card for the rule matching the product's own category, and expand the header's rules panel from its View rule link", () => {
     vi.useFakeTimers();
     try {
       const fixture = TestBed.createComponent(ProductDetail);
@@ -1122,7 +1123,12 @@ describe('ProductDetail', () => {
       fixture.componentRef.setInput('productPk', '12345');
       fixture.detectChanges();
 
-      expectRequest(httpMock, '*GET').flush(RESPONSE);
+      // The product's own category (matching the Unit Allotment's
+      // `unitGrants` below) is what decides the coverage card now — not
+      // the cart's own `productTag`, which this deliberately points at a
+      // *different*, nonexistent rule (999) below to prove it's no longer
+      // what drives this.
+      expectRequest(httpMock, '*GET').flush({ ...RESPONSE, product: { ...PRODUCT, progCatIds: [60] } });
       expectProductTagCartRequest(httpMock).flush({
         cartId: null,
         itemCount: 0,
@@ -1167,7 +1173,7 @@ describe('ProductDetail', () => {
           approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
           openOrders: null,
           lineTags: [],
-          productTag: { productPk: 12345, ruleId: 12, payUnit: 'UNITS', tagLabel: 'uses units' },
+          productTag: { productPk: 12345, ruleId: 999, payUnit: 'UNITS', tagLabel: 'uses units' },
         },
       });
       fixture.detectChanges();
@@ -1188,6 +1194,89 @@ describe('ProductDetail', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('prefers a units rule over a points rule that also covers the same product (units take priority)', () => {
+    const fixture = TestBed.createComponent(ProductDetail);
+    fixture.componentRef.setInput('productPk', '12345');
+    fixture.detectChanges();
+
+    expectRequest(httpMock, '*GET').flush({ ...RESPONSE, product: { ...PRODUCT, progCatIds: [498] } });
+    expectProductTagCartRequest(httpMock).flush({
+      cartId: null,
+      itemCount: 0,
+      subtotalPrice: 0,
+      subtotalPoints: null,
+      items: [],
+      allotment: {
+        programId: 3,
+        allotmentBar: null,
+        ruleCount: 2,
+        allotExclTaxFreight: 'N',
+        rules: [
+          {
+            ruleId: 90,
+            ruleName: 'points',
+            allotType: 'POINTS',
+            primaryUnit: 'POINTS',
+            isBarRule: 'N',
+            dollars: null,
+            units: null,
+            points: { total: 20, used: -3, inCart: 0, available: 23 },
+            cycle: {
+              renewalBasis: 'FIXED',
+              renewalPeriodMonths: 12,
+              cycleStart: '2026-09-09',
+              cycleEnd: '2027-09-08',
+              renewsOn: '2027-10-09',
+              expirationDate: null,
+              onExpiration: 'SUSPEND',
+            },
+            covers: { allAssortments: 'Y', categories: [], unitGrants: [] },
+            carryover: { type: 'FORFEIT', pct: null, capAmount: null, carriedIn: null },
+            quotas: [],
+            requireApproval: 'N',
+            allowCcFallback: 'N',
+          },
+          {
+            ruleId: 91,
+            ruleName: 'units',
+            allotType: 'UNITS',
+            primaryUnit: 'UNITS',
+            isBarRule: 'N',
+            dollars: null,
+            units: { total: 1, used: -1, inCart: 0, available: 2 },
+            points: null,
+            cycle: {
+              renewalBasis: 'FIXED',
+              renewalPeriodMonths: 12,
+              cycleStart: '2026-09-09',
+              cycleEnd: '2027-09-08',
+              renewsOn: '2027-10-09',
+              expirationDate: null,
+              onExpiration: 'SUSPEND',
+            },
+            covers: {
+              allAssortments: 'N',
+              categories: [],
+              unitGrants: [{ progCatId: 498, categoryName: 'Knife', unitQty: 1 }],
+            },
+            carryover: { type: 'FORFEIT', pct: null, capAmount: null, carriedIn: null },
+            quotas: [],
+            requireApproval: 'N',
+            allowCcFallback: 'N',
+          },
+        ],
+        approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+        openOrders: null,
+        lineTags: [],
+        productTag: null,
+      },
+    });
+    fixture.detectChanges();
+
+    const card = fixture.nativeElement.querySelector('app-allotment-coverage-card');
+    expect(card.querySelector('.coverage-card__title')?.textContent?.trim()).toBe('Covered by your units');
   });
 
   it('should not show the coverage card when there is no product tag', () => {

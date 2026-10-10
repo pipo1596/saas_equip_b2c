@@ -8,6 +8,12 @@ export type PayUnit = 'DOLLARS' | 'UNITS' | 'POINTS';
 export interface Balance {
   total: number;
   used: number;
+  // Held by an order still awaiting approval — already subtracted out of
+  // `available` server-side, same as `inCart` is. Optional (rather than
+  // normalized to `0`) since nothing reads it today; not shown anywhere in
+  // the UI yet, just here so the type matches the real payload when it's
+  // needed.
+  reserved?: number;
   inCart: number;
   available: number;
 }
@@ -212,9 +218,14 @@ export function fallbackChain(rule: AllotmentRule, rules: AllotmentRule[]): Allo
 
 // A meter can exceed 100% once the cart pushes a balance over its
 // allotment — that's intentional (see the warning-style guidance), not
-// clamped away here.
+// clamped away here. The *low* end is clamped to 0, though: `used` can go
+// negative (e.g. a return/credit that exceeds what was actually consumed),
+// which would otherwise draw a meter with negative fill.
 export function meterPct(balance: Balance): number {
-  return balance.total > 0 ? ((balance.used + balance.inCart) / balance.total) * 100 : 0;
+  if (balance.total <= 0) {
+    return 0;
+  }
+  return Math.max(0, ((balance.used + balance.inCart) / balance.total) * 100);
 }
 
 const DOLLAR_FORMATTER = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
@@ -246,22 +257,47 @@ export function coverageLabel(rule: AllotmentRule): string {
   return parts.join(' · ') || 'Nothing yet';
 }
 
-// Which rule (if any) a product is likely covered by, found by matching
-// its own program-category ids against each rule's covered categories — an
-// "all assortments" rule matches regardless of category. First match wins,
-// in the same order `rules` itself came back in. This is a client-computed
-// *preview* for browsing (e.g. a listing card, before anything's in the
-// cart) — the authoritative tag is always whatever the cart's own
-// `lineTags`/`productTag` says once the item is actually added.
+// Which rule (if any) a product is likely covered by, found by matching its
+// own program-category ids against each rule's covered categories, in the
+// same Units -> Dollars -> Points priority the real checkout allocation
+// (`allocateLine`) draws in. This is a client-computed *preview* for
+// browsing — a listing card only knows a product's price/points *range*
+// (not one SKU's exact figures), so unlike `allocateLine` this only answers
+// "which rule would this likely draw from", never "exactly how much" or
+// "would this come up short" — the authoritative tag is always whatever the
+// cart's own `lineTags`/`productTag` says once a specific SKU is added.
 export function ruleForCategories(
   rules: readonly AllotmentRule[],
   progCatIds: readonly number[],
 ): AllotmentRule | null {
-  return (
-    rules.find(
-      (rule) =>
-        rule.covers.allAssortments === 'Y' ||
-        rule.covers.categories.some((category) => progCatIds.includes(category.progCatId)),
-    ) ?? null
+  // Units coverage is tested against a rule's `unitGrants`, never its
+  // `categories` — the two are separate coverage lists on the same rule
+  // (see `coverageLabel` above), covering Units and Dollars/Points
+  // respectively.
+  const unitsRule = rules.find(
+    (rule) =>
+      (rule.allotType === 'UNITS' || rule.allotType === 'DOLLAR_UNITS') &&
+      rule.covers.unitGrants.some((grant) => progCatIds.includes(grant.progCatId)) &&
+      (rule.units?.available ?? 0) > 0,
   );
+  if (unitsRule) {
+    return unitsRule;
+  }
+
+  const coveredByAssortments = (rule: AllotmentRule) =>
+    rule.covers.allAssortments === 'Y' || rule.covers.categories.some((category) => progCatIds.includes(category.progCatId));
+
+  const dollarsRule = rules.find(
+    (rule) => (rule.allotType === 'DOLLAR' || rule.allotType === 'DOLLAR_UNITS') && coveredByAssortments(rule),
+  );
+  if (dollarsRule) {
+    // A dollar rule that's in scope but empty still blocks points — it
+    // doesn't fall through to the next check below.
+    return (dollarsRule.dollars?.available ?? 0) > 0 ? dollarsRule : null;
+  }
+
+  const pointsRule = rules.find(
+    (rule) => rule.allotType === 'POINTS' && coveredByAssortments(rule) && (rule.points?.available ?? 0) > 0,
+  );
+  return pointsRule ?? null;
 }

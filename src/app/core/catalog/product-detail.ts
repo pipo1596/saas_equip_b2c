@@ -39,6 +39,11 @@ export interface ProductDetailInfo {
   // Same deal, in points — both `null` on the same "no SKUs yet" terms.
   minPoints: number | null;
   maxPoints: number | null;
+  // Every program category this product belongs to — matched against an
+  // allotment rule's own `covers.categories`/`covers.unitGrants` to preview
+  // which rule (if any) is likely to cover it, the same way a listing
+  // card's own `Product.progCatIds` does.
+  progCatIds: number[];
 }
 
 // `skuId: null` is a product-level/gallery image; a populated `skuId` is
@@ -99,7 +104,7 @@ export interface ProductDetailData {
 }
 
 interface RawProductDetailData {
-  product: ProductDetailInfo;
+  product: Omit<ProductDetailInfo, 'progCatIds'> & { progCatIds: number[] | null };
   images: ProductImage[] | null;
   options: ProductOptionValue[] | null;
   attributes: ProductAttribute[] | null;
@@ -197,7 +202,7 @@ function dedupeImages(images: readonly ProductImage[]): ProductImage[] {
 // every list.
 function normalizeProductDetailData(raw: RawProductDetailData): ProductDetailData {
   return {
-    product: raw.product,
+    product: { ...raw.product, progCatIds: raw.product.progCatIds ?? [] },
     images: dedupeImages(
       (raw.images ?? []).map((image) => ({
         ...image,

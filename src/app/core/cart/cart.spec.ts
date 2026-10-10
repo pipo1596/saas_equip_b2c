@@ -518,7 +518,7 @@ describe('CartService', () => {
       expect(service.pointsOnly()).toBe(false);
     });
 
-    it('is false when there are allotment rules but none of them (or not all of them) are points', () => {
+    it('is false whenever a dollar rule exists at all, even alongside a points rule', () => {
       service.cart.set(cartWithRules([DOLLAR_RULE]));
       expect(service.pointsOnly()).toBe(false);
 
@@ -526,11 +526,29 @@ describe('CartService', () => {
       expect(service.pointsOnly()).toBe(false);
     });
 
-    it('is true only once every allotment rule is points', () => {
+    it('is true once every allotment rule is points', () => {
       service.cart.set(cartWithRules([POINTS_RULE]));
       expect(service.pointsOnly()).toBe(true);
 
       service.cart.set(cartWithRules([POINTS_RULE, { ...POINTS_RULE, ruleId: 13 }]));
+      expect(service.pointsOnly()).toBe(true);
+    });
+
+    it('is also true for a pure-units allotment, or a mix of points and units — dollars are what actually gates this, not points specifically', () => {
+      const UNITS_RULE = {
+        ...DOLLAR_RULE,
+        ruleId: 14,
+        ruleName: 'Knife Allowance',
+        allotType: 'UNITS' as const,
+        primaryUnit: 'UNITS' as const,
+        dollars: null,
+        units: { total: 1, used: 0, inCart: 0, available: 1 },
+      };
+
+      service.cart.set(cartWithRules([UNITS_RULE]));
+      expect(service.pointsOnly()).toBe(true);
+
+      service.cart.set(cartWithRules([UNITS_RULE, POINTS_RULE]));
       expect(service.pointsOnly()).toBe(true);
     });
   });

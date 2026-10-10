@@ -251,6 +251,34 @@ describe('Home', () => {
       expect(stats[1].querySelector('.stat__meta')).toBeNull();
     });
 
+    it('clamps the meter at 0% rather than going negative when a credit pushes "used" below zero', () => {
+      const fixture = TestBed.createComponent(Home);
+      fixture.detectChanges();
+      flushCartWithAllotment({
+        programId: 3,
+        allotmentBar: null,
+        ruleCount: 1,
+        allotExclTaxFreight: 'N',
+        rules: [
+          {
+            ...DOLLAR_RULE,
+            allotType: 'POINTS',
+            primaryUnit: 'POINTS',
+            dollars: null,
+            points: { total: 20, used: -3, reserved: 0, inCart: 0, available: 23 },
+          },
+        ],
+        approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+        openOrders: null,
+        lineTags: [],
+        productTag: null,
+      });
+      fixture.detectChanges();
+
+      const meter: HTMLElement = fixture.nativeElement.querySelector('.track i');
+      expect(meter.style.width).toBe('0%');
+    });
+
     it('shows Open orders as "—" (always null until there is a real orders table)', () => {
       const fixture = TestBed.createComponent(Home);
       fixture.detectChanges();

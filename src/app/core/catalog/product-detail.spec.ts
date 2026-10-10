@@ -37,6 +37,7 @@ const PRODUCT: ProductDetailInfo = {
   maxPrice: 94.99,
   minPoints: 800,
   maxPoints: 950,
+  progCatIds: [310],
 };
 
 const LOCATION_ID = 18;
@@ -165,6 +166,34 @@ describe('ProductDetailService', () => {
 
       expect(result?.images).toEqual([]);
       expect(result?.axes).toEqual([]);
+    });
+
+    it('passes through the product\'s own progCatIds, and normalizes a missing one to []', () => {
+      let result: ProductDetailData | undefined;
+      service.load(12345, LOCATION_ID).subscribe((data) => (result = data));
+
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCPRDDTL').flush({
+        product: { ...PRODUCT, progCatIds: [480, 498] },
+        images: null,
+        options: null,
+      });
+
+      expect(result?.product.progCatIds).toEqual([480, 498]);
+    });
+
+    it('normalizes a missing progCatIds to []', () => {
+      let result: ProductDetailData | undefined;
+      service.load(12345, LOCATION_ID).subscribe((data) => (result = data));
+
+      const productWithoutProgCatIds: Record<string, unknown> = { ...PRODUCT };
+      delete productWithoutProgCatIds['progCatIds'];
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCPRDDTL').flush({
+        product: productWithoutProgCatIds,
+        images: null,
+        options: null,
+      });
+
+      expect(result?.product.progCatIds).toEqual([]);
     });
 
     it('passes through the attributes array, and normalizes a missing one to []', () => {

@@ -298,6 +298,90 @@ describe('ProductList', () => {
       const tag: HTMLElement = fixture.nativeElement.querySelector('.pay-tag');
       expect(tag?.textContent?.trim()).toBe('General Allotment');
     });
+
+    it('matches a units rule by its own unitGrants, not by categories — the two are separate coverage lists', () => {
+      const fixture = TestBed.createComponent(ProductList);
+      const auth = TestBed.inject(AuthService);
+      const unitsRuleViaCategoriesOnly = {
+        ...CATEGORY_RULE,
+        ruleName: 'Unit Allotment',
+        allotType: 'UNITS' as const,
+        primaryUnit: 'UNITS' as const,
+        dollars: null,
+        units: { total: 5, used: 0, inCart: 0, available: 5 },
+        // The product's progCatId (5510) is listed under `categories`, not
+        // `unitGrants` — a units rule must not match on that.
+        covers: { allAssortments: 'N' as const, categories: [{ progCatId: 5510, categoryName: 'Long sleeve' }], unitGrants: [] },
+      };
+      TestBed.inject(CartService).cart.update((cart) => ({
+        ...cart,
+        allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [unitsRuleViaCategoriesOnly] },
+      }));
+      fixture.componentRef.setInput('categoryId', '5510');
+      auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
+      fixture.detectChanges();
+      expectProductsRequest(httpMock).flush(SAMPLE);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.pay-tag')).toBeNull();
+    });
+
+    it('prefers a units rule over a dollar rule that also covers the same product', () => {
+      const fixture = TestBed.createComponent(ProductList);
+      const auth = TestBed.inject(AuthService);
+      const unitsRule = {
+        ...CATEGORY_RULE,
+        ruleId: 71,
+        ruleName: 'Unit Allotment',
+        allotType: 'UNITS' as const,
+        primaryUnit: 'UNITS' as const,
+        dollars: null,
+        units: { total: 5, used: 0, inCart: 0, available: 5 },
+        covers: {
+          allAssortments: 'N' as const,
+          categories: [],
+          unitGrants: [{ progCatId: 5510, categoryName: 'Long sleeve', unitQty: 5 }],
+        },
+      };
+      TestBed.inject(CartService).cart.update((cart) => ({
+        ...cart,
+        allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [CATEGORY_RULE, unitsRule] },
+      }));
+      fixture.componentRef.setInput('categoryId', '5510');
+      auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
+      fixture.detectChanges();
+      expectProductsRequest(httpMock).flush(SAMPLE);
+      fixture.detectChanges();
+
+      const tag: HTMLElement = fixture.nativeElement.querySelector('.pay-tag');
+      expect(tag?.textContent?.trim()).toBe('Unit Allotment');
+    });
+
+    it('shows no badge when the covering dollar rule is in scope but has no balance left — points are not a fallback', () => {
+      const fixture = TestBed.createComponent(ProductList);
+      const auth = TestBed.inject(AuthService);
+      const emptyDollarRule = { ...CATEGORY_RULE, dollars: { total: 200, used: 200, inCart: 0, available: 0 } };
+      const pointsRule = {
+        ...CATEGORY_RULE,
+        ruleId: 72,
+        ruleName: 'Points Allowance',
+        allotType: 'POINTS' as const,
+        primaryUnit: 'POINTS' as const,
+        dollars: null,
+        points: { total: 400, used: 0, inCart: 0, available: 400 },
+      };
+      TestBed.inject(CartService).cart.update((cart) => ({
+        ...cart,
+        allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [emptyDollarRule, pointsRule] },
+      }));
+      fixture.componentRef.setInput('categoryId', '5510');
+      auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
+      fixture.detectChanges();
+      expectProductsRequest(httpMock).flush(SAMPLE);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.pay-tag')).toBeNull();
+    });
   });
 
   it('should omit categoryId from the product link on a bucket/full-catalog page (no real category)', () => {

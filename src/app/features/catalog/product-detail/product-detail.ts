@@ -17,7 +17,7 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import { switchMap } from 'rxjs';
 
-import { Allotment, AllotmentRule, CartService, PayTag } from '../../../core/cart/cart';
+import { AllotmentRule, CartService, PayTag, ruleForCategories } from '../../../core/cart/cart';
 import { Breadcrumb, hasCrumbs } from '../../../core/catalog/breadcrumb';
 import {
   ProductAttribute,
@@ -140,18 +140,15 @@ export class ProductDetail implements OnInit {
   // since a later cart action (e.g. this same "Add to Cart") re-fetches the
   // cart *without* `productPk` and would otherwise null this back out.
   readonly productTag = signal<PayTag | null>(null);
-  // The same call's full allotment payload, held onto for the same reason as
-  // `productTag` above — used only to look up the rule that tag points to.
-  private readonly allotmentForProductTag = signal<Allotment | null>(null);
-  // The one rule that actually pays for this product, if any — matched by
-  // id against the allotment snapshot from that same productPk-scoped load.
-  readonly coveringRule = computed<AllotmentRule | null>(() => {
-    const ruleId = this.productTag()?.ruleId;
-    if (ruleId == null) {
-      return null;
-    }
-    return this.allotmentForProductTag()?.rules.find((rule) => rule.ruleId === ruleId) ?? null;
-  });
+  private readonly allotmentRules = computed(() => this.cartService.cart().allotment?.rules ?? []);
+  // The rule most likely to cover this product, previewed client-side the
+  // same way a listing card's badge is (see `ruleForCategories`) — not
+  // `productTag`/`lineTags`, which only exist once a *specific SKU* is
+  // actually in the cart; this needs an answer before that, from just the
+  // product's own `progCatIds`.
+  readonly coveringRule = computed<AllotmentRule | null>(() =>
+    ruleForCategories(this.allotmentRules(), this.product()?.progCatIds ?? []),
+  );
   // The exact `selections()` object (by reference) that the currently-
   // loaded `resolvedSku` was actually fetched for — `selections.update()`
   // always produces a new object on any change, so comparing by reference
@@ -435,10 +432,7 @@ export class ProductDetail implements OnInit {
     // load, since there's nowhere on this page to surface a failure beyond
     // just not showing a tag.
     this.cartService.load(locationId, productPk).subscribe({
-      next: (cart) => {
-        this.productTag.set(cart.allotment?.productTag ?? null);
-        this.allotmentForProductTag.set(cart.allotment);
-      },
+      next: (cart) => this.productTag.set(cart.allotment?.productTag ?? null),
       error: () => {},
     });
   }
