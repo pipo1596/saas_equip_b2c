@@ -357,8 +357,11 @@ describe('OrderService', () => {
       let result: OrderPage | ApiError | undefined;
       service.list({ status: '', page: 1, pageSize: 25 }).subscribe((res) => (result = res));
 
-      const statusCounts = {
-        ALL: 11,
+      // The API sends the all-statuses total as a lowercase `all` key,
+      // unlike every other (uppercase) status key alongside it — normalized
+      // to `ALL` below so this asserts against the shape callers actually see.
+      const rawStatusCounts = {
+        all: 11,
         PENDING_APPROVAL: 1,
         PROCESSING: 6,
         PARTIALLY_SHIPPED: 1,
@@ -377,11 +380,19 @@ describe('OrderService', () => {
       httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER').flush({
         pagination: { page: 1, pageSize: 25, totalRows: 11, totalPages: 1 },
         data: [SUMMARY],
-        statusCounts,
+        statusCounts: rawStatusCounts,
         filters,
       });
 
-      expect((result as OrderPage).statusCounts).toEqual(statusCounts);
+      expect((result as OrderPage).statusCounts).toEqual({
+        ALL: 11,
+        PENDING_APPROVAL: 1,
+        PROCESSING: 6,
+        PARTIALLY_SHIPPED: 1,
+        SHIPPED: 1,
+        CANCELLED: 1,
+        REJECTED: 1,
+      });
       expect((result as OrderPage).filters).toEqual(filters);
     });
 

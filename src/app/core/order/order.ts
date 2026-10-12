@@ -274,9 +274,15 @@ interface RawOrderSummary extends Omit<OrderSummary, 'thumbnails'> {
   thumbnails: OrderThumb[] | null;
 }
 
+// The API sends the all-statuses total as a lowercase `all` key, unlike
+// every other (already-uppercase) `OrderStatus` key it sits alongside —
+// normalized to `ALL` below so the rest of the app can treat every key in
+// `OrderStatusCounts` the same way.
+type RawOrderStatusCounts = Record<OrderStatus, number> & { all: number };
+
 interface RawOrderPage extends Omit<OrderPage, 'data' | 'statusCounts' | 'filters'> {
   data: RawOrderSummary[] | null;
-  statusCounts: OrderStatusCounts | null;
+  statusCounts: RawOrderStatusCounts | null;
   filters: OrderListFilters | null;
 }
 
@@ -299,11 +305,19 @@ const DEFAULT_FILTERS: OrderListFilters = {
   sort: 'NEWEST',
 };
 
+function normalizeStatusCounts(raw: RawOrderStatusCounts | null): OrderStatusCounts {
+  if (!raw) {
+    return EMPTY_STATUS_COUNTS;
+  }
+  const { all, ...rest } = raw;
+  return { ...rest, ALL: all };
+}
+
 function normalizeOrderPage(raw: RawOrderPage): OrderPage {
   return {
     ...raw,
     data: (raw.data ?? []).map((row) => ({ ...row, thumbnails: row.thumbnails ?? [] })),
-    statusCounts: raw.statusCounts ?? EMPTY_STATUS_COUNTS,
+    statusCounts: normalizeStatusCounts(raw.statusCounts),
     filters: raw.filters ?? DEFAULT_FILTERS,
   };
 }

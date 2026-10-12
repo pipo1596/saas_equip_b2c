@@ -414,8 +414,10 @@ describe('OrderHistoryPage', () => {
       flushOrdersList(httpMock, {
         pagination: { page: 1, pageSize: 25, totalRows: 11, totalPages: 1 },
         data: [SUMMARY],
+        // The API sends the all-statuses total as a lowercase `all` key,
+        // unlike every other (uppercase) status key alongside it.
         statusCounts: {
-          ALL: 11,
+          all: 11,
           PENDING_APPROVAL: 1,
           PROCESSING: 6,
           PARTIALLY_SHIPPED: 1,
