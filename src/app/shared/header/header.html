@@ -89,6 +89,24 @@
           @if (fullName()) {
             <div class="user-menu__name">{{ fullName() }}</div>
           }
+          @if (canApprove()) {
+            <a
+              routerLink="/approvals"
+              class="dropdown-item d-flex align-items-center justify-content-between gap-2"
+              (click)="userMenuOpen.set(false)"
+            >
+              <span class="d-flex align-items-center gap-2">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M9 11l3 3L22 4" />
+                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                </svg>
+                Approvals
+              </span>
+              @if (pendingApprovalsCount() > 0) {
+                <span class="badge rounded-pill bg-primary">{{ pendingApprovalsCount() }}</span>
+              }
+            </a>
+          }
           <a
             routerLink="/orders"
             class="dropdown-item d-flex align-items-center gap-2"

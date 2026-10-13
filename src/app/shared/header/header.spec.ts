@@ -1118,6 +1118,89 @@ describe('Header', () => {
     expect(header.userMenuOpen()).toBe(false);
   });
 
+  describe('Approvals menu item', () => {
+    function cartWithApprovals(approvals: {
+      canApprove: 'Y' | 'N';
+      pendingApprovals: number | null;
+      awaitingApproval: number | null;
+    }) {
+      return {
+        cartId: null,
+        itemCount: 0,
+        subtotalPrice: 0,
+        subtotalPoints: null,
+        items: [],
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 0,
+          allotExclTaxFreight: 'N' as const,
+          rules: [],
+          approvals,
+          openOrders: null,
+          lineTags: [],
+          productTag: null,
+        },
+      };
+    }
+
+    it('hides the Approvals link when the employee cannot approve', () => {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+      header.cart.set(cartWithApprovals({ canApprove: 'N', pendingApprovals: null, awaitingApproval: null }));
+      fixture.detectChanges();
+      header.toggleUserMenu();
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.user-menu a[href="/approvals"]')).toBeNull();
+    });
+
+    it('shows the Approvals link with no badge when there are 0 pending', () => {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+      header.cart.set(cartWithApprovals({ canApprove: 'Y', pendingApprovals: 0, awaitingApproval: null }));
+      fixture.detectChanges();
+      header.toggleUserMenu();
+      fixture.detectChanges();
+
+      const link: HTMLAnchorElement = fixture.nativeElement.querySelector('.user-menu a[href="/approvals"]');
+      expect(link.textContent).toContain('Approvals');
+      expect(link.querySelector('.badge')).toBeNull();
+    });
+
+    it('shows the pending-approvals count as a badge', () => {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+      header.cart.set(cartWithApprovals({ canApprove: 'Y', pendingApprovals: 3, awaitingApproval: null }));
+      fixture.detectChanges();
+      header.toggleUserMenu();
+      fixture.detectChanges();
+
+      const link: HTMLAnchorElement = fixture.nativeElement.querySelector('.user-menu a[href="/approvals"]');
+      expect(link.querySelector('.badge')?.textContent?.trim()).toBe('3');
+    });
+
+    it('closes the menu when the Approvals link is clicked', () => {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+      header.cart.set(cartWithApprovals({ canApprove: 'Y', pendingApprovals: 1, awaitingApproval: null }));
+      fixture.detectChanges();
+
+      // No `/approvals` route is registered in this spec's bare
+      // `provideRouter([])` — mocked so the click below doesn't reject with
+      // "Cannot match any routes" as an unhandled rejection.
+      vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+
+      header.toggleUserMenu();
+      fixture.detectChanges();
+      expect(header.userMenuOpen()).toBe(true);
+
+      const link: HTMLAnchorElement = fixture.nativeElement.querySelector('.user-menu a[href="/approvals"]');
+      link.click();
+      expect(header.userMenuOpen()).toBe(false);
+    });
+  });
+
   describe('click outside closes the open menu', () => {
     it('closes the location menu on an outside click, but not a click inside it', () => {
       const fixture = TestBed.createComponent(Header);

@@ -108,6 +108,27 @@ export interface HistoryEntry {
   by: string | null;
 }
 
+export type ApprovalStepKind = 'LEVEL' | 'OVERRIDE';
+
+export interface ApprovalStep {
+  stepNo: number;
+  kind: ApprovalStepKind;
+  levelNo: number | null;
+  // `null` means this level approves any amount (or just passes it up).
+  levelMaxAmount: number | null;
+  roleNames: string | null;
+  scope: 'LOCATION' | 'CUSTOMER';
+  locationId: number | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SKIPPED' | 'EXPIRED' | 'CANCELLED';
+  actedAs: ApprovalStepKind | null;
+  actedTs: string | null;
+  notes: string | null;
+  createdTs: string;
+  dueTs: string | null;
+  // `actedBy` (an internal user tag, never a display name) is deliberately
+  // left off this type — there's nothing worth showing for it.
+}
+
 export interface OrderDetail {
   orderId: number;
   orderNumber: string;
@@ -155,6 +176,11 @@ export interface OrderDetail {
   paidFrom: PaidFrom[];
   shipments: Shipment[];
   history: HistoryEntry[];
+  // `'Y'` shows Approve/Reject and lets the viewer act — always decided
+  // from this flag, never re-derived from role/level/location/override
+  // client-side.
+  viewerCanAct: 'Y' | 'N';
+  approvals: ApprovalStep[];
 }
 
 // The live API sometimes sends `null` for a list field instead of `[]` —
@@ -165,11 +191,13 @@ interface RawShipment extends Omit<Shipment, 'lines'> {
   lines: Shipment['lines'] | null;
 }
 
-interface RawOrderDetail extends Omit<OrderDetail, 'lines' | 'paidFrom' | 'shipments' | 'history'> {
+interface RawOrderDetail
+  extends Omit<OrderDetail, 'lines' | 'paidFrom' | 'shipments' | 'history' | 'approvals'> {
   lines: OrderLine[] | null;
   paidFrom: PaidFrom[] | null;
   shipments: RawShipment[] | null;
   history: HistoryEntry[] | null;
+  approvals: ApprovalStep[] | null;
 }
 
 function normalizeOrderDetail(raw: RawOrderDetail): OrderDetail {
@@ -179,6 +207,7 @@ function normalizeOrderDetail(raw: RawOrderDetail): OrderDetail {
     paidFrom: raw.paidFrom ?? [],
     shipments: (raw.shipments ?? []).map((shipment) => ({ ...shipment, lines: shipment.lines ?? [] })),
     history: raw.history ?? [],
+    approvals: raw.approvals ?? [],
   };
 }
 
@@ -322,6 +351,104 @@ function normalizeOrderPage(raw: RawOrderPage): OrderPage {
   };
 }
 
+// ---- *APPRQ / *APPROVE / *REJECT ----
+
+export interface ApprovalQueueThumb {
+  lineNo: number;
+  skuId: number;
+  productTitle: string;
+  imageUrl: string | null;
+}
+
+export interface ApprovalPlacedBy {
+  employeeId: number;
+  employeeNumber: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+}
+
+export interface ApprovalStepSummary {
+  stepNo: number | null;
+  kind: ApprovalStepKind | null;
+  levelNo: number | null;
+  roleNames: string | null;
+  scope: 'LOCATION' | 'CUSTOMER' | null;
+  locationId: number | null;
+  waitingSince: string | null;
+  dueTs: string | null;
+}
+
+export interface ApprovalQueueRow {
+  orderId: number;
+  orderNumber: string;
+  status: 'PENDING_APPROVAL';
+  placedTs: string;
+  itemCount: number;
+  lineCount: number;
+  // Distinct products beyond the (at most 3) thumbnails shown — sent
+  // straight from the server here, unlike `OrderSummary`'s own `*LIST` rows
+  // which have no such field and so need it computed client-side instead
+  // (see `order-history.ts`'s `moreThumbsCount`).
+  moreCount: number;
+  orderTotal: number;
+  subtotalPoints: number;
+  allotDollarsUsed: number;
+  allotPointsUsed: number;
+  allotUnitsUsed: number;
+  shipMethodName: string | null;
+  trackingCount: number;
+  thumbnails: ApprovalQueueThumb[];
+  placedBy: ApprovalPlacedBy;
+  approvalStep: ApprovalStepSummary;
+}
+
+export interface ApprovalQueueResponse {
+  pagination: OrderPagination;
+  data: ApprovalQueueRow[];
+}
+
+interface RawApprovalQueueResponse extends Omit<ApprovalQueueResponse, 'data'> {
+  data: ApprovalQueueRow[] | null;
+}
+
+function normalizeApprovalQueueResponse(raw: RawApprovalQueueResponse): ApprovalQueueResponse {
+  return { ...raw, data: raw.data ?? [] };
+}
+
+const APPROVAL_STEP_STATUS_LABELS: Record<ApprovalStep['status'], string> = {
+  PENDING: 'Waiting',
+  APPROVED: 'Approved',
+  REJECTED: 'Rejected',
+  SKIPPED: 'Skipped – no approver',
+  EXPIRED: 'Timed out – moved up',
+  CANCELLED: 'Cancelled',
+};
+
+export function approvalStepStatusLabel(status: ApprovalStep['status']): string {
+  return APPROVAL_STEP_STATUS_LABELS[status];
+}
+
+// "Level 1" for a regular approval level, "Administrator" for an override
+// step that skipped the normal level chain — shared by the queue list's
+// "Your step" column and the order detail's own approval timeline.
+export function approvalStepLabel(step: { kind: ApprovalStepKind | null; levelNo: number | null }): string {
+  return step.kind === 'OVERRIDE' ? 'Administrator' : `Level ${step.levelNo ?? '?'}`;
+}
+
+// Deadline styling: highlight a row whose `dueTs` is today or tomorrow.
+// `dueTs` is server-local time with no zone, so this compares dates only —
+// `now` defaults to the real clock but can be overridden in tests.
+export function isApprovalDueSoon(dueTs: string | null, now = new Date()): boolean {
+  if (!dueTs) {
+    return false;
+  }
+  const due = new Date(`${dueTs.split(' ')[0]}T00:00:00`);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const daysUntilDue = Math.round((due.getTime() - today.getTime()) / 86_400_000);
+  return daysUntilDue >= 0 && daysUntilDue <= 1;
+}
+
 // A small generic "no photo" icon — shown in place of a product image
 // whenever `imageUrl` is `null` (no image on file, or the product's been
 // removed from the catalog since).
@@ -462,5 +589,30 @@ export class OrderService {
         ...(params.sort && params.sort !== 'NEWEST' ? { sort: params.sort } : {}),
       })
       .pipe(map((response) => ('success' in response ? response : normalizeOrderPage(response))));
+  }
+
+  // The orders waiting on *this* approver right now — level, location, and
+  // any Admin override are already applied server-side; never filter this
+  // list further client-side. `page` of `0` or omitted means 1 server-side,
+  // but this always sends an explicit page so a caller never has to care.
+  listApprovals(page: number, pageSize: number): Observable<ApprovalQueueResponse | ApiError> {
+    return this.http
+      .post<RawApprovalQueueResponse | ApiError>(this.dispatchUrl, { action: '*APPRQ', page, pageSize })
+      .pipe(map((response) => ('success' in response ? response : normalizeApprovalQueueResponse(response))));
+  }
+
+  approve(orderId: number, notes?: string): Observable<OrderWriteResult | ApiError> {
+    return this.http.post<OrderWriteResult | ApiError>(this.dispatchUrl, {
+      action: '*APPROVE',
+      orderId,
+      ...(notes ? { notes } : {}),
+    });
+  }
+
+  // `notes` here is the required rejection reason, not optional like the
+  // other write actions' notes — the caller is expected to have already
+  // blocked submission on an empty one.
+  reject(orderId: number, notes: string): Observable<OrderWriteResult | ApiError> {
+    return this.http.post<OrderWriteResult | ApiError>(this.dispatchUrl, { action: '*REJECT', orderId, notes });
   }
 }

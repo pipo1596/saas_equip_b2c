@@ -121,9 +121,12 @@ describe('OrderDetailPage', () => {
     history.replaceState(null, '');
   });
 
-  function createPage(orderId = '42') {
+  function createPage(orderId = '42', action: string | null = null) {
     const fixture = TestBed.createComponent(OrderDetailPage);
     fixture.componentRef.setInput('orderId', orderId);
+    if (action !== null) {
+      fixture.componentRef.setInput('action', action);
+    }
     return { fixture, page: fixture.componentInstance };
   }
 
@@ -381,5 +384,203 @@ describe('OrderDetailPage', () => {
     const summary: HTMLElement = fixture.nativeElement.querySelector('.order-detail__summary');
     const link = summary.querySelector('a[href="/orders"]');
     expect(link?.textContent).toContain('Back to order history');
+  });
+
+  describe('approver actions', () => {
+    const PENDING_ORDER = { ...BASE_ORDER, status: 'PENDING_APPROVAL' as const, viewerCanAct: 'Y' as const, approvals: [] as never[] };
+
+    function flushCart(httpMock: HttpTestingController) {
+      httpMock
+        .match((req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCCART')
+        .forEach((req) =>
+          req.flush({ cartId: null, itemCount: 0, subtotalPrice: 0, subtotalPoints: null, items: [] }),
+        );
+    }
+
+    it('shows no Approve/Reject buttons when viewerCanAct is N', () => {
+      const { fixture } = createPage();
+      fixture.detectChanges();
+      flushOrderGet(httpMock, { ...BASE_ORDER, viewerCanAct: 'N' as const });
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.order-detail__approval-actions')).toBeNull();
+    });
+
+    it('shows Approve/Reject buttons when viewerCanAct is Y', () => {
+      const { fixture } = createPage();
+      fixture.detectChanges();
+      flushOrderGet(httpMock, PENDING_ORDER);
+      fixture.detectChanges();
+
+      const actions: HTMLElement = fixture.nativeElement.querySelector('.order-detail__approval-actions');
+      expect(actions.textContent).toContain('Approve');
+      expect(actions.textContent).toContain('Reject');
+    });
+
+    it('disables the Reject submit button until a reason is entered, then posts *REJECT', () => {
+      const { fixture, page } = createPage();
+      fixture.detectChanges();
+      flushOrderGet(httpMock, PENDING_ORDER);
+      fixture.detectChanges();
+
+      page.openReject();
+      fixture.detectChanges();
+      const submit: HTMLButtonElement = fixture.nativeElement.querySelector('.order-detail__action-dialog .btn-danger');
+      expect(submit.disabled).toBe(true);
+
+      page.actionNotes.setValue('Over budget');
+      fixture.detectChanges();
+      expect(submit.disabled).toBe(false);
+
+      submit.click();
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      expect(req.request.body).toEqual({ action: '*REJECT', orderId: 42, notes: 'Over budget' });
+      req.flush({ success: true, message: 'Order rejected.', orderId: 42, orderNumber: 'EQ100001', status: 'REJECTED' });
+
+      flushOrderGet(httpMock, { ...PENDING_ORDER, status: 'REJECTED', viewerCanAct: 'N', rejectReason: 'Over budget' });
+      flushCart(httpMock);
+      fixture.detectChanges();
+
+      expect(page.actionDialog()).toBeNull();
+      expect(fixture.nativeElement.querySelector('.alert-success')?.textContent).toContain('Order rejected.');
+    });
+
+    it('submits *APPROVE with no notes when the field is left blank', () => {
+      const { fixture, page } = createPage();
+      fixture.detectChanges();
+      flushOrderGet(httpMock, PENDING_ORDER);
+      fixture.detectChanges();
+
+      page.openApprove();
+      fixture.detectChanges();
+      const submit: HTMLButtonElement = fixture.nativeElement.querySelector('.order-detail__action-dialog .btn-primary');
+      expect(submit.disabled).toBe(false);
+      submit.click();
+
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      expect(req.request.body).toEqual({ action: '*APPROVE', orderId: 42 });
+      req.flush({ success: true, message: 'Order approved.', orderId: 42, orderNumber: 'EQ100001', status: 'PROCESSING' });
+
+      flushOrderGet(httpMock, { ...PENDING_ORDER, status: 'PROCESSING', viewerCanAct: 'N' });
+      flushCart(httpMock);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.alert-success')?.textContent).toContain('Order approved.');
+    });
+
+    it("shows the server's own message when approval passes to the next level", () => {
+      const { fixture, page } = createPage();
+      fixture.detectChanges();
+      flushOrderGet(httpMock, PENDING_ORDER);
+      fixture.detectChanges();
+
+      page.openApprove();
+      fixture.detectChanges();
+      fixture.nativeElement.querySelector('.order-detail__action-dialog .btn-primary').click();
+
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER').flush({
+        success: true,
+        message: 'Order EQ100001 approved and forwarded to level 2 for further approval.',
+        orderId: 42,
+        orderNumber: 'EQ100001',
+        status: 'PENDING_APPROVAL',
+      });
+      flushOrderGet(httpMock, PENDING_ORDER);
+      flushCart(httpMock);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.alert-success')?.textContent).toContain(
+        'Order EQ100001 approved and forwarded to level 2 for further approval.',
+      );
+    });
+
+    it('shows the API failure message as-is and reloads the order', () => {
+      const { fixture, page } = createPage();
+      fixture.detectChanges();
+      flushOrderGet(httpMock, PENDING_ORDER);
+      fixture.detectChanges();
+
+      page.openApprove();
+      fixture.detectChanges();
+      fixture.nativeElement.querySelector('.order-detail__action-dialog .btn-primary').click();
+
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER')
+        .flush({ success: false, code: 'ERR', message: 'Order EQ100001 is no longer pending approval.' });
+      flushOrderGet(httpMock, { ...PENDING_ORDER, status: 'PROCESSING', viewerCanAct: 'N' });
+      flushCart(httpMock);
+      fixture.detectChanges();
+
+      expect(page.actionDialog()).toBeNull();
+      expect(fixture.nativeElement.querySelector('.alert-danger')?.textContent).toContain(
+        'Order EQ100001 is no longer pending approval.',
+      );
+    });
+
+    it('auto-opens the Approve dialog from ?action=approve when viewerCanAct is Y', () => {
+      const { fixture, page } = createPage('42', 'approve');
+      fixture.detectChanges();
+      flushOrderGet(httpMock, PENDING_ORDER);
+      fixture.detectChanges();
+
+      expect(page.actionDialog()).toBe('approve');
+    });
+
+    it('does not auto-open a dialog from ?action=approve when viewerCanAct is N', () => {
+      const { fixture, page } = createPage('42', 'approve');
+      fixture.detectChanges();
+      flushOrderGet(httpMock, { ...BASE_ORDER, viewerCanAct: 'N' as const });
+      fixture.detectChanges();
+
+      expect(page.actionDialog()).toBeNull();
+    });
+
+    it('points "Back to..." (breadcrumb and summary card) at Approvals when viewerCanAct is Y', () => {
+      const { fixture } = createPage();
+      fixture.detectChanges();
+      flushOrderGet(httpMock, PENDING_ORDER);
+      fixture.detectChanges();
+
+      const crumb = fixture.nativeElement.querySelector('.breadcrumb a[href="/approvals"]');
+      expect(crumb?.textContent).toContain('Approvals');
+      const summary: HTMLElement = fixture.nativeElement.querySelector('.order-detail__summary');
+      const backLink = summary.querySelector('a[href="/approvals"]');
+      expect(backLink?.textContent).toContain('Back to approvals');
+    });
+
+    it('renders the approval timeline with step label, status, and notes', () => {
+      const { fixture } = createPage();
+      fixture.detectChanges();
+      flushOrderGet(httpMock, {
+        ...BASE_ORDER,
+        viewerCanAct: 'N' as const,
+        approvals: [
+          {
+            stepNo: 1,
+            kind: 'LEVEL' as const,
+            levelNo: 1,
+            levelMaxAmount: 500,
+            roleNames: 'Lieutenant',
+            scope: 'LOCATION' as const,
+            locationId: 12,
+            status: 'APPROVED' as const,
+            actedAs: null,
+            actedTs: '2026-10-03 09:00:00',
+            notes: 'Looks good',
+            createdTs: '2026-10-02 09:14:00',
+            dueTs: null,
+          },
+        ],
+      });
+      fixture.detectChanges();
+
+      const text = fixture.nativeElement.textContent;
+      expect(text).toContain('Level 1');
+      expect(text).toContain('Lieutenant');
+      expect(text).toContain('Approved');
+      expect(text).toContain('Looks good');
+      expect(text).toContain('2026-10-03');
+      expect(text).toContain('$500.00');
+    });
   });
 });

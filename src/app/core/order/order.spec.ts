@@ -4,13 +4,17 @@ import { TestBed } from '@angular/core/testing';
 
 import {
   ApiError,
+  ApprovalQueueResponse,
   OrderDetail,
   OrderPage,
   OrderService,
   OrderWriteResult,
   PRODUCT_IMAGE_PLACEHOLDER,
+  approvalStepLabel,
+  approvalStepStatusLabel,
   historySourceLabel,
   historyStatusLabel,
+  isApprovalDueSoon,
   lineStatusLabel,
   orderStatusLabel,
   orderStatusTone,
@@ -88,6 +92,8 @@ const RAW_ORDER = {
   history: [
     { fromStatus: null, toStatus: 'PROCESSING', source: 'PORTAL' as const, note: null, orderLineId: null, ts: '2026-09-30 10:00:00', by: null },
   ],
+  viewerCanAct: 'N' as const,
+  approvals: [] as never[],
 };
 
 describe('OrderService', () => {
@@ -187,7 +193,7 @@ describe('OrderService', () => {
       expect(result).toEqual(RAW_ORDER);
     });
 
-    it('normalizes null lines/paidFrom/shipments/history to []', () => {
+    it('normalizes null lines/paidFrom/shipments/history/approvals to []', () => {
       let result: OrderDetail | ApiError | undefined;
       service.get(42).subscribe((res) => (result = res));
 
@@ -197,9 +203,10 @@ describe('OrderService', () => {
         paidFrom: null,
         shipments: null,
         history: null,
+        approvals: null,
       });
 
-      expect(result).toMatchObject({ lines: [], paidFrom: [], shipments: [], history: [] });
+      expect(result).toMatchObject({ lines: [], paidFrom: [], shipments: [], history: [], approvals: [] });
     });
 
     it('normalizes a null shipment.lines to []', () => {
@@ -408,6 +415,141 @@ describe('OrderService', () => {
       expect((result as OrderPage).data[0].thumbnails).toEqual([]);
     });
   });
+
+  describe('listApprovals', () => {
+    const QUEUE_ROW = {
+      orderId: 86,
+      orderNumber: 'SO-104901',
+      status: 'PENDING_APPROVAL' as const,
+      placedTs: '2026-10-02 09:14:00',
+      itemCount: 2,
+      lineCount: 2,
+      moreCount: 0,
+      orderTotal: 420,
+      subtotalPoints: 0,
+      allotDollarsUsed: 420,
+      allotPointsUsed: 0,
+      allotUnitsUsed: 0,
+      shipMethodName: 'Ground',
+      trackingCount: 0,
+      thumbnails: [{ lineNo: 1, skuId: 501, productTitle: 'Duty jacket', imageUrl: 'https://cdn.example.com/x.jpg' }],
+      placedBy: {
+        employeeId: 19235,
+        employeeNumber: 'E1042',
+        firstName: 'Alex',
+        lastName: 'Morgan',
+        email: 'alex@example.com',
+      },
+      approvalStep: {
+        stepNo: 1,
+        kind: 'LEVEL' as const,
+        levelNo: 1,
+        roleNames: 'Lieutenant',
+        scope: 'LOCATION' as const,
+        locationId: 12,
+        waitingSince: '2026-10-02 09:14:00',
+        dueTs: '2026-10-06 09:14:00',
+      },
+    };
+
+    it('posts *APPRQ with page/pageSize', () => {
+      service.listApprovals(1, 25).subscribe();
+
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      expect(req.request.body).toEqual({ action: '*APPRQ', page: 1, pageSize: 25 });
+      req.flush({ pagination: { page: 1, pageSize: 25, totalRows: 1, totalPages: 1 }, data: [QUEUE_ROW] });
+    });
+
+    it('returns the queue rows untouched when data is already an array', () => {
+      let result: ApprovalQueueResponse | ApiError | undefined;
+      service.listApprovals(1, 25).subscribe((res) => (result = res));
+
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER').flush({
+        pagination: { page: 1, pageSize: 25, totalRows: 1, totalPages: 1 },
+        data: [QUEUE_ROW],
+      });
+
+      expect((result as ApprovalQueueResponse).data).toEqual([QUEUE_ROW]);
+    });
+
+    it('normalizes a null data array to []', () => {
+      let result: ApprovalQueueResponse | ApiError | undefined;
+      service.listApprovals(1, 25).subscribe((res) => (result = res));
+
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER')
+        .flush({ pagination: { page: 1, pageSize: 25, totalRows: 0, totalPages: 0 }, data: null });
+
+      expect((result as ApprovalQueueResponse).data).toEqual([]);
+    });
+
+    it('passes an empty-queue failure straight through', () => {
+      let result: ApprovalQueueResponse | ApiError | undefined;
+      service.listApprovals(1, 25).subscribe((res) => (result = res));
+
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER')
+        .flush({ success: false, code: 'ERR', message: 'Not logged in.' });
+
+      expect(result).toEqual({ success: false, code: 'ERR', message: 'Not logged in.' });
+    });
+  });
+
+  describe('approve', () => {
+    it('posts *APPROVE with the orderId, omitting notes when not given', () => {
+      service.approve(86).subscribe();
+
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      expect(req.request.body).toEqual({ action: '*APPROVE', orderId: 86 });
+      req.flush({
+        success: true,
+        message: 'Order SO-104901 approved and forwarded to level 2 for further approval.',
+        orderId: 86,
+        orderNumber: 'SO-104901',
+        status: 'PENDING_APPROVAL',
+      });
+    });
+
+    it('includes notes when given', () => {
+      service.approve(86, 'Looks good').subscribe();
+
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      expect(req.request.body).toEqual({ action: '*APPROVE', orderId: 86, notes: 'Looks good' });
+      req.flush({ success: true, message: 'Order approved.', orderId: 86, orderNumber: 'SO-104901', status: 'PROCESSING' });
+    });
+
+    it('passes a failure straight through', () => {
+      let result: OrderWriteResult | ApiError | undefined;
+      service.approve(86).subscribe((res) => (result = res));
+
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER')
+        .flush({ success: false, code: 'ERR', message: 'Order SO-104901 is no longer pending approval.' });
+
+      expect(result).toEqual({ success: false, code: 'ERR', message: 'Order SO-104901 is no longer pending approval.' });
+    });
+  });
+
+  describe('reject', () => {
+    it('posts *REJECT with the orderId and the required reason', () => {
+      service.reject(86, 'Over budget for this quarter').subscribe();
+
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      expect(req.request.body).toEqual({ action: '*REJECT', orderId: 86, notes: 'Over budget for this quarter' });
+      req.flush({ success: true, message: 'Order rejected.', orderId: 86, orderNumber: 'SO-104901', status: 'REJECTED' });
+    });
+
+    it('passes a failure straight through', () => {
+      let result: OrderWriteResult | ApiError | undefined;
+      service.reject(86, 'Reason').subscribe((res) => (result = res));
+
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER')
+        .flush({ success: false, code: 'ERR', message: 'A reason is required to reject an order.' });
+
+      expect(result).toEqual({ success: false, code: 'ERR', message: 'A reason is required to reject an order.' });
+    });
+  });
 });
 
 describe('PRODUCT_IMAGE_PLACEHOLDER', () => {
@@ -462,5 +604,33 @@ describe('order label/tone helpers', () => {
   it('uses the known label for a real order status, and humanizes an unknown line-level token otherwise', () => {
     expect(historyStatusLabel('PROCESSING')).toBe('Processing');
     expect(historyStatusLabel('SHORT_SHIPPED')).toBe('Short shipped');
+  });
+});
+
+describe('approval helpers', () => {
+  it('labels a LEVEL step by its levelNo, and an OVERRIDE step as Administrator', () => {
+    expect(approvalStepLabel({ kind: 'LEVEL', levelNo: 2 })).toBe('Level 2');
+    expect(approvalStepLabel({ kind: 'OVERRIDE', levelNo: null })).toBe('Administrator');
+  });
+
+  it('labels every approval step status', () => {
+    expect(approvalStepStatusLabel('PENDING')).toBe('Waiting');
+    expect(approvalStepStatusLabel('APPROVED')).toBe('Approved');
+    expect(approvalStepStatusLabel('REJECTED')).toBe('Rejected');
+    expect(approvalStepStatusLabel('SKIPPED')).toBe('Skipped – no approver');
+    expect(approvalStepStatusLabel('EXPIRED')).toBe('Timed out – moved up');
+    expect(approvalStepStatusLabel('CANCELLED')).toBe('Cancelled');
+  });
+
+  it('flags a null dueTs as not due soon', () => {
+    expect(isApprovalDueSoon(null)).toBe(false);
+  });
+
+  it('flags today and tomorrow as due soon, but not the day after or yesterday', () => {
+    const now = new Date(2026, 9, 10); // 2026-10-10
+    expect(isApprovalDueSoon('2026-10-10 17:00:00', now)).toBe(true);
+    expect(isApprovalDueSoon('2026-10-11 09:00:00', now)).toBe(true);
+    expect(isApprovalDueSoon('2026-10-12 09:00:00', now)).toBe(false);
+    expect(isApprovalDueSoon('2026-10-09 09:00:00', now)).toBe(false);
   });
 });

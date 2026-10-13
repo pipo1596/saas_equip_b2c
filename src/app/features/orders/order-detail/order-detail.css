@@ -280,3 +280,35 @@
     flex-wrap: wrap;
   }
 }
+
+/* Approve/Reject dialog — same custom-property setup as
+   shared/confirm/confirm-dialog.ts, since this doesn't use Bootstrap's own
+   .modal wrapper either (the native <dialog> handles positioning/backdrop
+   itself). */
+.order-detail__action-dialog {
+  --bs-modal-padding: 1rem;
+  --bs-modal-color: var(--bs-body-color);
+  --bs-modal-bg: var(--bs-body-bg);
+  --bs-modal-border-color: var(--bs-border-color-translucent);
+  --bs-modal-border-width: var(--bs-border-width);
+  --bs-modal-border-radius: var(--bs-border-radius-lg);
+  --bs-modal-inner-border-radius: calc(var(--bs-border-radius-lg) - var(--bs-border-width));
+  --bs-modal-header-padding-x: 1rem;
+  --bs-modal-header-padding-y: 1rem;
+  --bs-modal-header-padding: 1rem 1rem;
+  --bs-modal-header-border-color: var(--bs-border-color);
+  --bs-modal-header-border-width: var(--bs-border-width);
+  --bs-modal-title-line-height: 1.5;
+  --bs-modal-footer-gap: 0.5rem;
+  --bs-modal-footer-bg: ;
+  --bs-modal-footer-border-color: var(--bs-border-color);
+  --bs-modal-footer-border-width: var(--bs-border-width);
+  padding: 0;
+  border: none;
+  background: transparent;
+  width: min(440px, calc(100vw - 32px));
+  max-width: none;
+}
+.order-detail__action-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.5);
+}

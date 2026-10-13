@@ -2,23 +2,31 @@ import { CurrencyPipe, isPlatformBrowser } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   OnInit,
   PLATFORM_ID,
+  ViewChild,
+  afterRenderEffect,
   computed,
   inject,
   input,
   signal,
 } from '@angular/core';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
 import { CartService, formatBalanceAmount } from '../../../core/cart/cart';
+import { LocationSelectionService } from '../../../core/location/location-selection';
 import {
+  ApprovalStep,
   HistoryEntry,
   OrderDetail,
   OrderLine,
   OrderService,
   PRODUCT_IMAGE_PLACEHOLDER,
   Shipment,
+  approvalStepLabel,
+  approvalStepStatusLabel,
   historySourceLabel,
   historyStatusLabel,
   lineStatusLabel,
@@ -31,7 +39,7 @@ import { Header } from '../../../shared/header/header';
 
 @Component({
   selector: 'app-order-detail-page',
-  imports: [Header, Footer, RouterLink, CurrencyPipe],
+  imports: [Header, Footer, RouterLink, CurrencyPipe, ReactiveFormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './order-detail.html',
   styleUrls: ['../../../shared/shared.css', './order-detail.css'],
@@ -39,7 +47,9 @@ import { Header } from '../../../shared/header/header';
 export class OrderDetailPage implements OnInit {
   private readonly orderService = inject(OrderService);
   private readonly cartService = inject(CartService);
+  private readonly locationSelectionService = inject(LocationSelectionService);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
+  @ViewChild('actionDialogEl') private readonly actionDialogEl?: ElementRef<HTMLDialogElement>;
 
   // Based on the employee's *current* allotment — applied retroactively to
   // past orders too, so a points-only employee never sees a dollar figure,
@@ -48,6 +58,16 @@ export class OrderDetailPage implements OnInit {
 
   // Bound from the route (`/orders/:orderId`, see app.routes.ts).
   readonly orderId = input('');
+
+  // Bound from `?action=approve`/`?action=reject` — the approval email's own
+  // links (`withComponentInputBinding()` in app.config.ts binds query params
+  // to a same-named input the same way it binds path params).
+  readonly action = input<string | null>(null);
+  // Only auto-open the dialog once, right after the very first load — the
+  // page reloads itself after submitting an action (to pick up the new
+  // `viewerCanAct`/status), and that reload shouldn't reopen the dialog from
+  // the same stale query param.
+  private autoOpened = false;
 
   // Only meaningful arriving straight from Place order's own navigation —
   // captured once at construction, since `history.state` reflects
@@ -60,6 +80,33 @@ export class OrderDetailPage implements OnInit {
   readonly notFound = signal(false);
   readonly error = signal<string | null>(null);
 
+  // Which action dialog (if any) is open — `null` means closed.
+  readonly actionDialog = signal<'approve' | 'reject' | null>(null);
+  readonly actionNotes = new FormControl('', { nonNullable: true });
+  readonly actionPending = signal(false);
+  // Set after an approve/reject response, success or failure — shown as a
+  // banner above the status banner until the next navigation or action.
+  readonly actionMessage = signal<{ tone: 'success' | 'danger'; text: string } | null>(null);
+
+  // Opens/closes the native <dialog> to track `actionDialog` — same
+  // afterRenderEffect idiom as `shared/confirm/confirm-dialog.ts`, since a
+  // plain effect() only guarantees running after change detection, not
+  // after the <dialog> itself exists/updated in the DOM. jsdom (tests)
+  // doesn't implement showModal()/close() at all; the dialog just never
+  // actually opens there, and the flow is exercised directly via the
+  // buttons/signals instead.
+  private readonly syncActionDialogOpenState = afterRenderEffect(() => {
+    const dialog = this.actionDialogEl?.nativeElement;
+    if (!dialog || typeof dialog.showModal !== 'function') {
+      return;
+    }
+    if (this.actionDialog() && !dialog.open) {
+      dialog.showModal();
+    } else if (!this.actionDialog() && dialog.open) {
+      dialog.close();
+    }
+  });
+
   readonly formatAmount = formatBalanceAmount;
   readonly placeholderImage = PRODUCT_IMAGE_PLACEHOLDER;
   readonly statusLabel = orderStatusLabel;
@@ -67,6 +114,8 @@ export class OrderDetailPage implements OnInit {
   readonly lineStatusLabel = lineStatusLabel;
   readonly historySourceLabel = historySourceLabel;
   readonly shipmentStatusLabel = shipmentStatusLabel;
+  readonly approvalStepLabel = approvalStepLabel;
+  readonly approvalStepStatusLabel = approvalStepStatusLabel;
 
   readonly orderLinesById = computed(() => {
     const map = new Map<number, OrderLine>();
@@ -148,11 +197,105 @@ export class OrderDetailPage implements OnInit {
           return;
         }
         this.order.set(result);
+        if (!this.autoOpened) {
+          this.autoOpened = true;
+          if (result.viewerCanAct === 'Y' && this.action() === 'approve') {
+            this.openApprove();
+          } else if (result.viewerCanAct === 'Y' && this.action() === 'reject') {
+            this.openReject();
+          }
+        }
       },
       error: () => {
         this.loading.set(false);
         this.error.set('We could not load this order.');
       },
     });
+  }
+
+  openApprove(): void {
+    this.actionNotes.setValue('');
+    this.actionDialog.set('approve');
+  }
+
+  openReject(): void {
+    this.actionNotes.setValue('');
+    this.actionDialog.set('reject');
+  }
+
+  closeActionDialog(): void {
+    this.actionDialog.set(null);
+  }
+
+  // Fires for a close the browser triggered itself (Escape, most notably)
+  // — a button click already clears `actionDialog` before this can fire,
+  // making it a no-op then. Same idiom as `confirm-dialog.ts`'s own
+  // `onNativeClose`.
+  onActionDialogNativeClose(): void {
+    if (this.actionDialog()) {
+      this.closeActionDialog();
+    }
+  }
+
+  // Same "click lands on the dialog itself only via the backdrop" trick as
+  // `confirm-dialog.ts`.
+  onActionDialogBackdropClick(event: MouseEvent): void {
+    if (event.target === this.actionDialogEl?.nativeElement) {
+      this.closeActionDialog();
+    }
+  }
+
+  // Reject requires a non-blank reason; Approve's note is always optional.
+  canSubmitAction(): boolean {
+    if (this.actionDialog() === 'reject') {
+      return this.actionNotes.value.trim().length > 0;
+    }
+    return true;
+  }
+
+  submitAction(): void {
+    const kind = this.actionDialog();
+    const order = this.order();
+    if (!kind || !order || !this.canSubmitAction()) {
+      return;
+    }
+
+    const notes = this.actionNotes.value.trim();
+    this.actionPending.set(true);
+    const request =
+      kind === 'approve'
+        ? this.orderService.approve(order.orderId, notes || undefined)
+        : this.orderService.reject(order.orderId, notes);
+
+    request.subscribe({
+      next: (result) => {
+        this.actionPending.set(false);
+        this.actionDialog.set(null);
+        if (!result.success) {
+          this.actionMessage.set({ tone: 'danger', text: result.message });
+        } else if (result.status === 'PROCESSING') {
+          this.actionMessage.set({ tone: 'success', text: 'Order approved.' });
+        } else if (result.status === 'REJECTED') {
+          this.actionMessage.set({ tone: 'success', text: 'Order rejected.' });
+        } else {
+          this.actionMessage.set({ tone: 'success', text: result.message });
+        }
+        this.load();
+        this.refreshApprovalBadge();
+      },
+      error: () => {
+        this.actionPending.set(false);
+        this.actionDialog.set(null);
+        this.actionMessage.set({ tone: 'danger', text: 'We could not reach the server. Please try again.' });
+      },
+    });
+  }
+
+  // The header's Approvals badge comes from the cart's own allotment, which
+  // this action never touches directly — re-fetch it so the count drops
+  // immediately instead of waiting for some unrelated cart refresh.
+  private refreshApprovalBadge(): void {
+    const locationId = this.locationSelectionService.activeLocation()?.locationId ?? null;
+    this.cartService.load(locationId).subscribe({ error: () => {} });
   }
 }

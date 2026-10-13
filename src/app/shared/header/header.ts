@@ -353,6 +353,9 @@ export class Header implements OnInit {
   readonly cart = this.cartService.cart;
   readonly pointsOnly = this.cartService.pointsOnly;
   readonly cartCount = computed(() => this.cart().itemCount);
+  readonly approvals = computed(() => this.cart().allotment?.approvals ?? null);
+  readonly canApprove = computed(() => this.approvals()?.canApprove === 'Y');
+  readonly pendingApprovalsCount = computed(() => this.approvals()?.pendingApprovals ?? 0);
   // Switching locations re-scopes the allotment breakdown (and the catalog
   // itself) to a different program — with items already in the cart, that'd
   // leave them covered (or not) by rules that were never actually checked

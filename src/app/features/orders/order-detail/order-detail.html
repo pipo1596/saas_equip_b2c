@@ -5,7 +5,11 @@
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb">
         <li class="breadcrumb-item"><a routerLink="/home">Home</a></li>
-        <li class="breadcrumb-item"><a routerLink="/orders">Order history</a></li>
+        @if (order()?.viewerCanAct === 'Y') {
+          <li class="breadcrumb-item"><a routerLink="/approvals">Approvals</a></li>
+        } @else {
+          <li class="breadcrumb-item"><a routerLink="/orders">Order history</a></li>
+        }
         <li class="breadcrumb-item active" aria-current="page">Order</li>
       </ol>
     </nav>
@@ -25,6 +29,17 @@
     } @else if (error(); as message) {
       <div class="alert alert-danger" role="alert">{{ message }}</div>
     } @else if (order(); as order) {
+      @if (actionMessage(); as msg) {
+        <div
+          class="alert mt-3"
+          [class.alert-success]="msg.tone === 'success'"
+          [class.alert-danger]="msg.tone === 'danger'"
+          [attr.role]="msg.tone === 'danger' ? 'alert' : 'status'"
+        >
+          {{ msg.text }}
+        </div>
+      }
+
       <div [class]="'order-detail__banner order-detail__banner--' + statusTone(order.status)">
         @if (justPlaced && order.status === 'PROCESSING') {
           <p class="order-detail__banner-title">
@@ -51,6 +66,13 @@
           <p class="order-detail__reject-reason">{{ order.rejectReason }}</p>
         }
       </div>
+
+      @if (order.viewerCanAct === 'Y') {
+        <div class="order-detail__approval-actions d-flex gap-2 mt-3">
+          <button type="button" class="btn btn-primary" (click)="openApprove()">Approve</button>
+          <button type="button" class="btn btn-outline-danger" (click)="openReject()">Reject</button>
+        </div>
+      }
 
       <div class="row g-4 mt-1">
         <div class="col-lg-8">
@@ -202,6 +224,39 @@
             </section>
           }
 
+          @if (order.approvals.length > 0) {
+            <section class="order-detail__panel">
+              <h2 class="order-detail__section-title">Approval</h2>
+              <ol class="order-detail__timeline">
+                @for (step of order.approvals; track step.stepNo) {
+                  <li class="order-detail__timeline-entry">
+                    <span class="order-detail__timeline-label">
+                      {{ approvalStepLabel(step) }}
+                      @if (step.roleNames) {
+                        ({{ step.roleNames }})
+                      }
+                      · {{ approvalStepStatusLabel(step.status) }}
+                      @if (step.actedAs === 'OVERRIDE') {
+                        (administrator override)
+                      }
+                    </span>
+                    @if (step.actedTs) {
+                      <span class="order-detail__timeline-meta">{{ step.actedTs.split(' ')[0] }}</span>
+                    } @else if (step.status === 'PENDING' && step.dueTs) {
+                      <span class="order-detail__timeline-meta">Respond by {{ step.dueTs.split(' ')[0] }}</span>
+                    }
+                    @if (step.levelMaxAmount !== null) {
+                      <p class="order-detail__timeline-note">Approves up to {{ step.levelMaxAmount | currency }}</p>
+                    }
+                    @if (step.notes) {
+                      <p class="order-detail__timeline-note">{{ step.notes }}</p>
+                    }
+                  </li>
+                }
+              </ol>
+            </section>
+          }
+
           <section class="order-detail__panel">
             <h2 class="order-detail__section-title">Timeline</h2>
             <ol class="order-detail__timeline">
@@ -283,10 +338,58 @@
               </div>
             }
 
-            <a routerLink="/orders" class="btn btn-outline-secondary w-100 mt-3">Back to order history</a>
+            @if (order.viewerCanAct === 'Y') {
+              <a routerLink="/approvals" class="btn btn-outline-secondary w-100 mt-3">Back to approvals</a>
+            } @else {
+              <a routerLink="/orders" class="btn btn-outline-secondary w-100 mt-3">Back to order history</a>
+            }
           </section>
         </div>
       </div>
+
+      <dialog
+        #actionDialogEl
+        class="order-detail__action-dialog"
+        [attr.aria-labelledby]="actionDialog() === 'reject' ? 'reject-dialog-title' : 'approve-dialog-title'"
+        (close)="onActionDialogNativeClose()"
+        (click)="onActionDialogBackdropClick($event)"
+      >
+        @if (actionDialog(); as kind) {
+          <div class="modal-content shadow-lg">
+            <div class="modal-header">
+              <h2 [id]="kind === 'reject' ? 'reject-dialog-title' : 'approve-dialog-title'" class="modal-title fs-5">
+                {{ kind === 'reject' ? 'Reject order' : 'Approve order' }} {{ order.orderNumber }}
+              </h2>
+              <button type="button" class="btn-close" aria-label="Close" (click)="closeActionDialog()"></button>
+            </div>
+            <div class="modal-body">
+              <label for="action-notes" class="form-label">
+                {{ kind === 'reject' ? 'Reason for rejecting (required)' : 'Note (optional)' }}
+              </label>
+              <textarea
+                id="action-notes"
+                class="form-control"
+                rows="3"
+                [formControl]="actionNotes"
+                [required]="kind === 'reject'"
+              ></textarea>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" (click)="closeActionDialog()">Cancel</button>
+              <button
+                type="button"
+                class="btn"
+                [class.btn-danger]="kind === 'reject'"
+                [class.btn-primary]="kind !== 'reject'"
+                [disabled]="!canSubmitAction() || actionPending()"
+                (click)="submitAction()"
+              >
+                {{ kind === 'reject' ? 'Reject' : 'Approve' }}
+              </button>
+            </div>
+          </div>
+        }
+      </dialog>
     }
   </div>
 </section>
