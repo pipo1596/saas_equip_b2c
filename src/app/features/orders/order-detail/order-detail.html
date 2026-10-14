@@ -69,8 +69,19 @@
 
       @if (order.viewerCanAct === 'Y') {
         <div class="order-detail__approval-actions d-flex gap-2 mt-3">
-          <button type="button" class="btn btn-primary" (click)="openApprove()">Approve</button>
-          <button type="button" class="btn btn-outline-danger" (click)="openReject()">Reject</button>
+          <button type="button" class="btn btn-success d-flex align-items-center gap-2" (click)="openApprove()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M1 12l5 5L17 6" />
+              <path d="M7 12l5 5L23 6" />
+            </svg>
+            Approve
+          </button>
+          <button type="button" class="btn btn-danger d-flex align-items-center gap-2" (click)="openReject()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+            Reject
+          </button>
         </div>
       }
 
@@ -378,12 +389,22 @@
               <button type="button" class="btn btn-outline-secondary" (click)="closeActionDialog()">Cancel</button>
               <button
                 type="button"
-                class="btn"
+                class="btn d-flex align-items-center gap-2"
                 [class.btn-danger]="kind === 'reject'"
-                [class.btn-primary]="kind !== 'reject'"
+                [class.btn-success]="kind !== 'reject'"
                 [disabled]="!canSubmitAction() || actionPending()"
                 (click)="submitAction()"
               >
+                @if (kind === 'reject') {
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M6 6l12 12M18 6L6 18" />
+                  </svg>
+                } @else {
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M1 12l5 5L17 6" />
+                    <path d="M7 12l5 5L23 6" />
+                  </svg>
+                }
                 {{ kind === 'reject' ? 'Reject' : 'Approve' }}
               </button>
             </div>

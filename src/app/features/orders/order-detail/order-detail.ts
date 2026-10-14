@@ -95,14 +95,25 @@ export class OrderDetailPage implements OnInit {
   // doesn't implement showModal()/close() at all; the dialog just never
   // actually opens there, and the flow is exercised directly via the
   // buttons/signals instead.
+  //
+  // `actionDialog()` is read *before* the `dialog` null-check, not after —
+  // unlike `confirm-dialog.ts`'s own `<dialog>` (always in the DOM from
+  // app root), this one only exists once `order()` has loaded, so the very
+  // first run of this effect hits the null-check and returns early. A
+  // signal effect only re-runs when a signal it actually read changes; if
+  // that first (aborted) run never reads `actionDialog()`, it's never
+  // registered as a dependency, and the effect would never fire again no
+  // matter how many times `actionDialog` changes afterward — reading it
+  // unconditionally first keeps it tracked on every run, early return or not.
   private readonly syncActionDialogOpenState = afterRenderEffect(() => {
+    const isOpen = this.actionDialog() !== null;
     const dialog = this.actionDialogEl?.nativeElement;
     if (!dialog || typeof dialog.showModal !== 'function') {
       return;
     }
-    if (this.actionDialog() && !dialog.open) {
+    if (isOpen && !dialog.open) {
       dialog.showModal();
-    } else if (!this.actionDialog() && dialog.open) {
+    } else if (!isOpen && dialog.open) {
       dialog.close();
     }
   });

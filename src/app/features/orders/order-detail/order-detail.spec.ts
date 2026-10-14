@@ -453,7 +453,7 @@ describe('OrderDetailPage', () => {
 
       page.openApprove();
       fixture.detectChanges();
-      const submit: HTMLButtonElement = fixture.nativeElement.querySelector('.order-detail__action-dialog .btn-primary');
+      const submit: HTMLButtonElement = fixture.nativeElement.querySelector('.order-detail__action-dialog .btn-success');
       expect(submit.disabled).toBe(false);
       submit.click();
 
@@ -476,7 +476,7 @@ describe('OrderDetailPage', () => {
 
       page.openApprove();
       fixture.detectChanges();
-      fixture.nativeElement.querySelector('.order-detail__action-dialog .btn-primary').click();
+      fixture.nativeElement.querySelector('.order-detail__action-dialog .btn-success').click();
 
       httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER').flush({
         success: true,
@@ -502,7 +502,7 @@ describe('OrderDetailPage', () => {
 
       page.openApprove();
       fixture.detectChanges();
-      fixture.nativeElement.querySelector('.order-detail__action-dialog .btn-primary').click();
+      fixture.nativeElement.querySelector('.order-detail__action-dialog .btn-success').click();
 
       httpMock
         .expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER')
