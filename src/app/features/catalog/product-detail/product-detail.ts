@@ -17,7 +17,7 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import { switchMap } from 'rxjs';
 
-import { AllotmentRule, CartService, PayTag, ruleForCategories } from '../../../core/cart/cart';
+import { AllotmentRule, CartService, PayTag, ruleForCategories, unitQuantityCap } from '../../../core/cart/cart';
 import { Breadcrumb, hasCrumbs } from '../../../core/catalog/breadcrumb';
 import {
   ProductAttribute,
@@ -94,6 +94,12 @@ export class ProductDetail implements OnInit {
   // first half of a sku-changing update).
   private readonly editedLineSkuId = signal<number | null>(null);
   private readonly editPrefillApplied = signal(false);
+  // The edited line's own quantity as it stood before this edit touched it
+  // — kept apart from the live `quantity` signal (which the shopper's own
+  // stepper clicks move around) so `maxQuantity` can always give this line
+  // back the headroom it already holds under a units rule, no matter what
+  // `quantity` has been changed to mid-edit.
+  private readonly editedLineOriginalQuantity = signal(0);
 
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
@@ -130,6 +136,9 @@ export class ProductDetail implements OnInit {
   // note rather than replacing the whole page, since by this point the
   // product itself already loaded fine.
   readonly availabilityError = signal<string | null>(null);
+  // Exposed for the template's own `maxQuantity() === Infinity` check —
+  // templates only resolve against the component instance, not globals.
+  readonly Infinity = Infinity;
   readonly quantity = signal(1);
   readonly addedToCart = signal(false);
   readonly addingToCart = signal(false);
@@ -148,6 +157,14 @@ export class ProductDetail implements OnInit {
   // product's own `progCatIds`.
   readonly coveringRule = computed<AllotmentRule | null>(() =>
     ruleForCategories(this.allotmentRules(), this.product()?.progCatIds ?? []),
+  );
+  // `Infinity` (rather than `null`) so every comparison/clamp against it
+  // below can stay a plain arithmetic op without a null-check at each
+  // call site — see `unitQuantityCap`'s own doc for when a cap applies at
+  // all.
+  readonly maxQuantity = computed(
+    () =>
+      unitQuantityCap(this.coveringRule(), this.isEditing() ? this.editedLineOriginalQuantity() : 0) ?? Infinity,
   );
   // The exact `selections()` object (by reference) that the currently-
   // loaded `resolvedSku` was actually fetched for — `selections.update()`
@@ -205,6 +222,7 @@ export class ProductDetail implements OnInit {
       this.resolvedSku() !== null &&
       Number.isInteger(this.quantity()) &&
       this.quantity() >= 1 &&
+      this.quantity() <= this.maxQuantity() &&
       !this.addingToCart(),
   );
 
@@ -400,6 +418,7 @@ export class ProductDetail implements OnInit {
     this.selections.set(selections);
     this.quantity.set(item.quantity);
     this.editedLineSkuId.set(item.skuId);
+    this.editedLineOriginalQuantity.set(item.quantity);
     this.editPrefillApplied.set(true);
   });
 
@@ -465,7 +484,14 @@ export class ProductDetail implements OnInit {
   setQuantity(value: number): void {
     this.addedToCart.set(false);
     this.addToCartError.set(null);
-    this.quantity.set(Number.isFinite(value) && value >= 1 ? Math.floor(value) : 1);
+    const floored = Number.isFinite(value) && value >= 1 ? Math.floor(value) : 1;
+    const current = this.quantity();
+    // The cap only constrains *raising* the quantity — never floors it
+    // below 1 even when `maxQuantity()` itself is 0 or negative (fully
+    // spoken for by what's already in the cart); that state blocks "Add to
+    // Cart" via `canAddToCart` instead of forcing a nonsensical quantity.
+    const next = floored <= current ? floored : Math.min(floored, this.maxQuantity());
+    this.quantity.set(Math.max(1, next));
   }
 
   addToCart(): void {

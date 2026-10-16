@@ -1279,6 +1279,129 @@ describe('ProductDetail', () => {
     expect(card.querySelector('.coverage-card__title')?.textContent?.trim()).toBe('Covered by your units');
   });
 
+  function unitAndDollarRules(units: { total: number; used: number; inCart: number; available: number }) {
+    return [
+      {
+        ruleId: 10,
+        ruleName: 'Dollar 100',
+        allotType: 'DOLLAR' as const,
+        primaryUnit: 'DOLLARS' as const,
+        isBarRule: 'N' as const,
+        dollars: { total: 100, used: 0, inCart: 0, available: 100 },
+        units: null,
+        points: null,
+        cycle: {
+          renewalBasis: 'FIXED' as const,
+          renewalPeriodMonths: 12,
+          cycleStart: '2026-09-09',
+          cycleEnd: '2027-09-08',
+          renewsOn: '2027-10-09',
+          expirationDate: null,
+          onExpiration: 'SUSPEND' as const,
+        },
+        covers: { allAssortments: 'Y' as const, categories: [], unitGrants: [] },
+        carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
+        quotas: [],
+        requireApproval: 'N' as const,
+        allowCcFallback: 'N' as const,
+      },
+      {
+        ruleId: 11,
+        ruleName: 'Unit Allotment',
+        allotType: 'UNITS' as const,
+        primaryUnit: 'UNITS' as const,
+        isBarRule: 'N' as const,
+        dollars: null,
+        units,
+        points: null,
+        cycle: {
+          renewalBasis: 'FIXED' as const,
+          renewalPeriodMonths: 12,
+          cycleStart: '2026-09-09',
+          cycleEnd: '2027-09-08',
+          renewsOn: '2027-10-09',
+          expirationDate: null,
+          onExpiration: 'SUSPEND' as const,
+        },
+        covers: {
+          allAssortments: 'N' as const,
+          categories: [],
+          unitGrants: [{ progCatId: 60, categoryName: 'Tactical', unitQty: 1 }],
+        },
+        carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
+        quotas: [],
+        requireApproval: 'N' as const,
+        allowCcFallback: 'N' as const,
+      },
+    ];
+  }
+
+  it('keeps attributing coverage to the unit allotment when the cart (not real usage) is what put it at 0 available', () => {
+    const fixture = TestBed.createComponent(ProductDetail);
+    fixture.componentRef.setInput('productPk', '12345');
+    fixture.detectChanges();
+
+    expectRequest(httpMock, '*GET').flush({ ...RESPONSE, product: { ...PRODUCT, progCatIds: [60] } });
+    expectProductTagCartRequest(httpMock).flush({
+      cartId: null,
+      itemCount: 0,
+      subtotalPrice: 0,
+      subtotalPoints: null,
+      items: [],
+      allotment: {
+        programId: 3,
+        allotmentBar: null,
+        ruleCount: 2,
+        allotExclTaxFreight: 'N',
+        // Nothing has actually been *used* (0) — it's only `inCart` (1)
+        // eating the single unit this rule ever had, which is why
+        // `available` is 0. Real remaining capacity (total - used) is still
+        // 1, so this should stay attributed to the unit allotment.
+        rules: unitAndDollarRules({ total: 1, used: 0, inCart: 1, available: 0 }),
+        approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+        openOrders: null,
+        lineTags: [],
+        productTag: null,
+      },
+    });
+    fixture.detectChanges();
+
+    const card = fixture.nativeElement.querySelector('app-allotment-coverage-card');
+    expect(card.querySelector('.coverage-card__title')?.textContent?.trim()).toBe('Covered by your Unit Allotment');
+  });
+
+  it('falls through to the next allotment once the unit rule is really exhausted, not just used up in the cart', () => {
+    const fixture = TestBed.createComponent(ProductDetail);
+    fixture.componentRef.setInput('productPk', '12345');
+    fixture.detectChanges();
+
+    expectRequest(httpMock, '*GET').flush({ ...RESPONSE, product: { ...PRODUCT, progCatIds: [60] } });
+    expectProductTagCartRequest(httpMock).flush({
+      cartId: null,
+      itemCount: 0,
+      subtotalPrice: 0,
+      subtotalPoints: null,
+      items: [],
+      // Real usage (`used: 1`) already accounts for the rule's whole
+      // capacity (`total: 1`) — genuinely nothing left, regardless of cart.
+      allotment: {
+        programId: 3,
+        allotmentBar: null,
+        ruleCount: 2,
+        allotExclTaxFreight: 'N',
+        rules: unitAndDollarRules({ total: 1, used: 1, inCart: 0, available: 0 }),
+        approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+        openOrders: null,
+        lineTags: [],
+        productTag: null,
+      },
+    });
+    fixture.detectChanges();
+
+    const card = fixture.nativeElement.querySelector('app-allotment-coverage-card');
+    expect(card.querySelector('.coverage-card__title')?.textContent?.trim()).toBe('Covered by your Dollar 100');
+  });
+
   it('should not show the coverage card when there is no product tag', () => {
     const fixture = TestBed.createComponent(ProductDetail);
     fixture.componentRef.setInput('productPk', '12345');
@@ -1394,6 +1517,177 @@ describe('ProductDetail', () => {
     expect(detail.quantity()).toBe(3);
     detail.setQuantity(Number.NaN);
     expect(detail.quantity()).toBe(1);
+  });
+
+  describe('unit allotment quantity cap', () => {
+    const UNITS_RULE = {
+      ruleId: 12,
+      ruleName: 'Unit Allotment',
+      allotType: 'UNITS' as const,
+      primaryUnit: 'UNITS' as const,
+      isBarRule: 'N' as const,
+      dollars: null,
+      points: null,
+      cycle: {
+        renewalBasis: 'FIXED' as const,
+        renewalPeriodMonths: 12,
+        cycleStart: '2026-09-09',
+        cycleEnd: '2027-09-08',
+        renewsOn: '2027-09-09',
+        expirationDate: null,
+        onExpiration: 'SUSPEND' as const,
+      },
+      covers: {
+        allAssortments: 'N' as const,
+        categories: [],
+        unitGrants: [{ progCatId: 60, categoryName: 'Tactical', unitQty: 5 }],
+      },
+      carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
+      quotas: [],
+      requireApproval: 'N' as const,
+      allowCcFallback: 'N' as const,
+    };
+
+    function loadWithUnitsRule(units: { total: number; used: number; inCart: number; available: number }) {
+      const fixture = TestBed.createComponent(ProductDetail);
+      fixture.componentRef.setInput('productPk', '12345');
+      fixture.detectChanges();
+      expectRequest(httpMock, '*GET').flush({ ...RESPONSE, product: { ...PRODUCT, progCatIds: [60] } });
+      expectProductTagCartRequest(httpMock).flush({
+        cartId: null,
+        itemCount: 0,
+        subtotalPrice: 0,
+        subtotalPoints: null,
+        items: [],
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 1,
+          allotExclTaxFreight: 'N',
+          rules: [{ ...UNITS_RULE, units }],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [],
+          productTag: null,
+        },
+      });
+      fixture.detectChanges();
+      return fixture;
+    }
+
+    it('disables the "+" button and sets max once quantity reaches what is available', () => {
+      const fixture = loadWithUnitsRule({ total: 5, used: 3, inCart: 0, available: 2 });
+      const detail = fixture.componentInstance;
+
+      expect(detail.maxQuantity()).toBe(2);
+      detail.setQuantity(2);
+      fixture.detectChanges();
+
+      const plusBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.qty-stepper__btn:last-of-type');
+      expect(plusBtn.disabled).toBe(true);
+      const input: HTMLInputElement = fixture.nativeElement.querySelector('.qty-stepper__input');
+      expect(input.max).toBe('2');
+    });
+
+    it('clamps a typed-in value down to what is available', () => {
+      const fixture = loadWithUnitsRule({ total: 5, used: 3, inCart: 0, available: 2 });
+      const detail = fixture.componentInstance;
+
+      detail.setQuantity(5);
+
+      expect(detail.quantity()).toBe(2);
+    });
+
+    it('applies no cap at all once the units rule is really exhausted (total - used <= 0)', () => {
+      const fixture = loadWithUnitsRule({ total: 5, used: 5, inCart: 0, available: 0 });
+      const detail = fixture.componentInstance;
+
+      detail.setQuantity(9);
+      fixture.detectChanges();
+
+      expect(detail.quantity()).toBe(9);
+      const plusBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.qty-stepper__btn:last-of-type');
+      expect(plusBtn.disabled).toBe(false);
+    });
+
+    it('blocks "Add to Cart" (and keeps the "+" disabled) when the cart — not real usage — has already used up every unit', () => {
+      // The exact real-world case that was broken: real capacity (total -
+      // used) is still 7, so the rule isn't really exhausted and stays the
+      // covering rule — but `available` is 0 because other additions
+      // already in the cart are using all 7. A *fresh* add on top of that
+      // has zero room, and must be blocked, not fall through to unlimited.
+      const fixture = loadWithUnitsRule({ total: 11, used: 4, inCart: 7, available: 0 });
+      const detail = fixture.componentInstance;
+      fixture.detectChanges();
+
+      expect(detail.maxQuantity()).toBe(0);
+      expect(detail.quantity()).toBe(1);
+
+      // Clicking "+" must not budge it past 1.
+      detail.setQuantity(2);
+      expect(detail.quantity()).toBe(1);
+      fixture.detectChanges();
+
+      const plusBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.qty-stepper__btn:last-of-type');
+      expect(plusBtn.disabled).toBe(true);
+      // `canAddToCart` itself also goes false purely off this, independent
+      // of whether a sku has resolved yet (1 > 0 is already a violation).
+      expect(detail.quantity() <= detail.maxQuantity()).toBe(false);
+    });
+
+    it('applies no cap when nothing covers the product (no units rule at all)', () => {
+      const fixture = TestBed.createComponent(ProductDetail);
+      const detail = fixture.componentInstance;
+      fixture.componentRef.setInput('productPk', '12345');
+      fixture.detectChanges();
+      expectRequest(httpMock, '*GET').flush(RESPONSE);
+      expectProductTagCartRequest(httpMock).flush({
+        cartId: null,
+        itemCount: 0,
+        subtotalPrice: 0,
+        subtotalPoints: null,
+        items: [],
+        allotment: null,
+      });
+      fixture.detectChanges();
+
+      detail.setQuantity(50);
+
+      expect(detail.quantity()).toBe(50);
+    });
+
+    it('gives an edited line back its own current quantity when computing the cap', () => {
+      const fixture = TestBed.createComponent(ProductDetail);
+      const detail = fixture.componentInstance;
+      fixture.componentRef.setInput('productPk', '12345');
+      fixture.componentRef.setInput('cartItemId', '9001');
+      fixture.detectChanges();
+      expectRequest(httpMock, '*GET').flush({ ...RESPONSE, product: { ...PRODUCT, progCatIds: [60] } });
+      expectProductTagCartRequest(httpMock).flush({
+        cartId: 501,
+        itemCount: 1,
+        subtotalPrice: 269.97,
+        subtotalPoints: null,
+        // The edited line (quantity 3) is itself what's consuming 3 of the
+        // rule's units — `available` already nets that out.
+        items: [CART_ITEM_TO_EDIT],
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 1,
+          allotExclTaxFreight: 'N',
+          rules: [{ ...UNITS_RULE, units: { total: 5, used: 0, inCart: 3, available: 2 } }],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [],
+          productTag: null,
+        },
+      });
+      fixture.detectChanges();
+
+      // 2 available + the 3 this very line already holds = 5, not 2.
+      expect(detail.maxQuantity()).toBe(5);
+    });
   });
 
   it('should disable a value once *AVAIL says it is no longer compatible', () => {

@@ -207,6 +207,7 @@
                   type="number"
                   class="qty-stepper__input"
                   min="1"
+                  [attr.max]="maxQuantity() === Infinity ? null : maxQuantity()"
                   step="1"
                   [value]="quantity()"
                   (change)="setQuantity($any($event.target).valueAsNumber)"
@@ -215,6 +216,7 @@
                 <button
                   type="button"
                   class="qty-stepper__btn"
+                  [disabled]="quantity() >= maxQuantity()"
                   (click)="setQuantity(quantity() + 1)"
                   aria-label="Increase quantity"
                 >

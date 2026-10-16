@@ -206,6 +206,36 @@ export function tileBalance(rule: AllotmentRule): Balance | null {
   return rule.dollars;
 }
 
+// The highest quantity a line covered by a units rule can be set to —
+// `null` means no cap applies at all, because `rule` isn't a units-type
+// rule (nothing to cap) or doesn't cover this line. Otherwise *always*
+// returns a real number, even `0` or negative — callers must not treat a
+// low-or-negative result as "no cap"; it means there's genuinely no room
+// for more right now, which should block adding/increasing rather than
+// quietly falling back to unlimited. (An actually-exhausted units rule
+// never reaches here in the first place: `ruleForCategories` stops
+// attributing coverage to one once it's really out, at which point
+// `coveringRule`/the line's own tag points elsewhere and this function
+// isn't even called with it.)
+//
+// `alreadyCounted` is how much of this exact line's own current quantity
+// is already folded into `rule.units.available` — `0` for a line not in
+// the cart yet, or the line's own existing quantity when adjusting one
+// already there, since raising it just reclaims headroom it already holds
+// rather than needing fresh room on top. Adding it back can turn a
+// negative `available` into a positive cap (e.g. a line sitting at 8 units
+// against a rule with only 7 truly available swings `available` to -1,
+// but the real cap for that line is still 7) — so this always computes the
+// sum and hands it back as-is, never short-circuiting on `available`
+// alone.
+export function unitQuantityCap(rule: AllotmentRule | null, alreadyCounted = 0): number | null {
+  const available = rule?.units?.available;
+  if (available === undefined) {
+    return null;
+  }
+  return available + alreadyCounted;
+}
+
 // The ordered rules this one falls back to once exhausted, resolved from
 // `fallbackRuleIds` against the full rule list — e.g. Uniform's own chain
 // resolves to `[Footwear]`. Skips any id that doesn't resolve to an actual
@@ -257,6 +287,17 @@ export function coverageLabel(rule: AllotmentRule): string {
   return parts.join(' · ') || 'Nothing yet';
 }
 
+// Whether a units balance is *really* out — its true remaining capacity
+// (`total - used`, same as a completed order would draw down), ignoring
+// `inCart`. `inCart` is just what's sitting in a cart right now, not yet
+// checked out — still speculative, so it shouldn't disqualify a unit
+// allotment from being shown as the covering rule the way an actually
+// exhausted one should. `reserved` (an order already awaiting approval) is
+// a real commitment, so it does count against it, same as `used`.
+function unitsReallyExhausted(units: Balance): boolean {
+  return units.total - units.used - (units.reserved ?? 0) <= 0;
+}
+
 // Which rule (if any) a product is likely covered by, found by matching its
 // own program-category ids against each rule's covered categories, in the
 // same Units -> Dollars -> Points priority the real checkout allocation
@@ -266,6 +307,13 @@ export function coverageLabel(rule: AllotmentRule): string {
 // "which rule would this likely draw from", never "exactly how much" or
 // "would this come up short" — the authoritative tag is always whatever the
 // cart's own `lineTags`/`productTag` says once a specific SKU is added.
+//
+// A units rule here only gets skipped in favor of the next one down once
+// it's *really* exhausted (see `unitsReallyExhausted`) — not just because
+// the cart's own current contents happen to be using up its room right
+// now. Otherwise adding a few of these items would make the preview
+// reattribute the product to a dollar rule it doesn't actually belong to,
+// purely as a side effect of what's already sitting in the cart.
 export function ruleForCategories(
   rules: readonly AllotmentRule[],
   progCatIds: readonly number[],
@@ -278,7 +326,8 @@ export function ruleForCategories(
     (rule) =>
       (rule.allotType === 'UNITS' || rule.allotType === 'DOLLAR_UNITS') &&
       rule.covers.unitGrants.some((grant) => progCatIds.includes(grant.progCatId)) &&
-      (rule.units?.available ?? 0) > 0,
+      rule.units &&
+      !unitsReallyExhausted(rule.units),
   );
   if (unitsRule) {
     return unitsRule;
