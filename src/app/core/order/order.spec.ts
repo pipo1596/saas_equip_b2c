@@ -12,6 +12,7 @@ import {
   PRODUCT_IMAGE_PLACEHOLDER,
   approvalStepLabel,
   approvalStepStatusLabel,
+  historyByLabel,
   historySourceLabel,
   historyStatusLabel,
   isApprovalDueSoon,
@@ -591,6 +592,32 @@ describe('order label/tone helpers', () => {
     expect(historySourceLabel('FULFIL_API')).toBe('Warehouse');
     expect(historySourceLabel('ADMIN')).toBe('Admin');
     expect(historySourceLabel('SYSTEM')).toBe('System');
+  });
+
+  it('labels a history entry placed during a shop-as session, regardless of its source', () => {
+    const entry = {
+      fromStatus: null,
+      toStatus: 'PROCESSING',
+      source: 'PORTAL' as const,
+      note: null,
+      orderLineId: null,
+      ts: '2026-10-15 10:00:00',
+      by: 'SHOP:L1:9001/EMP:345',
+    };
+    expect(historyByLabel(entry)).toBe('Placed by admin on behalf of the employee');
+  });
+
+  it('falls back to the normal source label for a history entry with no shop-as prefix', () => {
+    const entry = {
+      fromStatus: null,
+      toStatus: 'PROCESSING',
+      source: 'PORTAL' as const,
+      note: null,
+      orderLineId: null,
+      ts: '2026-10-15 10:00:00',
+      by: null,
+    };
+    expect(historyByLabel(entry)).toBe('You');
   });
 
   it('labels every shipment status', () => {

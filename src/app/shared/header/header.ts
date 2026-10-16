@@ -575,9 +575,15 @@ export class Header implements OnInit {
       });
   }
 
+  // `endSession()` is the real, server-side sign-out (`SHOPEND` — now the
+  // general one, not just for ending a shop-as session) — navigates to login
+  // either way, same as today, rather than branching on `wasImpersonating`
+  // (a normal "Log off" click is never impersonating in the first place).
   logOut(): void {
     this.userMenuOpen.set(false);
-    this.authService.logout();
-    this.router.navigateByUrl('/');
+    this.authService.endSession().subscribe({
+      next: () => this.router.navigateByUrl('/'),
+      error: () => this.router.navigateByUrl('/'),
+    });
   }
 }

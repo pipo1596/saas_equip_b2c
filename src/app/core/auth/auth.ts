@@ -4,9 +4,10 @@ import { Injectable, PLATFORM_ID, computed, inject, signal } from '@angular/core
 import { type Observable, tap } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
-import { EmployeeService, type EmployeeLocation } from '../employee/employee';
+import { CartService } from '../cart/cart';
+import { EmployeeService, type EmployeeLocation, type Impersonation } from '../employee/employee';
 
-export type { EmployeeLocation } from '../employee/employee';
+export type { EmployeeLocation, Impersonation } from '../employee/employee';
 
 // The legacy CGI dispatcher branches on this `action` field rather than the
 // URL/SEPGM value. `login` and `verifyMfa` are confirmed against the real
@@ -17,6 +18,8 @@ const ACTION = {
   verifyMfa: 'MFA1',
   requestReset: 'FORGOT1',
   resetPassword: 'RESET1',
+  shopAs: 'SHOPAS1',
+  shopEnd: 'SHOPEND',
 } as const;
 
 // localStorage (not sessionStorage) — a session started in one tab should
@@ -52,6 +55,28 @@ export interface SimpleResponse {
   message: string | null;
 }
 
+// The `SHOPAS1` response — same dispatcher/session pattern as `LOGIN1`, but
+// never requires MFA (the admin already authenticated in the admin
+// console) and carries who's actually doing the shopping.
+export interface ShopAsResponse {
+  success: boolean;
+  empId?: string;
+  source?: 'L' | 'R';
+  sessionId?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  actorName?: string;
+  actorLevel?: 'L1' | 'L2';
+  message: string | null;
+}
+
+export interface ShopEndResponse {
+  success: boolean;
+  wasImpersonating: boolean;
+  message: string | null;
+}
+
 export interface Session {
   empId: string;
   sessionId: string;
@@ -60,6 +85,7 @@ export interface Session {
   email: string;
   phone: string;
   locations: EmployeeLocation[];
+  impersonation: Impersonation | null;
 }
 
 interface PendingMfa {
@@ -71,11 +97,16 @@ interface PendingMfa {
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly employeeService = inject(EmployeeService);
+  private readonly cartService = inject(CartService);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
   private readonly dispatchUrl = `${environment.apiBaseUrl}/cgi/APPSCDSPCH?SEPGM=APCLOGIN`;
 
   readonly session = signal<Session | null>(this.restoreSession());
   readonly pendingMfa = signal<PendingMfa | null>(this.restorePendingMfa());
+  // Set once `endSession()` resolves with `wasImpersonating: true` — tells
+  // `app.html` to replace the whole routed app with a static "session
+  // ended" screen instead of sending the admin to the portal login page.
+  readonly sessionEnded = signal(false);
 
   // Only `pendingMfa` (empId/sessionId) survives a refresh, in
   // sessionStorage — the password itself is kept in memory only, for as
@@ -106,6 +137,7 @@ export class AuthService {
     return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || null;
   });
   readonly locations = computed(() => this.session()?.locations ?? []);
+  readonly impersonation = computed(() => this.session()?.impersonation ?? null);
 
   login(email: string, password: string): Observable<LoginResponse> {
     this.pendingCredentials = { email, password };
@@ -153,10 +185,65 @@ export class AuthService {
   }
 
   logout(): void {
+    this.clearLocalState();
+  }
+
+  // The real `SHOPAS1` redeem — same dispatcher/session pattern as `login`,
+  // but there's no MFA step (the admin already authenticated in the admin
+  // console) and the resulting session is flagged as impersonating. Follows
+  // the exact same "build session, persist, then refresh from the employee
+  // record" path as a normal login (see `applyLoginResponse`) so the
+  // `impersonation` flag — merged in from `APCEMPLYEE` by
+  // `loadEmployeeDetails` — survives a page reload via the ordinary
+  // persisted-session mechanism, with no separate refetch-on-bootstrap
+  // needed.
+  redeemShopAs(token: string): Observable<ShopAsResponse> {
+    return this.http.post<ShopAsResponse>(this.dispatchUrl, { action: ACTION.shopAs, token }).pipe(
+      tap((response) => {
+        if (!response.success) {
+          return;
+        }
+        const session: Session = {
+          empId: response.empId ?? '',
+          sessionId: response.sessionId ?? '',
+          firstName: response.firstName ?? '',
+          lastName: response.lastName ?? '',
+          email: response.email ?? '',
+          phone: '',
+          locations: [],
+          impersonation: { active: true, actorName: response.actorName ?? '', actorLevel: response.actorLevel ?? 'L1' },
+        };
+        this.session.set(session);
+        this.persistSession(session);
+        this.loadEmployeeDetails(session);
+      }),
+    );
+  }
+
+  // The real sign-out call — ends the banner's "End" button and (per the
+  // backend contract) is now also what a normal "Log off" uses, so an
+  // ordinary session actually gets invalidated server-side rather than just
+  // cleared client-side. `mfa.ts`'s "cancel this challenge" and the idle
+  // timeout both keep using the plain, no-network `logout()` above — there's
+  // no real session yet in the first case, and no reason to add a network
+  // call to the second.
+  endSession(): Observable<ShopEndResponse> {
+    return this.http.post<ShopEndResponse>(this.dispatchUrl, { action: ACTION.shopEnd }).pipe(
+      tap((response) => {
+        this.clearLocalState();
+        if (response.wasImpersonating) {
+          this.sessionEnded.set(true);
+        }
+      }),
+    );
+  }
+
+  private clearLocalState(): void {
     this.session.set(null);
     this.pendingMfa.set(null);
     this.pendingCredentials = null;
     this.employeeService.clear();
+    this.cartService.reset();
     this.clearPendingMfa();
     if (this.isBrowser) {
       localStorage.removeItem(AUTH_STORAGE_KEY);
@@ -195,6 +282,7 @@ export class AuthService {
       email: response.email ?? '',
       phone: response.phone ?? '',
       locations: [],
+      impersonation: null,
     };
     this.pendingMfa.set(null);
     this.pendingCredentials = null;
@@ -216,6 +304,7 @@ export class AuthService {
         email: employee.email || session.email,
         phone: employee.phone || session.phone,
         locations: employee.locations ?? session.locations,
+        impersonation: employee.impersonation,
       };
       this.session.set(updated);
       this.persistSession(updated);
@@ -253,7 +342,10 @@ export class AuthService {
         localStorage.removeItem(AUTH_STORAGE_KEY);
         return null;
       }
-      return parsed as Session;
+      // Unlike the required fields above, a session cached before
+      // `impersonation` existed just means "not impersonating" — there's no
+      // reason to force a re-login over it.
+      return { ...parsed, impersonation: parsed.impersonation ?? null } as Session;
     } catch {
       return null;
     }

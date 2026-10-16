@@ -15,6 +15,7 @@ import {
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
+import { AuthService } from '../../../core/auth/auth';
 import { CartService, formatBalanceAmount } from '../../../core/cart/cart';
 import { LocationSelectionService } from '../../../core/location/location-selection';
 import {
@@ -27,7 +28,7 @@ import {
   Shipment,
   approvalStepLabel,
   approvalStepStatusLabel,
-  historySourceLabel,
+  historyByLabel,
   historyStatusLabel,
   lineStatusLabel,
   orderStatusLabel,
@@ -47,6 +48,7 @@ import { Header } from '../../../shared/header/header';
 export class OrderDetailPage implements OnInit {
   private readonly orderService = inject(OrderService);
   private readonly cartService = inject(CartService);
+  private readonly authService = inject(AuthService);
   private readonly locationSelectionService = inject(LocationSelectionService);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
   @ViewChild('actionDialogEl') private readonly actionDialogEl?: ElementRef<HTMLDialogElement>;
@@ -55,6 +57,10 @@ export class OrderDetailPage implements OnInit {
   // past orders too, so a points-only employee never sees a dollar figure,
   // including on an order they placed before switching programs.
   readonly pointsOnly = this.cartService.pointsOnly;
+
+  // Approve/Reject are blocked server-side (`IMP`) while shopping as an
+  // employee — hidden here too rather than waiting for that error.
+  readonly impersonating = computed(() => this.authService.impersonation() !== null);
 
   // Bound from the route (`/orders/:orderId`, see app.routes.ts).
   readonly orderId = input('');
@@ -123,7 +129,7 @@ export class OrderDetailPage implements OnInit {
   readonly statusLabel = orderStatusLabel;
   readonly statusTone = orderStatusTone;
   readonly lineStatusLabel = lineStatusLabel;
-  readonly historySourceLabel = historySourceLabel;
+  readonly historyByLabel = historyByLabel;
   readonly shipmentStatusLabel = shipmentStatusLabel;
   readonly approvalStepLabel = approvalStepLabel;
   readonly approvalStepStatusLabel = approvalStepStatusLabel;
@@ -210,9 +216,10 @@ export class OrderDetailPage implements OnInit {
         this.order.set(result);
         if (!this.autoOpened) {
           this.autoOpened = true;
-          if (result.viewerCanAct === 'Y' && this.action() === 'approve') {
+          const canAct = result.viewerCanAct === 'Y' && !this.impersonating();
+          if (canAct && this.action() === 'approve') {
             this.openApprove();
-          } else if (result.viewerCanAct === 'Y' && this.action() === 'reject') {
+          } else if (canAct && this.action() === 'reject') {
             this.openReject();
           }
         }

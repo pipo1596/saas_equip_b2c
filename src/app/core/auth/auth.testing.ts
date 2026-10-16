@@ -21,4 +21,5 @@ export const FAKE_SESSION: Session = {
   email: FAKE_EMAIL,
   phone: FAKE_PHONE,
   locations: [],
+  impersonation: null,
 };

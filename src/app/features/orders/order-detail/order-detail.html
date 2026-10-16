@@ -67,7 +67,7 @@
         }
       </div>
 
-      @if (order.viewerCanAct === 'Y') {
+      @if (order.viewerCanAct === 'Y' && !impersonating()) {
         <div class="order-detail__approval-actions d-flex gap-2 mt-3">
           <button type="button" class="btn btn-success d-flex align-items-center gap-2" (click)="openApprove()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -274,7 +274,7 @@
               @for (entry of sortedHistory(); track entry.ts + entry.toStatus + (entry.orderLineId ?? '')) {
                 <li class="order-detail__timeline-entry">
                   <span class="order-detail__timeline-label">{{ historyEntryLabel(entry) }}</span>
-                  <span class="order-detail__timeline-meta">{{ historySourceLabel(entry.source) }} · {{ entry.ts }}</span>
+                  <span class="order-detail__timeline-meta">{{ historyByLabel(entry) }} · {{ entry.ts }}</span>
                   @if (entry.note) {
                     <p class="order-detail__timeline-note">{{ entry.note }}</p>
                   }

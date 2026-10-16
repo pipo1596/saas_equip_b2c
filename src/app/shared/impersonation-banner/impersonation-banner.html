@@ -1,0 +1,8 @@
+@if (impersonation(); as imp) {
+  <div class="impersonation-banner" role="status">
+    <span>
+      You're shopping as <b>{{ fullName() }}</b> (signed in as {{ imp.actorName }}).
+    </span>
+    <button type="button" class="btn btn-sm btn-light" (click)="endSession()">End</button>
+  </div>
+}

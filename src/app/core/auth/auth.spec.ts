@@ -62,6 +62,30 @@ describe('AuthService', () => {
     expect(localStorage.getItem('auth.session')).toBeNull();
   });
 
+  it('restores a cached session from before `impersonation` existed as not impersonating, rather than discarding it', () => {
+    localStorage.setItem(
+      'auth.session',
+      JSON.stringify({
+        empId: FAKE_EMP_ID,
+        sessionId: FAKE_SESSION_ID,
+        firstName: 'P',
+        lastName: 'A',
+        email: '',
+        phone: '',
+        locations: [],
+      }),
+    );
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    const restored = TestBed.inject(AuthService);
+
+    expect(restored.isAuthenticated()).toBe(true);
+    expect(restored.impersonation()).toBeNull();
+  });
+
   it('sets the session (including email/phone) on a successful login with no MFA step', () => {
     service.login('jane.doe@example.com', 'TestPass123!').subscribe();
 
@@ -92,6 +116,7 @@ describe('AuthService', () => {
       email: FAKE_EMAIL,
       phone: FAKE_PHONE,
       locations: [],
+      impersonation: null,
     });
   });
 
@@ -172,6 +197,7 @@ describe('AuthService', () => {
       email: '',
       phone: '',
       locations: [],
+      impersonation: null,
     });
   });
 
@@ -408,5 +434,96 @@ describe('AuthService', () => {
     service.logout();
 
     expect(service.resendMfa()).toBeNull();
+  });
+
+  describe('redeemShopAs', () => {
+    it('posts SHOPAS1 with the token and sets an impersonating session', () => {
+      service.redeemShopAs('9f3c...token').subscribe();
+
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN');
+      expect(req.request.body).toEqual({ action: 'SHOPAS1', token: '9f3c...token' });
+      req.flush({
+        success: true,
+        impersonating: true,
+        empId: FAKE_EMP_ID,
+        source: 'L',
+        sessionId: FAKE_SESSION_ID,
+        firstName: FAKE_FIRST_NAME,
+        lastName: FAKE_LAST_NAME,
+        email: FAKE_EMAIL,
+        actorName: 'Pat Admin',
+        actorLevel: 'L1',
+        message: null,
+      });
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
+        .flush({ empId: FAKE_EMP_ID, firstName: FAKE_FIRST_NAME, lastName: FAKE_LAST_NAME, impersonation: { active: true, actorName: 'Pat Admin', actorLevel: 'L1' } });
+
+      expect(service.isAuthenticated()).toBe(true);
+      expect(service.impersonation()).toEqual({ active: true, actorName: 'Pat Admin', actorLevel: 'L1' });
+    });
+
+    it('does nothing to the session on a failed redeem', () => {
+      service.redeemShopAs('bad-token').subscribe();
+
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN')
+        .flush({ success: false, message: 'This shop-as link is invalid, has expired, or was already used.' });
+
+      expect(service.isAuthenticated()).toBe(false);
+    });
+  });
+
+  describe('endSession', () => {
+    function signInAsImpersonating() {
+      service.redeemShopAs('9f3c...token').subscribe();
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN').flush({
+        success: true,
+        empId: FAKE_EMP_ID,
+        sessionId: FAKE_SESSION_ID,
+        firstName: FAKE_FIRST_NAME,
+        lastName: FAKE_LAST_NAME,
+        actorName: 'Pat Admin',
+        actorLevel: 'L1' as const,
+        message: null,
+      });
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
+        .flush({ empId: FAKE_EMP_ID, firstName: FAKE_FIRST_NAME, lastName: FAKE_LAST_NAME, impersonation: { active: true, actorName: 'Pat Admin', actorLevel: 'L1' } });
+    }
+
+    it('posts SHOPEND, clears the session, and flags sessionEnded when it was impersonating', () => {
+      signInAsImpersonating();
+
+      service.endSession().subscribe();
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN');
+      expect(req.request.body).toEqual({ action: 'SHOPEND' });
+      req.flush({ success: true, wasImpersonating: true, message: null });
+
+      expect(service.isAuthenticated()).toBe(false);
+      expect(service.sessionEnded()).toBe(true);
+    });
+
+    it('clears the session without flagging sessionEnded for a normal (non-impersonating) sign-out', () => {
+      service.login('jane.doe@example.com', 'TestPass123!').subscribe();
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN').flush({
+        success: true,
+        mfaRequired: false,
+        empId: FAKE_EMP_ID,
+        sessionId: FAKE_SESSION_ID,
+        message: null,
+      } satisfies LoginResponse);
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
+        .flush({ empId: FAKE_EMP_ID, firstName: FAKE_FIRST_NAME, lastName: FAKE_LAST_NAME });
+
+      service.endSession().subscribe();
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN')
+        .flush({ success: true, wasImpersonating: false, message: null });
+
+      expect(service.isAuthenticated()).toBe(false);
+      expect(service.sessionEnded()).toBe(false);
+    });
   });
 });

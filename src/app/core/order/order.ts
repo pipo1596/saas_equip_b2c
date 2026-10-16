@@ -22,7 +22,10 @@ export type LineStatus = 'OPEN' | 'BACKORDERED' | 'PARTIALLY_SHIPPED' | 'SHIPPED
 
 export interface ApiError {
   success: false;
-  code: 'PCH' | 'INS' | 'NFD' | 'BOP' | 'ERR';
+  // `IMP` — approve/reject attempted while shopping as the employee (the
+  // buttons should already be hidden then; see `historyByLabel`/
+  // `order-detail.ts`'s `impersonating` gate).
+  code: 'PCH' | 'INS' | 'NFD' | 'BOP' | 'ERR' | 'IMP';
   message: string;
 }
 
@@ -514,6 +517,18 @@ const HISTORY_SOURCE_LABELS: Record<HistoryEntry['source'], string> = {
 
 export function historySourceLabel(source: HistoryEntry['source']): string {
   return HISTORY_SOURCE_LABELS[source];
+}
+
+// A history entry recorded during a shop-as session carries `by:
+// "SHOP:<L1|L2>:<adminId>/EMP:<employeeId>"` instead of the usual internal
+// tag — surfaced as a specific, friendlier label here instead of whatever
+// `historySourceLabel(entry.source)` would otherwise show (typically "You",
+// since it's still a `PORTAL`-sourced entry either way).
+export function historyByLabel(entry: HistoryEntry): string {
+  if (entry.by?.startsWith('SHOP:')) {
+    return 'Placed by admin on behalf of the employee';
+  }
+  return historySourceLabel(entry.source);
 }
 
 const SHIPMENT_STATUS_LABELS: Record<Shipment['status'], string> = {

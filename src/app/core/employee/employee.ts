@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
-import { Observable, of, shareReplay, tap } from 'rxjs';
+import { Observable, map, of, shareReplay, tap } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 
@@ -9,6 +9,15 @@ export interface EmployeeLocation {
   locationId: number;
   locationCode: string;
   locationName: string;
+}
+
+// `active` is always `true` when present — this is only ever non-null for a
+// shop-as session; a normal employee session gets `null`, never `{active:
+// false, ...}`.
+export interface Impersonation {
+  active: true;
+  actorName: string;
+  actorLevel: 'L1' | 'L2';
 }
 
 // Field names beyond empId/firstName/lastName/locations are best guesses
@@ -23,6 +32,11 @@ export interface EmployeeDetails {
   phone?: string;
   jobTitle?: string;
   department?: string;
+  impersonation: Impersonation | null;
+}
+
+interface RawEmployeeDetails extends Omit<EmployeeDetails, 'impersonation'> {
+  impersonation?: Impersonation | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -48,8 +62,9 @@ export class EmployeeService {
 
     if (!this.request$) {
       this.request$ = this.http
-        .post<EmployeeDetails>(this.dispatchUrl, { empId, sessionId, action: '*GET' })
+        .post<RawEmployeeDetails>(this.dispatchUrl, { empId, sessionId, action: '*GET' })
         .pipe(
+          map((raw) => ({ ...raw, impersonation: raw.impersonation ?? null })),
           tap((employee) => this.employee.set(employee)),
           shareReplay(1),
         );

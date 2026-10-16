@@ -123,6 +123,13 @@ export class CartService {
   // a loading state on first load without it firing on every add/remove.
   readonly loading = signal(false);
 
+  // Drops back to an empty cart without a network call — used when signing
+  // out (including ending a shop-as session), so a stale cart never
+  // momentarily shows through before the next real `load()`.
+  reset(): void {
+    this.cart.set(EMPTY_CART);
+  }
+
   // True once the employee actually has allotment rules and *none* of them
   // pay in dollars — not just a strict all-points allotment, but a mix of
   // points and units too (e.g. a "knife" unit grant alongside a points

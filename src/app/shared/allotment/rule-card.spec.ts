@@ -72,17 +72,20 @@ describe('AllotmentRuleCard', () => {
     expect(fixture.nativeElement.querySelector('.rule-card__renews')).toBeNull();
   });
 
-  it('summarizes the primary balance, its cycle, and an all-assortments coverage in one line', () => {
+  it('summarizes the primary balance and its cycle, with an all-assortments coverage badge', () => {
     const fixture = TestBed.createComponent(AllotmentRuleCard);
     fixture.componentRef.setInput('rule', BASE_RULE);
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('.rule-card__summary')?.textContent?.trim()).toBe(
-      '$600.00 every 12 months · Any item in the catalog',
+      '$600.00 every 12 months',
+    );
+    expect(fixture.nativeElement.querySelector('.rule-card__coverage')?.textContent?.trim()).toBe(
+      'Any item in the catalog',
     );
   });
 
-  it('summarizes specific categories and unit grants in the coverage half of the summary', () => {
+  it('shows specific categories and unit grants as the coverage badge', () => {
     const fixture = TestBed.createComponent(AllotmentRuleCard);
     fixture.componentRef.setInput('rule', {
       ...BASE_RULE,
@@ -97,7 +100,10 @@ describe('AllotmentRuleCard', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('.rule-card__summary')?.textContent?.trim()).toBe(
-      '5 units every 12 months · Tactical items only',
+      '5 units every 12 months',
+    );
+    expect(fixture.nativeElement.querySelector('.rule-card__coverage')?.textContent?.trim()).toBe(
+      'Tactical items only',
     );
   });
 

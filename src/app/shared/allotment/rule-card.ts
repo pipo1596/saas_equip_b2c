@@ -36,6 +36,13 @@ interface BalanceLine {
           }
         </div>
         <p class="rule-card__summary">{{ summaryLine() }}</p>
+        <p class="rule-card__coverage">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82Z" />
+            <circle cx="6.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+          </svg>
+          {{ coverageText() }}
+        </p>
 
         @for (line of balanceLines(); track line.label) {
           <app-allotment-balance-box class="rule-card__balance-box" [balance]="line.balance" [unit]="line.unit" />
@@ -81,7 +88,19 @@ interface BalanceLine {
     .rule-card__summary {
       font-size: 12.5px;
       color: var(--slate-600);
-      margin: 2px 0 10px;
+      margin: 2px 0 6px;
+    }
+    .rule-card__coverage {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--action);
+      background: color-mix(in srgb, var(--action) 8%, white);
+      padding: 4px 10px;
+      border-radius: 999px;
+      margin: 0 0 12px;
     }
     .rule-card__balance-box {
       display: block;
@@ -132,19 +151,21 @@ export class AllotmentRuleCard {
     return lines;
   });
 
-  // "$500.00 every 12 months · Any item in the catalog" — the rule's own
-  // headline, using whichever balance matches its `primaryUnit`.
+  // "$500.00 every 12 months" — the rule's own cycle headline, using
+  // whichever balance matches its `primaryUnit`. What it actually *covers*
+  // is surfaced separately (`coverageText`, below) as its own badge rather
+  // than folded into this line — it's the detail people most need to
+  // notice at a glance (e.g. a rule scoped to one category, not "any item"),
+  // and it was easy to miss buried in a single muted line.
   readonly summaryLine = computed(() => {
     const rule = this.rule();
     const balance = tileBalance(rule);
-    const parts = [
-      balance
-        ? `${formatBalanceAmount(balance.total, rule.primaryUnit)} every ${rule.cycle.renewalPeriodMonths} months`
-        : null,
-      coverageLabel(rule),
-    ].filter((part): part is string => !!part);
-    return parts.join(' · ');
+    return balance
+      ? `${formatBalanceAmount(balance.total, rule.primaryUnit)} every ${rule.cycle.renewalPeriodMonths} months`
+      : '';
   });
+
+  readonly coverageText = computed(() => coverageLabel(this.rule()));
 
   readonly carryoverSummary = computed(() => {
     const { carryover } = this.rule();

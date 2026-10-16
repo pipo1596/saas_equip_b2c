@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideRouter } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 
+import { AuthService } from '../../../core/auth/auth';
 import { CartService } from '../../../core/cart/cart';
 import { POINTS_ONLY_ALLOTMENT } from '../../../core/cart/cart.testing';
 import { OrderDetailPage } from './order-detail';
@@ -417,6 +418,44 @@ describe('OrderDetailPage', () => {
       expect(actions.textContent).toContain('Reject');
     });
 
+    it('hides Approve/Reject while shopping as the employee, even when viewerCanAct is Y', () => {
+      TestBed.inject(AuthService).session.set({
+        empId: 'E1',
+        sessionId: 'S1',
+        firstName: 'Jane',
+        lastName: 'Doe',
+        email: '',
+        phone: '',
+        locations: [],
+        impersonation: { active: true, actorName: 'Pat Admin', actorLevel: 'L1' },
+      });
+      const { fixture } = createPage();
+      fixture.detectChanges();
+      flushOrderGet(httpMock, PENDING_ORDER);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.order-detail__approval-actions')).toBeNull();
+    });
+
+    it('does not auto-open the Approve dialog from ?action=approve while shopping as the employee', () => {
+      TestBed.inject(AuthService).session.set({
+        empId: 'E1',
+        sessionId: 'S1',
+        firstName: 'Jane',
+        lastName: 'Doe',
+        email: '',
+        phone: '',
+        locations: [],
+        impersonation: { active: true, actorName: 'Pat Admin', actorLevel: 'L1' },
+      });
+      const { fixture, page } = createPage('42', 'approve');
+      fixture.detectChanges();
+      flushOrderGet(httpMock, PENDING_ORDER);
+      fixture.detectChanges();
+
+      expect(page.actionDialog()).toBeNull();
+    });
+
     it('disables the Reject submit button until a reason is entered, then posts *REJECT', () => {
       const { fixture, page } = createPage();
       fixture.detectChanges();
@@ -581,6 +620,31 @@ describe('OrderDetailPage', () => {
       expect(text).toContain('Looks good');
       expect(text).toContain('2026-10-03');
       expect(text).toContain('$500.00');
+    });
+
+    it('labels an order-placed entry recorded during a shop-as session instead of the usual "You"', () => {
+      const { fixture } = createPage();
+      fixture.detectChanges();
+      flushOrderGet(httpMock, {
+        ...BASE_ORDER,
+        viewerCanAct: 'N' as const,
+        history: [
+          {
+            fromStatus: null,
+            toStatus: 'PROCESSING',
+            source: 'PORTAL' as const,
+            note: null,
+            orderLineId: null,
+            ts: '2026-09-30 10:00:00',
+            by: 'SHOP:L1:9001/EMP:345',
+          },
+        ],
+      });
+      fixture.detectChanges();
+
+      const timeline: HTMLElement = fixture.nativeElement.querySelector('.order-detail__timeline');
+      expect(timeline.textContent).toContain('Placed by admin on behalf of the employee');
+      expect(timeline.textContent).not.toContain('You');
     });
   });
 });

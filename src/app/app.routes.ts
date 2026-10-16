@@ -20,6 +20,12 @@ export const routes: Routes = [
       import('./features/auth/forgot-password/forgot-password').then((m) => m.ForgotPassword),
   },
   {
+    // Public, no guard — the admin console's new tab may hold no session, or
+    // an unrelated one; this must work unconditionally.
+    path: 'shop-as',
+    loadComponent: () => import('./features/auth/shop-as/shop-as').then((m) => m.ShopAs),
+  },
+  {
     path: 'home',
     canActivate: [authGuard],
     loadComponent: () => import('./features/home/home').then((m) => m.Home),

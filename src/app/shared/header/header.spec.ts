@@ -1085,6 +1085,7 @@ describe('Header', () => {
     const header = fixture.componentInstance;
     const auth = TestBed.inject(AuthService);
     const router = TestBed.inject(Router);
+    const httpMock = TestBed.inject(HttpTestingController);
     const navigateSpy = vi.spyOn(router, 'navigateByUrl');
 
     auth.session.set({ ...FAKE_SESSION, locations: [] });
@@ -1092,8 +1093,12 @@ describe('Header', () => {
     expect(header.userMenuOpen()).toBe(true);
 
     header.logOut();
-
     expect(header.userMenuOpen()).toBe(false);
+
+    const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN');
+    expect(req.request.body).toEqual({ action: 'SHOPEND' });
+    req.flush({ success: true, wasImpersonating: false, message: null });
+
     expect(auth.session()).toBeNull();
     expect(navigateSpy).toHaveBeenCalledWith('/');
   });
