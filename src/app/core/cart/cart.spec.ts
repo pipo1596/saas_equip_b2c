@@ -534,22 +534,29 @@ describe('CartService', () => {
       expect(service.pointsOnly()).toBe(true);
     });
 
-    it('is also true for a pure-units allotment, or a mix of points and units — dollars are what actually gates this, not points specifically', () => {
-      const UNITS_RULE = {
-        ...DOLLAR_RULE,
-        ruleId: 14,
-        ruleName: 'Knife Allowance',
-        allotType: 'UNITS' as const,
-        primaryUnit: 'UNITS' as const,
-        dollars: null,
-        units: { total: 1, used: 0, inCart: 0, available: 1 },
-      };
+    const UNITS_RULE = {
+      ...DOLLAR_RULE,
+      ruleId: 14,
+      ruleName: 'Knife Allowance',
+      allotType: 'UNITS' as const,
+      primaryUnit: 'UNITS' as const,
+      dollars: null,
+      units: { total: 1, used: 0, inCart: 0, available: 1 },
+    };
 
+    it('is false for a pure-units allotment — there is no points rule to pay the rest with, so it falls back to dollars like anyone else', () => {
       service.cart.set(cartWithRules([UNITS_RULE]));
-      expect(service.pointsOnly()).toBe(true);
+      expect(service.pointsOnly()).toBe(false);
+    });
 
+    it('is true for a mix of points and units with no dollar rule — points is the only real fallback once units runs out', () => {
       service.cart.set(cartWithRules([UNITS_RULE, POINTS_RULE]));
       expect(service.pointsOnly()).toBe(true);
+    });
+
+    it('is false for a mix of units and dollars with no points rule', () => {
+      service.cart.set(cartWithRules([UNITS_RULE, DOLLAR_RULE]));
+      expect(service.pointsOnly()).toBe(false);
     });
   });
 });

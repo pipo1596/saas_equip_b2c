@@ -131,20 +131,30 @@ export class CartService {
     this.cart.set(EMPTY_CART);
   }
 
-  // True once the employee actually has allotment rules and *none* of them
-  // pay in dollars — not just a strict all-points allotment, but a mix of
-  // points and units too (e.g. a "knife" unit grant alongside a points
-  // allowance, with no dollar rule anywhere). Dollars take priority over
-  // points in the real checkout allocation (units, then dollars, then
-  // points — see `allocateLine`), so dollar pricing is only ever
-  // meaningful when a dollar rule actually exists; a mix that's missing one
-  // entirely can never draw on it regardless of what else it has. No rules
-  // at all (e.g. no location resolved yet) falls back to showing dollars
-  // like everyone else. Read site-wide to suppress dollar pricing for an
+  // True once the employee actually has a points rule, and no dollar rule
+  // exists anywhere to fall back to instead — not just a strict all-points
+  // allotment, but a mix of points and units too (e.g. a "knife" unit grant
+  // alongside a points allowance, with no dollar rule anywhere). Dollars
+  // take priority over points in the real checkout allocation (units, then
+  // dollars, then points — see `allocateLine`), so dollar pricing is only
+  // ever meaningful when a dollar rule actually exists; a mix that's
+  // missing one entirely can never draw on it regardless of what else it
+  // has.
+  //
+  // Requiring an actual points rule (not just "no dollar rule") matters for
+  // a units-only allotment: with no dollar rule *and* no points rule, the
+  // old check still said "points only", showing points pricing for
+  // anything the units grant didn't cover — even though there's no points
+  // balance at all to pay that with. Units-only (or no allotment at all,
+  // e.g. no location resolved yet) falls back to showing dollars like
+  // everyone else. Read site-wide to suppress dollar pricing for an
   // employee who can never actually pay in dollars.
   readonly pointsOnly = computed(() => {
     const rules = this.cart().allotment?.rules ?? [];
-    return rules.length > 0 && rules.every((rule) => rule.primaryUnit !== 'DOLLARS');
+    return (
+      rules.some((rule) => rule.primaryUnit === 'POINTS') &&
+      rules.every((rule) => rule.primaryUnit !== 'DOLLARS')
+    );
   });
   // Owned here (not by the header) so any component with a "success" moment
   // — e.g. product detail after `addItem` resolves — can pop the header's
