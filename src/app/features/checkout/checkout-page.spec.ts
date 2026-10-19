@@ -370,7 +370,7 @@ describe('CheckoutPage', () => {
     // which isn't what this is testing.
     const summary: HTMLElement = fixture.nativeElement.querySelector('.checkout-page__summary');
     expect(summary.textContent).not.toContain('$');
-    expect(summary.textContent).not.toContain('Subtotal due');
+    expect(summary.textContent).not.toContain('Sub total');
     expect(summary.textContent).not.toContain('Total');
     expect(summary.textContent).toContain('300 pts');
   });
@@ -768,6 +768,75 @@ describe('CheckoutPage', () => {
     expect(page.orderTotal()).toBeCloseTo(expectedTotal, 5);
 
     expect(fixture.nativeElement.querySelector('.alert-warning')?.textContent).toContain('$41.32');
+  });
+
+  it('shows the covered (non-card) total in its own "On account" section when the goods are covered but shipping/tax are not', () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    const page = fixture.componentInstance;
+    fixture.detectChanges();
+    flushInitialCartLoads(httpMock, FULLY_COVERED_CART);
+    flushCheckoutData(httpMock, {
+      cust_addrs: [PRIMARY_ADDRESS],
+      ship_addrs: [PRIMARY_ADDRESS],
+      ship_mthds: [DEFAULT_SHIP_METHOD],
+      tax_rates: [QC_TAX_RATE],
+    });
+    fixture.detectChanges();
+
+    // Only the covered goods (179.98) — shipping/tax are excluded from this
+    // allotment's coverage, so they're not part of the "doesn't need a card"
+    // total.
+    expect(page.onAccountTotal()).toBeCloseTo(179.98, 5);
+    const amount: HTMLElement = fixture.nativeElement.querySelector('.checkout-page__on-account-amount');
+    expect(amount.textContent?.trim()).toBe('$179.98');
+  });
+
+  it('includes shipping/tax in "On account" once the allotment covers those too', () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    const page = fixture.componentInstance;
+    fixture.detectChanges();
+    flushInitialCartLoads(httpMock, CART_WITH_SHIPPING_AND_TAX_COVERED);
+    flushCheckoutData(httpMock, {
+      cust_addrs: [PRIMARY_ADDRESS],
+      ship_addrs: [PRIMARY_ADDRESS],
+      ship_mthds: [DEFAULT_SHIP_METHOD],
+      tax_rates: [QC_TAX_RATE],
+    });
+    fixture.detectChanges();
+
+    expect(page.onAccountTotal()).toBeCloseTo(179.98 + 12.5 + (179.98 + 12.5) * 0.14975, 5);
+    expect(fixture.nativeElement.querySelector('.checkout-page__on-account-amount')).not.toBeNull();
+  });
+
+  it('hides the "On account" section entirely when nothing is covered by allotment', () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    fixture.detectChanges();
+    flushInitialCartLoads(httpMock, CART);
+    flushCheckoutData(httpMock, {
+      cust_addrs: [PRIMARY_ADDRESS],
+      ship_addrs: [PRIMARY_ADDRESS],
+      ship_mthds: [DEFAULT_SHIP_METHOD],
+      tax_rates: [QC_TAX_RATE],
+    });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.checkout-page__on-account-amount')).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('On account');
+  });
+
+  it('hides the "On account" section for a points-only employee, even when fully covered', () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    fixture.detectChanges();
+    flushInitialCartLoads(httpMock, POINTS_FULLY_COVERED_CART);
+    flushCheckoutData(httpMock, {
+      cust_addrs: [PRIMARY_ADDRESS],
+      ship_addrs: [PRIMARY_ADDRESS],
+      ship_mthds: [DEFAULT_SHIP_METHOD],
+      tax_rates: [QC_TAX_RATE],
+    });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.checkout-page__on-account-amount')).toBeNull();
   });
 
   it('should not charge shipping/tax to the card when the allotment explicitly covers them too', () => {

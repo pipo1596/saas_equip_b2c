@@ -193,6 +193,16 @@ export class CheckoutPage implements OnInit {
       : this.subtotalDue() + this.shippingCost() + this.taxAmount();
   });
 
+  // The dollar side of the order that's covered by allotment and never
+  // touches a card — the grand total (items + shipping + tax) minus
+  // whatever `orderTotal` already says is due on card. Only meaningful in
+  // dollar mode: a points-only employee has no credit-card fallback at all
+  // (see `orderTotal`'s own comment), so there's no "on account vs. card"
+  // split to show them.
+  readonly onAccountTotal = computed(() =>
+    this.cart().subtotalPrice + this.shippingCost() + this.taxAmount() - this.orderTotal(),
+  );
+
   readonly submitting = signal(false);
   readonly placeOrderError = signal<string | null>(null);
   // `PCH` is a warning, not a blocking error — the cart's just been

@@ -188,6 +188,16 @@
               }
             </section>
 
+            @if (!pointsOnly() && onAccountTotal() > 0) {
+              <section class="checkout-page__panel">
+                <h2 class="checkout-page__section-title">On account</h2>
+                <div class="d-flex justify-content-between align-items-baseline">
+                  <span class="checkout-page__on-account-note">Covered by your allotment — not charged to a card</span>
+                  <b class="checkout-page__on-account-amount">{{ onAccountTotal() | currency }}</b>
+                </div>
+              </section>
+            }
+
           </div>
 
           <div class="col-lg-4">
@@ -270,7 +280,7 @@
               @if (!pointsOnly()) {
                 <hr />
                 <div class="d-flex justify-content-between align-items-baseline mb-2">
-                  <span>Subtotal due</span>
+                  <span class="checkout-page__summary-pill">Sub total</span>
                   <b>{{ subtotalDue() | currency }}</b>
                 </div>
                 <div class="d-flex justify-content-between align-items-baseline mb-2">
