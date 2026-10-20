@@ -447,7 +447,7 @@ describe('CartPage', () => {
     expect(fixture.nativeElement.textContent).toContain('Out of stock.');
   });
 
-  describe('unit allotment quantity cap', () => {
+  describe('unit allotment exceeded warning', () => {
     const UNITS_RULE = {
       ruleId: 31,
       ruleName: 'Unit Allotment',
@@ -498,26 +498,7 @@ describe('CartPage', () => {
       };
     }
 
-    it('disables the "+" button and sets max once the line\'s quantity reaches what is available', () => {
-      const fixture = TestBed.createComponent(CartPage);
-      const page = fixture.componentInstance;
-      fixture.detectChanges();
-      // 2 available + this line's own current qty (2, already counted in
-      // that figure) = a cap of 4.
-      flushInitialCartLoads(httpMock, cartWithUnitsLine({ total: 10, used: 4, inCart: 2, available: 2 }));
-      fixture.detectChanges();
-
-      expect(page.maxQuantityFor(CART.items[0])).toBe(4);
-
-      const row: HTMLElement = fixture.nativeElement.querySelectorAll('.cart-page__row')[0];
-      const plusBtn = row.querySelector('.qty-stepper__btn:last-of-type') as HTMLButtonElement;
-      const input = row.querySelector('.qty-stepper__input') as HTMLInputElement;
-      // The fixture's own quantity (2) is below the cap (4), so still enabled.
-      expect(plusBtn.disabled).toBe(false);
-      expect(input.max).toBe('4');
-    });
-
-    it('clamps a typed-in value down to what is available', () => {
+    it('allows raising the quantity past what is available — no stepper cap anymore', () => {
       const fixture = TestBed.createComponent(CartPage);
       const page = fixture.componentInstance;
       fixture.detectChanges();
@@ -527,61 +508,25 @@ describe('CartPage', () => {
       page.setQuantity(CART.items[0], 9);
 
       const req = expectCartRequest(httpMock, '*UPDATE_QT');
-      expect(req.request.body).toEqual({ action: '*UPDATE_QT', skuId: 9001, qty: 4, locationId: null });
+      expect(req.request.body).toEqual({ action: '*UPDATE_QT', skuId: 9001, qty: 9, locationId: null });
     });
 
-    it("caps at this line's own current quantity when available is exactly 0 (nothing further to give, but this line still holds what it has)", () => {
+    it('shows no warning and allows Checkout while the rule is not over-drawn', () => {
       const fixture = TestBed.createComponent(CartPage);
-      const page = fixture.componentInstance;
       fixture.detectChanges();
-      // `available: 0` here means the rule's whole remaining capacity is
-      // already exactly this line's own 2 units — not that the rule is so
-      // overdrawn there's nothing to cap at all (see the "truly exhausted"
-      // test below for that case).
-      flushInitialCartLoads(httpMock, cartWithUnitsLine({ total: 10, used: 8, inCart: 2, available: 0 }));
+      flushInitialCartLoads(httpMock, cartWithUnitsLine({ total: 10, used: 4, inCart: 2, available: 2 }));
       fixture.detectChanges();
 
-      expect(page.maxQuantityFor(CART.items[0])).toBe(2);
-
-      // Clamping 9 down to 2 lands right back on this line's own current
-      // quantity (2) — a no-op, not a request to "update" to what it
-      // already is.
-      page.setQuantity(CART.items[0], 9);
-      httpMock.expectNone((req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCCART' && req.body?.action === '*UPDATE_QT');
+      expect(fixture.nativeElement.textContent).not.toContain('is exceeded');
+      expect(fixture.nativeElement.querySelector('a.cart-page__checkout')).not.toBeNull();
     });
 
-    it('still blocks increasing (but never blocks decreasing) once the rule is overdrawn beyond even what this line itself holds', () => {
+    it("shows the exceeded-rule message and disables Checkout once the cart's own contents drive the rule negative", () => {
       const fixture = TestBed.createComponent(CartPage);
-      const page = fixture.componentInstance;
-      fixture.detectChanges();
-      // This line holds 2 units, but the rule is already -5 overall (e.g.
-      // other lines overdrew it) — crediting this line's own 2 back still
-      // leaves -3. The backend already tagged this line as UNITS-covered,
-      // so that's a real (negative) cap, not "nothing to cap at all": it
-      // blocks raising the quantity further, same as a positive cap would.
-      flushInitialCartLoads(httpMock, cartWithUnitsLine({ total: 10, used: 13, inCart: 2, available: -5 }));
-      fixture.detectChanges();
-
-      expect(page.maxQuantityFor(CART.items[0])).toBe(-3);
-
-      // Raising it is blocked outright (clamped value stays at the current
-      // quantity, so nothing to update).
-      page.setQuantity(CART.items[0], 9);
-      httpMock.expectNone((req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCCART' && req.body?.action === '*UPDATE_QT');
-
-      // Lowering it must still go through — a cap never blocks a decrease.
-      page.setQuantity(CART.items[0], 1);
-      const req = expectCartRequest(httpMock, '*UPDATE_QT');
-      expect(req.request.body).toEqual({ action: '*UPDATE_QT', skuId: 9001, qty: 1, locationId: null });
-    });
-
-    it("recovers a cap from a negative available figure once this line's own quantity is credited back (the exact real-world case that was broken)", () => {
-      const fixture = TestBed.createComponent(CartPage);
-      const page = fixture.componentInstance;
       fixture.detectChanges();
       // Mirrors the real bug report: total 11, used 4, this one line sitting
       // at 8 units already (over the 7 truly available) swings `available`
-      // to -1 — the true cap is still 7 (11 - 4), not "no cap at all".
+      // to -1.
       const EIGHT_CAPS = { ...CART.items[0], quantity: 8 };
       flushInitialCartLoads(httpMock, {
         ...cartWithUnitsLine({ total: 11, used: 4, inCart: 8, available: -1 }),
@@ -589,25 +534,22 @@ describe('CartPage', () => {
       });
       fixture.detectChanges();
 
-      expect(page.maxQuantityFor(EIGHT_CAPS)).toBe(7);
-
-      const row: HTMLElement = fixture.nativeElement.querySelectorAll('.cart-page__row')[0];
-      const plusBtn = row.querySelector('.qty-stepper__btn:last-of-type') as HTMLButtonElement;
-      expect(plusBtn.disabled).toBe(true);
-
-      page.setQuantity(EIGHT_CAPS, 9);
-      const req = expectCartRequest(httpMock, '*UPDATE_QT');
-      expect(req.request.body).toEqual({ action: '*UPDATE_QT', skuId: 9001, qty: 7, locationId: null });
+      expect(fixture.nativeElement.textContent).toContain(
+        'Your Unit Allotment is exceeded. Please adjust qty before checking out.',
+      );
+      expect(fixture.nativeElement.querySelector('a.cart-page__checkout')).toBeNull();
+      const checkoutBtn: HTMLButtonElement = fixture.nativeElement.querySelector('button.cart-page__checkout');
+      expect(checkoutBtn.disabled).toBe(true);
     });
 
-    it('applies no cap to a line not covered by a units rule', () => {
+    it('shows no warning for a rule over-drawn by real usage alone, with nothing of this cart against it', () => {
       const fixture = TestBed.createComponent(CartPage);
-      const page = fixture.componentInstance;
       fixture.detectChanges();
-      flushInitialCartLoads(httpMock, CART);
+      flushInitialCartLoads(httpMock, cartWithUnitsLine({ total: 10, used: 12, inCart: 0, available: -2 }));
       fixture.detectChanges();
 
-      expect(page.maxQuantityFor(CART.items[0])).toBe(Infinity);
+      expect(fixture.nativeElement.textContent).not.toContain('is exceeded');
+      expect(fixture.nativeElement.querySelector('a.cart-page__checkout')).not.toBeNull();
     });
   });
 
@@ -666,19 +608,6 @@ describe('CartPage', () => {
         },
       };
     }
-
-    it('caps the stepper at the quota limit and disables "+", matching the real reported scenario', () => {
-      const fixture = TestBed.createComponent(CartPage);
-      const page = fixture.componentInstance;
-      fixture.detectChanges();
-      flushInitialCartLoads(httpMock, cartWithQuotaItem(2));
-      fixture.detectChanges();
-
-      expect(page.maxQuantityFor(page.cart().items[0])).toBe(2);
-      const row: HTMLElement = fixture.nativeElement.querySelectorAll('.cart-page__row')[0];
-      const plusBtn = row.querySelector('.qty-stepper__btn:last-of-type') as HTMLButtonElement;
-      expect(plusBtn.disabled).toBe(true);
-    });
 
     it('shows the exact exceeded-quota message and disables Checkout once over the limit', () => {
       const fixture = TestBed.createComponent(CartPage);

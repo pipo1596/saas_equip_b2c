@@ -25,6 +25,9 @@
       @for (status of exceededQuotas(); track status.quota.quotaId) {
         <div class="alert alert-warning" role="alert">{{ quotaExceededMessage(status) }}</div>
       }
+      @for (rule of exceededUnitRules(); track rule.ruleId) {
+        <div class="alert alert-warning" role="alert">{{ unitRuleExceededMessage(rule) }}</div>
+      }
 
       @if (cart().items.length === 0) {
         <div class="cart-page__empty text-center py-5">
@@ -131,7 +134,7 @@
                 </div>
               }
 
-              @if (exceededQuotas().length === 0) {
+              @if (exceededQuotas().length === 0 && exceededUnitRules().length === 0) {
                 <a routerLink="/checkout" class="cart-page__checkout">
                   <span class="cart-page__checkout-title">Checkout</span>
                 </a>
@@ -223,7 +226,6 @@
         type="number"
         class="qty-stepper__input"
         min="1"
-        [attr.max]="maxQuantityFor(item) === Infinity ? null : maxQuantityFor(item)"
         step="1"
         [value]="item.quantity"
         [disabled]="updatingSkuId() === item.skuId || clearing()"
@@ -233,7 +235,7 @@
       <button
         type="button"
         class="qty-stepper__btn"
-        [disabled]="updatingSkuId() === item.skuId || clearing() || item.quantity >= maxQuantityFor(item)"
+        [disabled]="updatingSkuId() === item.skuId || clearing()"
         (click)="setQuantity(item, item.quantity + 1)"
         aria-label="Increase quantity"
       >

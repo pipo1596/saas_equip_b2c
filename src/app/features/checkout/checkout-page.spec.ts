@@ -866,6 +866,35 @@ describe('CheckoutPage', () => {
     expect(fixture.nativeElement.textContent).toContain('(covered by allotment)');
   });
 
+  it("shows the order's real Sub total/Total even when fully covered by allotment, instead of reading $0.00", () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    const page = fixture.componentInstance;
+    fixture.detectChanges();
+    flushInitialCartLoads(httpMock, CART_WITH_SHIPPING_AND_TAX_COVERED);
+    flushCheckoutData(httpMock, {
+      cust_addrs: [PRIMARY_ADDRESS],
+      ship_addrs: [PRIMARY_ADDRESS],
+      ship_mthds: [DEFAULT_SHIP_METHOD],
+      tax_rates: [QC_TAX_RATE],
+    });
+    fixture.detectChanges();
+
+    // Fully covered, so nothing is actually due on card — `subtotalDue`/
+    // `orderTotal` (the card-due figures) are correctly both 0 here.
+    expect(page.subtotalDue()).toBe(0);
+    expect(page.orderTotal()).toBe(0);
+    // But "Sub total"/"Total" are display-only and always show the order's
+    // real value, regardless of what an allotment covers.
+    expect(page.fullSubtotal()).toBe(179.98);
+    expect(page.fullTotal()).toBeCloseTo(179.98 + 12.5 + page.taxAmount(), 5);
+
+    const summary: HTMLElement = fixture.nativeElement.querySelector('.checkout-page__summary');
+    const rows: HTMLElement[] = Array.from(summary.querySelectorAll('.d-flex'));
+    const totalRow = rows.find((row) => row.querySelector('span')?.textContent?.trim() === 'Total');
+    expect(totalRow?.querySelector('b')?.textContent?.trim()).not.toBe('$0.00');
+    expect(summary.textContent).toContain('$179.98');
+  });
+
   it('blocks placing the order when a category quota is exceeded, even though the balance is otherwise fully covered', () => {
     const fixture = TestBed.createComponent(CheckoutPage);
     const page = fixture.componentInstance;
@@ -906,6 +935,35 @@ describe('CheckoutPage', () => {
     expect(page.canPlaceOrder()).toBe(false);
     expect(fixture.nativeElement.textContent).toContain(
       'Your quota for 2 Caps is exceeded. Please adjust qty before checking out.',
+    );
+  });
+
+  it("blocks placing the order when a unit-allotment rule is exceeded by the cart's own contents, even though the balance is otherwise fully covered", () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    const page = fixture.componentInstance;
+    fixture.detectChanges();
+    const ruleWithExceededUnits = {
+      ...CART_WITH_SHIPPING_AND_TAX_COVERED.allotment!.rules[0],
+      units: { total: 10, used: 4, inCart: 8, available: -2 },
+    };
+    flushInitialCartLoads(httpMock, {
+      ...CART_WITH_SHIPPING_AND_TAX_COVERED,
+      allotment: { ...CART_WITH_SHIPPING_AND_TAX_COVERED.allotment!, rules: [ruleWithExceededUnits] },
+    });
+    flushCheckoutData(httpMock, {
+      cust_addrs: [PRIMARY_ADDRESS],
+      ship_addrs: [PRIMARY_ADDRESS],
+      ship_mthds: [DEFAULT_SHIP_METHOD],
+      tax_rates: [QC_TAX_RATE],
+    });
+    fixture.detectChanges();
+    page.contactForm.setValue({ email: 'pat@example.com', firstName: 'Pat', lastName: 'Doe', phone: '555-0100', extension: '' });
+    fixture.detectChanges();
+
+    expect(page.orderTotal()).toBe(0);
+    expect(page.canPlaceOrder()).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain(
+      `Your ${ruleWithExceededUnits.ruleName} is exceeded. Please adjust qty before checking out.`,
     );
   });
 

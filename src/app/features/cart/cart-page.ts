@@ -14,17 +14,17 @@ import {
   formatBalanceAmount,
   formatCartItemOptions,
   tileBalance,
-  unitQuantityCap,
 } from '../../core/cart/cart';
 import {
   amountDueAtCheckout,
   exceededQuotas,
+  exceededUnitRules,
   lineTagByItemId,
   paidFromLines,
   pointsShortfall,
   quotaExceededMessage,
-  quotaUnitCapForCategories,
   resolvedAllocations,
+  unitRuleExceededMessage,
 } from '../../core/cart/cart-totals';
 import { LocationSelectionService } from '../../core/location/location-selection';
 import { AllotmentBalanceBox } from '../../shared/allotment/balance-box';
@@ -61,10 +61,6 @@ export class CartPage implements OnInit {
 
   readonly cart = this.cartService.cart;
   readonly pointsOnly = this.cartService.pointsOnly;
-  // Exposed for the template's own `maxQuantityFor(item) === Infinity`
-  // check — templates only resolve against the component instance, not
-  // globals.
-  readonly Infinity = Infinity;
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   // Which sku a quantity change or remove is currently in flight for — lets
@@ -124,10 +120,15 @@ export class CartPage implements OnInit {
   // allotment's limit the cart currently sits, for a points-only employee
   // (who has no card fallback, so this is their only "Balance" figure).
   readonly pointsShortfall = computed(() => pointsShortfall(this.cart()));
-  // Any category quota the cart currently sits over — checkout is blocked
-  // until these clear (see the "Checkout" link in the template).
+  // Any category quota, or units rule the cart's own contents have driven
+  // negative, the cart currently sits over — checkout is blocked until
+  // these clear (see the "Checkout" link in the template). Quantities
+  // themselves are never capped anymore; a shopper can add as many as they
+  // like, and finds out about a limit here instead.
   readonly exceededQuotas = computed(() => exceededQuotas(this.cart()));
   readonly quotaExceededMessage = quotaExceededMessage;
+  readonly exceededUnitRules = computed(() => exceededUnitRules(this.cart()));
+  readonly unitRuleExceededMessage = unitRuleExceededMessage;
 
   lineTag(cartItemId: number): PayTag | null {
     return this.tagsByItemId().get(cartItemId) ?? null;
@@ -137,28 +138,6 @@ export class CartPage implements OnInit {
   // — `null` when nothing covers it, same as `lineTag` returning nothing.
   primaryAllocation(item: CartItem): LineAllocation | null {
     return resolvedAllocations(item, this.tagsByItemId().get(item.cartItemId))[0] ?? null;
-  }
-
-  // `Infinity` (rather than `null`) so the stepper's own clamp/disabled
-  // checks stay plain arithmetic — see `unitQuantityCap`'s own doc for when
-  // a cap applies at all. `item.quantity` is passed back in as what's
-  // "already counted" since this line is already sitting in the cart —
-  // raising it just reclaims headroom it already holds under the rule,
-  // rather than needing fresh room on top. Combines two independent caps —
-  // the rule's own unit balance, and any category quota (which applies
-  // regardless of which rule ends up paying for the line) — taking
-  // whichever is more restrictive.
-  maxQuantityFor(item: CartItem): number {
-    const allocation = this.primaryAllocation(item);
-    const allotmentCap =
-      allocation?.payUnit === 'UNITS'
-        ? (unitQuantityCap(
-            (this.cart().allotment?.rules ?? []).find((candidate) => candidate.ruleId === allocation.ruleId) ?? null,
-            item.quantity,
-          ) ?? Infinity)
-        : Infinity;
-    const quotaCap = quotaUnitCapForCategories(this.cart(), item.progCatIds, item.cartItemId) ?? Infinity;
-    return Math.min(allotmentCap, quotaCap);
   }
 
   // Only populated (and only worth showing under the price) once a line's
@@ -288,20 +267,17 @@ export class CartPage implements OnInit {
 
   // The stepper's own floor is 1, not 0 — `*UPDATE_QT` would delete the
   // line outright at 0, which should only happen via the explicit Remove
-  // link, not an accidental extra click/scroll on the stepper. The ceiling
-  // (when a units rule covers this line — see `maxQuantityFor`) clamps a
-  // typed-in value rather than rejecting it outright, same as the floor —
-  // but only when actually *raising* the quantity; a line already sitting
-  // above its own cap (e.g. one added before the cap existed, or where the
-  // rule's gone negative since) must still be reducible, not stuck.
+  // link, not an accidental extra click/scroll on the stepper. No ceiling —
+  // a shopper can raise this as high as they like; going over a unit
+  // allotment or category quota just surfaces a warning and blocks
+  // checkout instead (see `exceededQuotas`/`exceededUnitRules`).
   setQuantity(item: CartItem, qty: number): void {
-    const clamped = qty <= item.quantity ? qty : Math.min(qty, this.maxQuantityFor(item));
-    if (clamped === item.quantity || clamped < 1 || this.updatingSkuId() !== null || this.clearing()) {
+    if (qty === item.quantity || qty < 1 || this.updatingSkuId() !== null || this.clearing()) {
       return;
     }
     this.updatingSkuId.set(item.skuId);
     this.error.set(null);
-    this.cartService.setQuantity(item.skuId, clamped, this.currentLocationId()).subscribe({
+    this.cartService.setQuantity(item.skuId, qty, this.currentLocationId()).subscribe({
       next: () => this.updatingSkuId.set(null),
       error: (err: unknown) => {
         this.updatingSkuId.set(null);

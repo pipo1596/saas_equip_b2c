@@ -20,9 +20,11 @@ import { CartService, formatBalanceAmount, formatCartItemOptions } from '../../c
 import {
   amountDueAtCheckout,
   exceededQuotas,
+  exceededUnitRules,
   paidFromLines,
   pointsShortfall,
   quotaExceededMessage,
+  unitRuleExceededMessage,
 } from '../../core/cart/cart-totals';
 import {
   CheckoutService,
@@ -154,6 +156,12 @@ export class CheckoutPage implements OnInit {
   // order the same as an uncovered balance does (see `canPlaceOrder`).
   readonly exceededQuotas = computed(() => exceededQuotas(this.cart()));
   readonly quotaExceededMessage = quotaExceededMessage;
+  // Same treatment for a unit-allotment rule the cart's own contents have
+  // driven negative — the cart page is the primary place this is caught,
+  // but this is the defensive backstop in case the cart changed between
+  // viewing it and reaching this page.
+  readonly exceededUnitRules = computed(() => exceededUnitRules(this.cart()));
+  readonly unitRuleExceededMessage = unitRuleExceededMessage;
 
   // `FLAT` is the only rate type the API gives a cost for today — anything
   // else has nothing to show yet, so it's treated as "not costed" rather
@@ -213,6 +221,15 @@ export class CheckoutPage implements OnInit {
     this.cart().subtotalPrice + this.shippingCost() + this.taxAmount() - this.orderTotal(),
   );
 
+  // The order's real dollar value, regardless of how much of it an
+  // allotment covers — unlike `subtotalDue`/`orderTotal` (which only count
+  // what's actually left to pay by card, and can read $0 on a fully-covered
+  // order), "Sub total"/"Total" in the summary always show the same figures
+  // whether or not anything is covered. What *is* covered shows separately,
+  // in the "Paid from"/"On account" breakdown.
+  readonly fullSubtotal = computed(() => this.cart().subtotalPrice);
+  readonly fullTotal = computed(() => this.fullSubtotal() + this.shippingCost() + this.taxAmount());
+
   readonly submitting = signal(false);
   readonly placeOrderError = signal<string | null>(null);
   // `PCH` is a warning, not a blocking error — the cart's just been
@@ -223,6 +240,7 @@ export class CheckoutPage implements OnInit {
     () =>
       this.orderTotal() === 0 &&
       this.exceededQuotas().length === 0 &&
+      this.exceededUnitRules().length === 0 &&
       !!this.selectedAddress() &&
       !!this.selectedShipMethod() &&
       this.contactFormStatus() === 'VALID' &&

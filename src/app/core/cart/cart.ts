@@ -29,7 +29,6 @@ export {
   meterPct,
   ruleForCategories,
   tileBalance,
-  unitQuantityCap,
 } from './allotment';
 
 // Just the display labels for this line's variant (Color/Size/etc.) — for

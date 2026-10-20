@@ -206,36 +206,6 @@ export function tileBalance(rule: AllotmentRule): Balance | null {
   return rule.dollars;
 }
 
-// The highest quantity a line covered by a units rule can be set to —
-// `null` means no cap applies at all, because `rule` isn't a units-type
-// rule (nothing to cap) or doesn't cover this line. Otherwise *always*
-// returns a real number, even `0` or negative — callers must not treat a
-// low-or-negative result as "no cap"; it means there's genuinely no room
-// for more right now, which should block adding/increasing rather than
-// quietly falling back to unlimited. (An actually-exhausted units rule
-// never reaches here in the first place: `ruleForCategories` stops
-// attributing coverage to one once it's really out, at which point
-// `coveringRule`/the line's own tag points elsewhere and this function
-// isn't even called with it.)
-//
-// `alreadyCounted` is how much of this exact line's own current quantity
-// is already folded into `rule.units.available` — `0` for a line not in
-// the cart yet, or the line's own existing quantity when adjusting one
-// already there, since raising it just reclaims headroom it already holds
-// rather than needing fresh room on top. Adding it back can turn a
-// negative `available` into a positive cap (e.g. a line sitting at 8 units
-// against a rule with only 7 truly available swings `available` to -1,
-// but the real cap for that line is still 7) — so this always computes the
-// sum and hands it back as-is, never short-circuiting on `available`
-// alone.
-export function unitQuantityCap(rule: AllotmentRule | null, alreadyCounted = 0): number | null {
-  const available = rule?.units?.available;
-  if (available === undefined) {
-    return null;
-  }
-  return available + alreadyCounted;
-}
-
 // The ordered rules this one falls back to once exhausted, resolved from
 // `fallbackRuleIds` against the full rule list — e.g. Uniform's own chain
 // resolves to `[Footwear]`. Skips any id that doesn't resolve to an actual

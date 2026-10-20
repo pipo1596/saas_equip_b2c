@@ -3,7 +3,7 @@
 // checkout" figures in both places rather than two subtly different copies
 // of the same calculation.
 
-import { AllotmentQuota, Cart, CartItem, LineAllocation, LineTag, PayUnit, tileBalance } from './cart';
+import { AllotmentQuota, AllotmentRule, Cart, CartItem, LineAllocation, LineTag, PayUnit, tileBalance } from './cart';
 
 export function lineTagByItemId(cart: Cart): Map<number, LineTag> {
   return new Map((cart.allotment?.lineTags ?? []).map((tag) => [tag.cartItemId, tag]));
@@ -105,39 +105,21 @@ export function quotaExceededMessage(status: QuotaStatus): string {
   return `Your quota for ${quota.limitValue} ${plural} is exceeded. Please adjust qty before checking out.`;
 }
 
-// The highest this item's own quantity can be without exceeding any
-// UNITS-type quota covering its categories — crediting back its own
-// current contribution (same "give back what's already yours" pattern as
-// `unitQuantityCap`), via `excludeCartItemId` (the cart line being
-// adjusted, or `null` for a fresh add not in the cart yet). `null` means no
-// UNITS quota applies at all. DOLLARS/POINTS-type quotas aren't translated
-// into a quantity cap here — there's no reliable per-unit amount to divide
-// a dollar/points limit by — they still show up via `quotaStatuses`/
-// `exceededQuotas` for a warning and a checkout block, just not as a
-// stepper ceiling.
-export function quotaUnitCapForCategories(
-  cart: Cart,
-  progCatIds: readonly number[],
-  excludeCartItemId: number | null,
-): number | null {
+// Every units (or dollar-units) rule whose balance the *cart itself* has
+// driven negative — `available < 0` with something actually `inCart`
+// against it, as opposed to a rule that was already over-drawn by real
+// usage alone before this cart held anything of its own. Nothing caps the
+// quantity stepper anymore (shoppers can add as many as they like); this
+// is what the cart page warns about instead, and what blocks moving on to
+// checkout.
+export function exceededUnitRules(cart: Cart): AllotmentRule[] {
   const rules = cart.allotment?.rules ?? [];
-  let cap: number | null = null;
-  for (const rule of rules) {
-    for (const quota of rule.quotas) {
-      if (quota.limitType !== 'UNITS' || quota.progCatId === null) {
-        continue;
-      }
-      if (!progCatIds.includes(quota.progCatId)) {
-        continue;
-      }
-      const usedByOthers = cart.items
-        .filter((item) => item.cartItemId !== excludeCartItemId && item.progCatIds.includes(quota.progCatId as number))
-        .reduce((sum, item) => sum + item.quantity, 0);
-      const thisCap = quota.limitValue - usedByOthers;
-      cap = cap === null ? thisCap : Math.min(cap, thisCap);
-    }
-  }
-  return cap;
+  return rules.filter((rule) => rule.units !== null && rule.units.inCart > 0 && rule.units.available < 0);
+}
+
+// "Your Unit Allotment is exceeded. Please adjust qty before checking out."
+export function unitRuleExceededMessage(rule: AllotmentRule): string {
+  return `Your ${rule.ruleName} is exceeded. Please adjust qty before checking out.`;
 }
 
 // What actually pays for this order, one line per rule with anything

@@ -2,12 +2,13 @@ import { Allotment, AllotmentQuota, AllotmentRule, Cart, CartItem, LineTag } fro
 import {
   amountDueAtCheckout,
   exceededQuotas,
+  exceededUnitRules,
   paidFromLines,
   pointsShortfall,
   quotaExceededMessage,
   quotaStatuses,
-  quotaUnitCapForCategories,
   resolvedAllocations,
+  unitRuleExceededMessage,
 } from './cart-totals';
 import { POINTS_ONLY_ALLOTMENT } from './cart.testing';
 
@@ -344,41 +345,54 @@ describe('quotaExceededMessage', () => {
   });
 });
 
-describe('quotaUnitCapForCategories', () => {
-  it('caps at the quota limit for a fresh add (nothing in the cart yet)', () => {
-    const cart = cartWithQuotas([CAP_QUOTA], []);
-    expect(quotaUnitCapForCategories(cart, [63], null)).toBe(2);
+function ruleWithUnits(overrides: Partial<AllotmentRule> = {}): AllotmentRule {
+  return {
+    ...POINTS_ONLY_ALLOTMENT.rules[0],
+    ruleId: 7,
+    ruleName: 'Uniform Allowance',
+    allotType: 'UNITS',
+    primaryUnit: 'UNITS',
+    points: null,
+    units: { total: 10, used: 0, inCart: 5, available: 5 },
+    ...overrides,
+  };
+}
+
+describe('exceededUnitRules', () => {
+  it('is empty when a units rule is not over-drawn', () => {
+    const rule = ruleWithUnits({ units: { total: 10, used: 0, inCart: 5, available: 5 } });
+    const cart: Cart = { cartId: 1, itemCount: 0, subtotalPrice: 0, subtotalPoints: 0, items: [], allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [rule] } };
+
+    expect(exceededUnitRules(cart)).toEqual([]);
   });
 
-  it("credits an existing line's own quantity back, so adjusting it isn't capped at the full limit minus itself", () => {
-    const cap = makeItem({ cartItemId: 1, quantity: 2, progCatIds: [63] });
-    const cart = cartWithQuotas([CAP_QUOTA], [cap]);
+  it("includes a units rule the cart's own contents have driven negative", () => {
+    const rule = ruleWithUnits({ units: { total: 10, used: 4, inCart: 8, available: -2 } });
+    const cart: Cart = { cartId: 1, itemCount: 0, subtotalPrice: 0, subtotalPoints: 0, items: [], allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [rule] } };
 
-    // Without crediting its own 2 back, this would wrongly cap at 0.
-    expect(quotaUnitCapForCategories(cart, [63], 1)).toBe(2);
+    expect(exceededUnitRules(cart)).toEqual([rule]);
   });
 
-  it('subtracts what other lines already use, for a fresh add sharing the same category', () => {
-    const capA = makeItem({ cartItemId: 1, quantity: 1, progCatIds: [63] });
-    const cart = cartWithQuotas([CAP_QUOTA], [capA]);
+  it('excludes a rule that is over-drawn but has nothing in the cart against it', () => {
+    const rule = ruleWithUnits({ units: { total: 10, used: 12, inCart: 0, available: -2 } });
+    const cart: Cart = { cartId: 1, itemCount: 0, subtotalPrice: 0, subtotalPoints: 0, items: [], allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [rule] } };
 
-    expect(quotaUnitCapForCategories(cart, [63], null)).toBe(1);
+    expect(exceededUnitRules(cart)).toEqual([]);
   });
 
-  it('is null when no UNITS quota covers the given categories', () => {
-    const cart = cartWithQuotas([CAP_QUOTA], []);
-    expect(quotaUnitCapForCategories(cart, [66], null)).toBeNull();
-  });
+  it('excludes a rule with no units balance at all (a dollars/points-only rule)', () => {
+    const rule = ruleWithUnits({ units: null });
+    const cart: Cart = { cartId: 1, itemCount: 0, subtotalPrice: 0, subtotalPoints: 0, items: [], allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [rule] } };
 
-  it('is null for a DOLLARS/POINTS-type quota — not translated into a quantity cap', () => {
-    const dollarQuota: AllotmentQuota = { ...CAP_QUOTA, limitType: 'DOLLARS' };
-    const cart = cartWithQuotas([dollarQuota], []);
-    expect(quotaUnitCapForCategories(cart, [63], null)).toBeNull();
+    expect(exceededUnitRules(cart)).toEqual([]);
   });
+});
 
-  it('takes the most restrictive of multiple quotas covering the same item', () => {
-    const tightQuota: AllotmentQuota = { ...CAP_QUOTA, quotaId: 99, limitValue: 1 };
-    const cart = cartWithQuotas([CAP_QUOTA, tightQuota], []);
-    expect(quotaUnitCapForCategories(cart, [63], null)).toBe(1);
+describe('unitRuleExceededMessage', () => {
+  it('matches the expected wording', () => {
+    const rule = ruleWithUnits({ ruleName: 'Uniform Allowance' });
+    expect(unitRuleExceededMessage(rule)).toBe(
+      'Your Uniform Allowance is exceeded. Please adjust qty before checking out.',
+    );
   });
 });
