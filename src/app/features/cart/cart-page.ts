@@ -18,9 +18,12 @@ import {
 } from '../../core/cart/cart';
 import {
   amountDueAtCheckout,
+  exceededQuotas,
   lineTagByItemId,
   paidFromLines,
   pointsShortfall,
+  quotaExceededMessage,
+  quotaUnitCapForCategories,
   resolvedAllocations,
 } from '../../core/cart/cart-totals';
 import { LocationSelectionService } from '../../core/location/location-selection';
@@ -121,6 +124,10 @@ export class CartPage implements OnInit {
   // allotment's limit the cart currently sits, for a points-only employee
   // (who has no card fallback, so this is their only "Balance" figure).
   readonly pointsShortfall = computed(() => pointsShortfall(this.cart()));
+  // Any category quota the cart currently sits over — checkout is blocked
+  // until these clear (see the "Checkout" link in the template).
+  readonly exceededQuotas = computed(() => exceededQuotas(this.cart()));
+  readonly quotaExceededMessage = quotaExceededMessage;
 
   lineTag(cartItemId: number): PayTag | null {
     return this.tagsByItemId().get(cartItemId) ?? null;
@@ -137,14 +144,21 @@ export class CartPage implements OnInit {
   // a cap applies at all. `item.quantity` is passed back in as what's
   // "already counted" since this line is already sitting in the cart —
   // raising it just reclaims headroom it already holds under the rule,
-  // rather than needing fresh room on top.
+  // rather than needing fresh room on top. Combines two independent caps —
+  // the rule's own unit balance, and any category quota (which applies
+  // regardless of which rule ends up paying for the line) — taking
+  // whichever is more restrictive.
   maxQuantityFor(item: CartItem): number {
     const allocation = this.primaryAllocation(item);
-    if (allocation?.payUnit !== 'UNITS') {
-      return Infinity;
-    }
-    const rule = (this.cart().allotment?.rules ?? []).find((candidate) => candidate.ruleId === allocation.ruleId);
-    return unitQuantityCap(rule ?? null, item.quantity) ?? Infinity;
+    const allotmentCap =
+      allocation?.payUnit === 'UNITS'
+        ? (unitQuantityCap(
+            (this.cart().allotment?.rules ?? []).find((candidate) => candidate.ruleId === allocation.ruleId) ?? null,
+            item.quantity,
+          ) ?? Infinity)
+        : Infinity;
+    const quotaCap = quotaUnitCapForCategories(this.cart(), item.progCatIds, item.cartItemId) ?? Infinity;
+    return Math.min(allotmentCap, quotaCap);
   }
 
   // Only populated (and only worth showing under the price) once a line's

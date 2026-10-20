@@ -38,6 +38,7 @@ const CART: Cart = {
         { optName: 'Color', valueDesc: 'Black' },
         { optName: 'Size', valueDesc: 'M' },
       ],
+      progCatIds: [],
     },
   ],
 };
@@ -863,6 +864,49 @@ describe('CheckoutPage', () => {
 
     expect(fixture.nativeElement.querySelector('.alert-warning')).toBeNull();
     expect(fixture.nativeElement.textContent).toContain('(covered by allotment)');
+  });
+
+  it('blocks placing the order when a category quota is exceeded, even though the balance is otherwise fully covered', () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    const page = fixture.componentInstance;
+    fixture.detectChanges();
+    const ruleWithQuota = {
+      ...CART_WITH_SHIPPING_AND_TAX_COVERED.allotment!.rules[0],
+      quotas: [
+        {
+          quotaId: 12,
+          programId: 3,
+          programName: "St John's Fire",
+          progCatId: 60,
+          categoryName: 'Cap',
+          limitType: 'UNITS' as const,
+          limitValue: 2,
+        },
+      ],
+    };
+    flushInitialCartLoads(httpMock, {
+      ...CART_WITH_SHIPPING_AND_TAX_COVERED,
+      items: [{ ...CART.items[0], quantity: 5, progCatIds: [60] }],
+      allotment: { ...CART_WITH_SHIPPING_AND_TAX_COVERED.allotment!, rules: [ruleWithQuota] },
+    });
+    flushCheckoutData(httpMock, {
+      cust_addrs: [PRIMARY_ADDRESS],
+      ship_addrs: [PRIMARY_ADDRESS],
+      ship_mthds: [DEFAULT_SHIP_METHOD],
+      tax_rates: [QC_TAX_RATE],
+    });
+    fixture.detectChanges();
+    page.contactForm.setValue({ email: 'pat@example.com', firstName: 'Pat', lastName: 'Doe', phone: '555-0100', extension: '' });
+    fixture.detectChanges();
+
+    // Everything else that gates `canPlaceOrder` is satisfied (balance is
+    // $0, address/ship method/contact are all set) — only the quota blocks
+    // it.
+    expect(page.orderTotal()).toBe(0);
+    expect(page.canPlaceOrder()).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain(
+      'Your quota for 2 Caps is exceeded. Please adjust qty before checking out.',
+    );
   });
 
   it('should not block a points-only order over leftover dollar shipping/tax it never sees or pays', () => {

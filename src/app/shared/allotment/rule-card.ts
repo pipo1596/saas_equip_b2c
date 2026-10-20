@@ -183,11 +183,15 @@ export class AllotmentRuleCard {
     return summary;
   });
 
+  // Category name leads rather than trailing after the limit — two quotas
+  // with the same limit (e.g. "2 units max" for both Cap and Shoe) read as
+  // obviously distinct this way, instead of both starting with the exact
+  // same phrase and looking like a duplicate at a glance.
   readonly quotasSummary = computed(() =>
     this.rule()
       .quotas.map(
         (quota) =>
-          `${quota.limitValue} ${quota.limitType.toLowerCase()} max · ${quota.categoryName ?? 'All categories'} (${quota.programName})`,
+          `${quota.categoryName ?? 'All categories'}: ${quota.limitValue} ${quota.limitType.toLowerCase()} max (${quota.programName})`,
       )
       .join('; '),
   );

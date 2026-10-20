@@ -64,6 +64,11 @@ export interface CartItem {
   isAvailable: string;
   imageUrl: string;
   options: CartItemOption[];
+  // Every program category this line's product belongs to — matched
+  // against an allotment rule's quota (`AllotmentQuota.progCatId`) to check
+  // the cart against it, the same way `Product.progCatIds` previews
+  // allotment coverage on a listing card.
+  progCatIds: number[];
 }
 
 export interface Cart {
@@ -92,12 +97,17 @@ const EMPTY_CART: Cart = {
   allotment: null,
 };
 
+interface RawCartItem extends Omit<CartItem, 'options' | 'progCatIds'> {
+  options: CartItemOption[] | null;
+  progCatIds: number[] | null;
+}
+
 interface RawCart {
   cartId: number | null;
   itemCount: number;
   subtotalPrice: number;
   subtotalPoints: number | null;
-  items: CartItem[] | null;
+  items: RawCartItem[] | null;
   allotment: RawAllotment | null;
 }
 
@@ -109,7 +119,11 @@ interface ApiFailure {
 function normalizeCart(raw: RawCart): Cart {
   return {
     ...raw,
-    items: (raw.items ?? []).map((item) => ({ ...item, options: item.options ?? [] })),
+    items: (raw.items ?? []).map((item) => ({
+      ...item,
+      options: item.options ?? [],
+      progCatIds: item.progCatIds ?? [],
+    })),
     allotment: normalizeAllotment(raw.allotment),
   };
 }

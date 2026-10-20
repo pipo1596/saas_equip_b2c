@@ -35,6 +35,7 @@ const CART: Cart = {
         { optName: 'Color', valueDesc: 'Black' },
         { optName: 'Size', valueDesc: 'M' },
       ],
+      progCatIds: [],
     },
   ],
 };

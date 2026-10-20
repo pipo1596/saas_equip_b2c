@@ -3,7 +3,7 @@
 // checkout" figures in both places rather than two subtly different copies
 // of the same calculation.
 
-import { Cart, CartItem, LineAllocation, LineTag, PayUnit, tileBalance } from './cart';
+import { AllotmentQuota, Cart, CartItem, LineAllocation, LineTag, PayUnit, tileBalance } from './cart';
 
 export function lineTagByItemId(cart: Cart): Map<number, LineTag> {
   return new Map((cart.allotment?.lineTags ?? []).map((tag) => [tag.cartItemId, tag]));
@@ -42,6 +42,102 @@ export interface PaidFromLine {
   ruleName: string;
   unit: PayUnit;
   amount: number;
+}
+
+export interface QuotaStatus {
+  quota: AllotmentQuota;
+  ruleId: number;
+  // In whatever unit `quota.limitType` implies — a quantity count for
+  // UNITS, a dollar amount for DOLLARS, a points amount for POINTS.
+  used: number;
+  exceeded: boolean;
+}
+
+function quotaUsageAmount(quota: AllotmentQuota, item: CartItem): number {
+  if (quota.limitType === 'DOLLARS') {
+    return item.lineTotalPrice;
+  }
+  if (quota.limitType === 'POINTS') {
+    return item.lineTotalPoints ?? 0;
+  }
+  return item.quantity;
+}
+
+// Every quota across every rule, with how much of it the cart currently
+// uses — summing whichever of quantity/lineTotalPrice/lineTotalPoints
+// matches the quota's own `limitType`, across every cart item whose
+// `progCatIds` includes the quota's `progCatId`. This reads a quota as "you
+// can't have more than N of this category in your cart at all", regardless
+// of which rule's `lineTag` actually ends up paying for any one item — a
+// quota is a sub-limit on the category itself, not on one funding source.
+// A quota with no `progCatId` can't be matched against any cart item from
+// here and is skipped — there's nothing client-side to check it against.
+export function quotaStatuses(cart: Cart): QuotaStatus[] {
+  const rules = cart.allotment?.rules ?? [];
+  const statuses: QuotaStatus[] = [];
+  for (const rule of rules) {
+    for (const quota of rule.quotas) {
+      if (quota.progCatId === null) {
+        continue;
+      }
+      const used = cart.items
+        .filter((item) => item.progCatIds.includes(quota.progCatId as number))
+        .reduce((sum, item) => sum + quotaUsageAmount(quota, item), 0);
+      statuses.push({ quota, ruleId: rule.ruleId, used, exceeded: used > quota.limitValue });
+    }
+  }
+  return statuses;
+}
+
+export function exceededQuotas(cart: Cart): QuotaStatus[] {
+  return quotaStatuses(cart).filter((status) => status.exceeded);
+}
+
+// "Your quota for 2 Caps is exceeded. Please adjust qty before checking
+// out." — the category name's own casing/plural comes straight from
+// `categoryName` as the API sent it (the API supplies a shared, non-count-
+// sensitive label, so this is a best-effort "add an s" rather than true
+// grammatical pluralization).
+export function quotaExceededMessage(status: QuotaStatus): string {
+  const { quota } = status;
+  const label = quota.categoryName ?? 'item';
+  const plural = quota.limitValue === 1 ? label : `${label}s`;
+  return `Your quota for ${quota.limitValue} ${plural} is exceeded. Please adjust qty before checking out.`;
+}
+
+// The highest this item's own quantity can be without exceeding any
+// UNITS-type quota covering its categories — crediting back its own
+// current contribution (same "give back what's already yours" pattern as
+// `unitQuantityCap`), via `excludeCartItemId` (the cart line being
+// adjusted, or `null` for a fresh add not in the cart yet). `null` means no
+// UNITS quota applies at all. DOLLARS/POINTS-type quotas aren't translated
+// into a quantity cap here — there's no reliable per-unit amount to divide
+// a dollar/points limit by — they still show up via `quotaStatuses`/
+// `exceededQuotas` for a warning and a checkout block, just not as a
+// stepper ceiling.
+export function quotaUnitCapForCategories(
+  cart: Cart,
+  progCatIds: readonly number[],
+  excludeCartItemId: number | null,
+): number | null {
+  const rules = cart.allotment?.rules ?? [];
+  let cap: number | null = null;
+  for (const rule of rules) {
+    for (const quota of rule.quotas) {
+      if (quota.limitType !== 'UNITS' || quota.progCatId === null) {
+        continue;
+      }
+      if (!progCatIds.includes(quota.progCatId)) {
+        continue;
+      }
+      const usedByOthers = cart.items
+        .filter((item) => item.cartItemId !== excludeCartItemId && item.progCatIds.includes(quota.progCatId as number))
+        .reduce((sum, item) => sum + item.quantity, 0);
+      const thisCap = quota.limitValue - usedByOthers;
+      cap = cap === null ? thisCap : Math.min(cap, thisCap);
+    }
+  }
+  return cap;
 }
 
 // What actually pays for this order, one line per rule with anything

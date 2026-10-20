@@ -883,6 +883,7 @@ describe('Header', () => {
           isAvailable: 'Y',
           imageUrl: '',
           options: [],
+          progCatIds: [],
         },
       ],
     });
@@ -1030,6 +1031,7 @@ describe('Header', () => {
           isAvailable: 'Y',
           imageUrl: '',
           options: [],
+          progCatIds: [],
         },
       ],
     });

@@ -1690,6 +1690,110 @@ describe('ProductDetail', () => {
     });
   });
 
+  describe('category quota enforcement', () => {
+    const DOLLAR_RULE_WITH_QUOTA = {
+      ruleId: 10,
+      ruleName: 'General Allotment',
+      allotType: 'DOLLAR' as const,
+      primaryUnit: 'DOLLARS' as const,
+      isBarRule: 'N' as const,
+      dollars: { total: 500, used: 0, inCart: 0, available: 500 },
+      units: null,
+      points: null,
+      cycle: {
+        renewalBasis: 'FIXED' as const,
+        renewalPeriodMonths: 12,
+        cycleStart: '2026-09-09',
+        cycleEnd: '2027-09-08',
+        renewsOn: '2027-09-09',
+        expirationDate: null,
+        onExpiration: 'SUSPEND' as const,
+      },
+      covers: { allAssortments: 'Y' as const, categories: [], unitGrants: [] },
+      carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
+      quotas: [
+        {
+          quotaId: 12,
+          programId: 3,
+          programName: "St John's Fire",
+          progCatId: 60,
+          categoryName: 'Cap',
+          limitType: 'UNITS' as const,
+          limitValue: 2,
+        },
+      ],
+      requireApproval: 'N' as const,
+      allowCcFallback: 'N' as const,
+    };
+
+    it('caps a fresh add at the quota limit', () => {
+      const fixture = TestBed.createComponent(ProductDetail);
+      const detail = fixture.componentInstance;
+      fixture.componentRef.setInput('productPk', '12345');
+      fixture.detectChanges();
+      expectRequest(httpMock, '*GET').flush({ ...RESPONSE, product: { ...PRODUCT, progCatIds: [60] } });
+      expectProductTagCartRequest(httpMock).flush({
+        cartId: null,
+        itemCount: 0,
+        subtotalPrice: 0,
+        subtotalPoints: null,
+        items: [],
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 1,
+          allotExclTaxFreight: 'N',
+          rules: [DOLLAR_RULE_WITH_QUOTA],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [],
+          productTag: null,
+        },
+      });
+      fixture.detectChanges();
+
+      expect(detail.maxQuantity()).toBe(2);
+      detail.setQuantity(5);
+      expect(detail.quantity()).toBe(2);
+    });
+
+    it("credits an edited line's own quantity back against the quota, rather than capping at the limit minus itself", () => {
+      const fixture = TestBed.createComponent(ProductDetail);
+      const detail = fixture.componentInstance;
+      fixture.componentRef.setInput('productPk', '12345');
+      fixture.componentRef.setInput('cartItemId', '9001');
+      fixture.detectChanges();
+      expectRequest(httpMock, '*GET').flush({ ...RESPONSE, product: { ...PRODUCT, progCatIds: [60] } });
+      expectProductTagCartRequest(httpMock).flush({
+        cartId: 501,
+        itemCount: 1,
+        subtotalPrice: 269.97,
+        subtotalPoints: null,
+        // This very line (quantity 3) is itself the only thing using the
+        // Cap quota — crediting it back means the real cap is the full
+        // limit (2)... which is actually *below* its current 3, matching a
+        // quota that was lowered after the line was added.
+        items: [{ ...CART_ITEM_TO_EDIT, progCatIds: [60] }],
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 1,
+          allotExclTaxFreight: 'N',
+          rules: [DOLLAR_RULE_WITH_QUOTA],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [],
+          productTag: null,
+        },
+      });
+      fixture.detectChanges();
+
+      // Excluded from "used by others" entirely (not merely credited back),
+      // so the cap is exactly the quota's own limit.
+      expect(detail.maxQuantity()).toBe(2);
+    });
+  });
+
   it('should disable a value once *AVAIL says it is no longer compatible', () => {
     const fixture = TestBed.createComponent(ProductDetail);
     const detail = fixture.componentInstance;

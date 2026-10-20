@@ -1,5 +1,14 @@
-import { Allotment, AllotmentRule, Cart, CartItem, LineTag } from './cart';
-import { amountDueAtCheckout, paidFromLines, pointsShortfall, resolvedAllocations } from './cart-totals';
+import { Allotment, AllotmentQuota, AllotmentRule, Cart, CartItem, LineTag } from './cart';
+import {
+  amountDueAtCheckout,
+  exceededQuotas,
+  paidFromLines,
+  pointsShortfall,
+  quotaExceededMessage,
+  quotaStatuses,
+  quotaUnitCapForCategories,
+  resolvedAllocations,
+} from './cart-totals';
 import { POINTS_ONLY_ALLOTMENT } from './cart.testing';
 
 function makeItem(overrides: Partial<CartItem> = {}): CartItem {
@@ -22,6 +31,7 @@ function makeItem(overrides: Partial<CartItem> = {}): CartItem {
     isAvailable: 'Y',
     imageUrl: '/photos/partner-2/products/111006-729-EFD.JPG',
     options: [],
+    progCatIds: [],
     ...overrides,
   };
 }
@@ -224,5 +234,151 @@ describe('amountDueAtCheckout', () => {
     const cart = makeOverdrawnPointsCart(1100);
     expect(amountDueAtCheckout(cart)).toBe(0);
     expect(pointsShortfall(cart)).toBe(1100);
+  });
+});
+
+const CAP_QUOTA: AllotmentQuota = {
+  quotaId: 12,
+  programId: 3,
+  programName: "St John's Fire",
+  progCatId: 63,
+  categoryName: 'Cap',
+  limitType: 'UNITS',
+  limitValue: 2,
+};
+
+const SHOE_QUOTA: AllotmentQuota = {
+  quotaId: 13,
+  programId: 3,
+  programName: "St John's Fire",
+  progCatId: 66,
+  categoryName: 'Shoe',
+  limitType: 'UNITS',
+  limitValue: 2,
+};
+
+function cartWithQuotas(quotas: AllotmentQuota[], items: CartItem[]): Cart {
+  const rule: AllotmentRule = { ...POINTS_ONLY_ALLOTMENT.rules[0], quotas };
+  return {
+    cartId: 1,
+    itemCount: items.length,
+    subtotalPrice: 0,
+    subtotalPoints: 0,
+    items,
+    allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [rule] },
+  };
+}
+
+describe('quotaStatuses / exceededQuotas', () => {
+  it('is not exceeded when the matching items stay at or under the limit', () => {
+    const cap = makeItem({ cartItemId: 1, quantity: 2, progCatIds: [63] });
+    const cart = cartWithQuotas([CAP_QUOTA], [cap]);
+
+    const [status] = quotaStatuses(cart);
+    expect(status.used).toBe(2);
+    expect(status.exceeded).toBe(false);
+    expect(exceededQuotas(cart)).toEqual([]);
+  });
+
+  it('is exceeded once the matching items go over the limit, matching the real reported case (qty 5 against a 2-unit Cap quota)', () => {
+    const cap = makeItem({ cartItemId: 1, quantity: 5, progCatIds: [63] });
+    const cart = cartWithQuotas([CAP_QUOTA], [cap]);
+
+    const [status] = quotaStatuses(cart);
+    expect(status.used).toBe(5);
+    expect(status.exceeded).toBe(true);
+    expect(exceededQuotas(cart)).toEqual([status]);
+  });
+
+  it('sums every matching line toward the same quota, across different cart items', () => {
+    const capA = makeItem({ cartItemId: 1, quantity: 1, progCatIds: [63] });
+    const capB = makeItem({ cartItemId: 2, quantity: 2, progCatIds: [63] });
+    const cart = cartWithQuotas([CAP_QUOTA], [capA, capB]);
+
+    expect(quotaStatuses(cart)[0].used).toBe(3);
+    expect(quotaStatuses(cart)[0].exceeded).toBe(true);
+  });
+
+  it('keeps two distinct quotas on the same rule independent, even with the same limit value — not a duplicate', () => {
+    const cap = makeItem({ cartItemId: 1, quantity: 5, progCatIds: [63] });
+    const shoe = makeItem({ cartItemId: 2, quantity: 1, progCatIds: [66] });
+    const cart = cartWithQuotas([CAP_QUOTA, SHOE_QUOTA], [cap, shoe]);
+
+    const statuses = quotaStatuses(cart);
+    expect(statuses).toHaveLength(2);
+    expect(statuses.find((s) => s.quota.quotaId === 12)?.exceeded).toBe(true);
+    expect(statuses.find((s) => s.quota.quotaId === 13)?.exceeded).toBe(false);
+  });
+
+  it('skips a quota with no progCatId — nothing client-side to match it against', () => {
+    const item = makeItem({ cartItemId: 1, quantity: 10, progCatIds: [] });
+    const cart = cartWithQuotas([{ ...CAP_QUOTA, progCatId: null, categoryName: null }], [item]);
+
+    expect(quotaStatuses(cart)).toEqual([]);
+  });
+
+  it('sums dollars (not quantity) for a DOLLARS-type quota', () => {
+    const item = makeItem({ cartItemId: 1, quantity: 1, lineTotalPrice: 150, progCatIds: [63] });
+    const dollarQuota: AllotmentQuota = { ...CAP_QUOTA, limitType: 'DOLLARS', limitValue: 100 };
+    const cart = cartWithQuotas([dollarQuota], [item]);
+
+    const [status] = quotaStatuses(cart);
+    expect(status.used).toBe(150);
+    expect(status.exceeded).toBe(true);
+  });
+});
+
+describe('quotaExceededMessage', () => {
+  it('matches the exact reported wording', () => {
+    const status = { quota: CAP_QUOTA, ruleId: 90, used: 5, exceeded: true };
+    expect(quotaExceededMessage(status)).toBe(
+      "Your quota for 2 Caps is exceeded. Please adjust qty before checking out.",
+    );
+  });
+
+  it('does not pluralize a limit of 1', () => {
+    const status = { quota: { ...CAP_QUOTA, limitValue: 1 }, ruleId: 90, used: 2, exceeded: true };
+    expect(quotaExceededMessage(status)).toBe(
+      "Your quota for 1 Cap is exceeded. Please adjust qty before checking out.",
+    );
+  });
+});
+
+describe('quotaUnitCapForCategories', () => {
+  it('caps at the quota limit for a fresh add (nothing in the cart yet)', () => {
+    const cart = cartWithQuotas([CAP_QUOTA], []);
+    expect(quotaUnitCapForCategories(cart, [63], null)).toBe(2);
+  });
+
+  it("credits an existing line's own quantity back, so adjusting it isn't capped at the full limit minus itself", () => {
+    const cap = makeItem({ cartItemId: 1, quantity: 2, progCatIds: [63] });
+    const cart = cartWithQuotas([CAP_QUOTA], [cap]);
+
+    // Without crediting its own 2 back, this would wrongly cap at 0.
+    expect(quotaUnitCapForCategories(cart, [63], 1)).toBe(2);
+  });
+
+  it('subtracts what other lines already use, for a fresh add sharing the same category', () => {
+    const capA = makeItem({ cartItemId: 1, quantity: 1, progCatIds: [63] });
+    const cart = cartWithQuotas([CAP_QUOTA], [capA]);
+
+    expect(quotaUnitCapForCategories(cart, [63], null)).toBe(1);
+  });
+
+  it('is null when no UNITS quota covers the given categories', () => {
+    const cart = cartWithQuotas([CAP_QUOTA], []);
+    expect(quotaUnitCapForCategories(cart, [66], null)).toBeNull();
+  });
+
+  it('is null for a DOLLARS/POINTS-type quota — not translated into a quantity cap', () => {
+    const dollarQuota: AllotmentQuota = { ...CAP_QUOTA, limitType: 'DOLLARS' };
+    const cart = cartWithQuotas([dollarQuota], []);
+    expect(quotaUnitCapForCategories(cart, [63], null)).toBeNull();
+  });
+
+  it('takes the most restrictive of multiple quotas covering the same item', () => {
+    const tightQuota: AllotmentQuota = { ...CAP_QUOTA, quotaId: 99, limitValue: 1 };
+    const cart = cartWithQuotas([CAP_QUOTA, tightQuota], []);
+    expect(quotaUnitCapForCategories(cart, [63], null)).toBe(1);
   });
 });

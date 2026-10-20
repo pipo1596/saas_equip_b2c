@@ -37,6 +37,7 @@ const CART: Cart = {
         { optName: 'Color', valueDesc: 'Black' },
         { optName: 'Size', valueDesc: 'M' },
       ],
+      progCatIds: [],
     },
     {
       cartItemId: 9002,
@@ -57,6 +58,7 @@ const CART: Cart = {
       isAvailable: 'Y',
       imageUrl: '',
       options: [],
+      progCatIds: [],
     },
   ],
 };
@@ -606,6 +608,100 @@ describe('CartPage', () => {
       fixture.detectChanges();
 
       expect(page.maxQuantityFor(CART.items[0])).toBe(Infinity);
+    });
+  });
+
+  describe('category quota enforcement', () => {
+    const POINTS_RULE_WITH_QUOTA = {
+      ruleId: 22,
+      ruleName: 'Allotment Points',
+      allotType: 'POINTS' as const,
+      primaryUnit: 'POINTS' as const,
+      isBarRule: 'N' as const,
+      dollars: null,
+      units: null,
+      points: { total: 450, used: 120, inCart: 0, available: 330 },
+      cycle: {
+        renewalBasis: 'FIXED' as const,
+        renewalPeriodMonths: 12,
+        cycleStart: '2026-01-01',
+        cycleEnd: '2026-12-31',
+        renewsOn: '2027-01-01',
+        expirationDate: null,
+        onExpiration: 'SUSPEND' as const,
+      },
+      covers: { allAssortments: 'Y' as const, categories: [], unitGrants: [] },
+      carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
+      quotas: [
+        {
+          quotaId: 12,
+          programId: 3,
+          programName: "St John's Fire",
+          progCatId: 63,
+          categoryName: 'Cap',
+          limitType: 'UNITS' as const,
+          limitValue: 2,
+        },
+      ],
+      requireApproval: 'N' as const,
+      allowCcFallback: 'N' as const,
+      fallbackRuleIds: [],
+    };
+
+    function cartWithQuotaItem(quantity: number) {
+      return {
+        ...CART,
+        items: [{ ...CART.items[0], quantity, progCatIds: [63] }],
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 1,
+          allotExclTaxFreight: 'N' as const,
+          rules: [POINTS_RULE_WITH_QUOTA],
+          approvals: { canApprove: 'N' as const, pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [
+            { cartItemId: 9001, skuId: 9001, ruleId: 22, payUnit: 'POINTS' as const, tagLabel: 'uses points', allocations: [] },
+          ],
+        },
+      };
+    }
+
+    it('caps the stepper at the quota limit and disables "+", matching the real reported scenario', () => {
+      const fixture = TestBed.createComponent(CartPage);
+      const page = fixture.componentInstance;
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, cartWithQuotaItem(2));
+      fixture.detectChanges();
+
+      expect(page.maxQuantityFor(page.cart().items[0])).toBe(2);
+      const row: HTMLElement = fixture.nativeElement.querySelectorAll('.cart-page__row')[0];
+      const plusBtn = row.querySelector('.qty-stepper__btn:last-of-type') as HTMLButtonElement;
+      expect(plusBtn.disabled).toBe(true);
+    });
+
+    it('shows the exact exceeded-quota message and disables Checkout once over the limit', () => {
+      const fixture = TestBed.createComponent(CartPage);
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, cartWithQuotaItem(5));
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.textContent).toContain(
+        'Your quota for 2 Caps is exceeded. Please adjust qty before checking out.',
+      );
+      expect(fixture.nativeElement.querySelector('a.cart-page__checkout')).toBeNull();
+      const checkoutBtn: HTMLButtonElement = fixture.nativeElement.querySelector('button.cart-page__checkout');
+      expect(checkoutBtn.disabled).toBe(true);
+    });
+
+    it('shows no warning and allows Checkout once back within the quota', () => {
+      const fixture = TestBed.createComponent(CartPage);
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, cartWithQuotaItem(2));
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.textContent).not.toContain('is exceeded');
+      expect(fixture.nativeElement.querySelector('a.cart-page__checkout')).not.toBeNull();
     });
   });
 

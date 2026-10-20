@@ -18,6 +18,7 @@ import { Router, RouterLink } from '@angular/router';
 import { switchMap } from 'rxjs';
 
 import { AllotmentRule, CartService, PayTag, ruleForCategories, unitQuantityCap } from '../../../core/cart/cart';
+import { quotaUnitCapForCategories } from '../../../core/cart/cart-totals';
 import { Breadcrumb, hasCrumbs } from '../../../core/catalog/breadcrumb';
 import {
   ProductAttribute,
@@ -162,10 +163,21 @@ export class ProductDetail implements OnInit {
   // below can stay a plain arithmetic op without a null-check at each
   // call site — see `unitQuantityCap`'s own doc for when a cap applies at
   // all.
-  readonly maxQuantity = computed(
-    () =>
-      unitQuantityCap(this.coveringRule(), this.isEditing() ? this.editedLineOriginalQuantity() : 0) ?? Infinity,
-  );
+  // Combines two independent caps — the covering rule's own unit balance,
+  // and any category quota (which applies regardless of which rule ends up
+  // paying) — taking whichever is more restrictive. `cartItemId` (when
+  // editing) is the exact cart line this page is adjusting, so the quota
+  // check can credit its own current quantity back the same way the units
+  // cap already does.
+  readonly maxQuantity = computed(() => {
+    const allotmentCap =
+      unitQuantityCap(this.coveringRule(), this.isEditing() ? this.editedLineOriginalQuantity() : 0) ?? Infinity;
+    const excludeCartItemId = this.isEditing() ? Number(this.cartItemId()) : null;
+    const quotaCap =
+      quotaUnitCapForCategories(this.cartService.cart(), this.product()?.progCatIds ?? [], excludeCartItemId) ??
+      Infinity;
+    return Math.min(allotmentCap, quotaCap);
+  });
   // The exact `selections()` object (by reference) that the currently-
   // loaded `resolvedSku` was actually fetched for — `selections.update()`
   // always produces a new object on any change, so comparing by reference

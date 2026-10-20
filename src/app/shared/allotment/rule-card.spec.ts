@@ -180,7 +180,7 @@ describe('AllotmentRuleCard', () => {
       ],
     });
     fixture.detectChanges();
-    expect(facts(fixture)).toContain('Quota limits: 6 units max · Shirts (ANB Standard Program)');
+    expect(facts(fixture)).toContain('Quota limits: Shirts: 6 units max (ANB Standard Program)');
   });
 
   it('falls back to "All categories" for a quota with no category', () => {
@@ -201,7 +201,39 @@ describe('AllotmentRuleCard', () => {
     });
     fixture.detectChanges();
 
-    expect(facts(fixture)).toContain('Quota limits: 100 dollars max · All categories (ANB Standard Program)');
+    expect(facts(fixture)).toContain('Quota limits: All categories: 100 dollars max (ANB Standard Program)');
+  });
+
+  it('keeps two quotas with the same limit clearly distinct, category-first, rather than looking duplicated', () => {
+    const fixture = TestBed.createComponent(AllotmentRuleCard);
+    fixture.componentRef.setInput('rule', {
+      ...BASE_RULE,
+      quotas: [
+        {
+          quotaId: 12,
+          programId: 3,
+          programName: "St John's Fire",
+          progCatId: 63,
+          categoryName: 'Cap',
+          limitType: 'UNITS' as const,
+          limitValue: 2,
+        },
+        {
+          quotaId: 13,
+          programId: 3,
+          programName: "St John's Fire",
+          progCatId: 66,
+          categoryName: 'Shoe',
+          limitType: 'UNITS' as const,
+          limitValue: 2,
+        },
+      ],
+    });
+    fixture.detectChanges();
+
+    expect(facts(fixture)).toContain(
+      "Quota limits: Cap: 2 units max (St John's Fire); Shoe: 2 units max (St John's Fire)",
+    );
   });
 
   it('consolidates approval and card-fallback into a single "Approval:" line', () => {

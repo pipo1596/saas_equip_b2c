@@ -17,7 +17,13 @@ import { Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../../core/auth/auth';
 import { CartService, formatBalanceAmount, formatCartItemOptions } from '../../core/cart/cart';
-import { amountDueAtCheckout, paidFromLines, pointsShortfall } from '../../core/cart/cart-totals';
+import {
+  amountDueAtCheckout,
+  exceededQuotas,
+  paidFromLines,
+  pointsShortfall,
+  quotaExceededMessage,
+} from '../../core/cart/cart-totals';
 import {
   CheckoutService,
   CustomerAddress,
@@ -144,6 +150,10 @@ export class CheckoutPage implements OnInit {
   // allotment's limit the cart sits, for a points-only employee (who has
   // no card fallback, so this is their only "Balance" figure).
   readonly pointsShortfall = computed(() => pointsShortfall(this.cart()));
+  // Any category quota the cart currently sits over — blocks placing the
+  // order the same as an uncovered balance does (see `canPlaceOrder`).
+  readonly exceededQuotas = computed(() => exceededQuotas(this.cart()));
+  readonly quotaExceededMessage = quotaExceededMessage;
 
   // `FLAT` is the only rate type the API gives a cost for today — anything
   // else has nothing to show yet, so it's treated as "not costed" rather
@@ -212,6 +222,7 @@ export class CheckoutPage implements OnInit {
   readonly canPlaceOrder = computed(
     () =>
       this.orderTotal() === 0 &&
+      this.exceededQuotas().length === 0 &&
       !!this.selectedAddress() &&
       !!this.selectedShipMethod() &&
       this.contactFormStatus() === 'VALID' &&
