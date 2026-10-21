@@ -43,6 +43,20 @@ export interface AllotmentCategoryRef {
 
 export interface AllotmentUnitGrant extends AllotmentCategoryRef {
   unitQty: number;
+  // Per-assortment balance detail — optional since a grant with no posted
+  // balance yet (nothing used, nothing adjusted) may not carry these at
+  // all; `remaining` on its own would then just be `unitQty` again (see
+  // `unitGrantLines` in the Rules panel, which falls back the same way).
+  remaining?: number;
+  // An order against this grant still awaiting approval — a real
+  // commitment against `remaining`, not yet posted.
+  reserved?: number;
+  // `remaining - reserved`, before this cart's own contents are considered
+  // — which grant a cart item actually draws from isn't decided until
+  // checkout (most specific assortment first, then its parent), so this
+  // can't net out the cart itself the way the rule-level `units.available`
+  // does.
+  availableBeforeCart?: number;
 }
 
 export interface AllotmentCovers {
@@ -247,12 +261,26 @@ export function coverageLabel(rule: AllotmentRule): string {
   if (rule.covers.allAssortments === 'Y') {
     return 'Any item in the catalog';
   }
+  const categoryNames = rule.covers.categories.map((category) => category.categoryName);
+  const grantNames = rule.covers.unitGrants.map((grant) => grant.categoryName);
+  // `categories` (dollars/points coverage) and `unitGrants` (the per-
+  // assortment units breakdown) describe genuinely different things on a
+  // `DOLLAR_UNITS` rule that covers some categories by dollars and others
+  // by units — but when they name the exact same categories, that's the
+  // same coverage listed twice over, not two distinct coverages, and
+  // showing both reads as a flat-out duplicate ("Jacket, Jobshirt, Trouser
+  // · Jacket, Jobshirt, Trouser items only"). The units phrasing is the
+  // more specific of the two, so it's the one that stays.
+  const namesMatch =
+    categoryNames.length > 0 &&
+    categoryNames.length === grantNames.length &&
+    categoryNames.every((name) => grantNames.includes(name));
   const parts: string[] = [];
-  if (rule.covers.categories.length > 0) {
-    parts.push(rule.covers.categories.map((category) => category.categoryName).join(', '));
+  if (categoryNames.length > 0 && !namesMatch) {
+    parts.push(categoryNames.join(', '));
   }
-  if (rule.covers.unitGrants.length > 0) {
-    parts.push(`${rule.covers.unitGrants.map((grant) => grant.categoryName).join(', ')} items only`);
+  if (grantNames.length > 0) {
+    parts.push(`${grantNames.join(', ')} items only`);
   }
   return parts.join(' · ') || 'Nothing yet';
 }
@@ -277,6 +305,12 @@ function unitsReallyExhausted(units: Balance): boolean {
 // "which rule would this likely draw from", never "exactly how much" or
 // "would this come up short" — the authoritative tag is always whatever the
 // cart's own `lineTags`/`productTag` says once a specific SKU is added.
+// Deliberately pooled-total-only (not per-grant): a real cart can keep
+// drawing units against an individual assortment well past its own grant
+// once the rule as a whole still has room elsewhere (see `exceededUnitRules`
+// for the actual over-draw warning this produces) — a listing preview
+// guessing a dollar fallback the real checkout wouldn't actually take would
+// be its own, worse kind of wrong.
 //
 // A units rule here only gets skipped in favor of the next one down once
 // it's *really* exhausted (see `unitsReallyExhausted`) — not just because
@@ -319,4 +353,19 @@ export function ruleForCategories(
     (rule) => rule.allotType === 'POINTS' && coveredByAssortments(rule) && (rule.points?.available ?? 0) > 0,
   );
   return pointsRule ?? null;
+}
+
+// The one grant on a units (or dollar-units) rule that actually matches a
+// product's own categories — now that units are tracked per assortment
+// (Cap 2, Polo 1, Shirt 3, ... rather than one pooled total), a product
+// detail page showing this rule needs the specific grant it draws from,
+// not the rule's aggregate `units` balance across every assortment it
+// covers. `null` when the rule covers no matching grant at all (e.g. a
+// dollars-only rule, or `progCatIds` that don't actually match any of this
+// rule's grants).
+export function unitGrantForCategories(
+  rule: AllotmentRule,
+  progCatIds: readonly number[],
+): AllotmentUnitGrant | null {
+  return rule.covers.unitGrants.find((grant) => progCatIds.includes(grant.progCatId)) ?? null;
 }

@@ -57,4 +57,23 @@ describe('PayTagBadge', () => {
     expect(el.textContent?.trim()).toBe('uses points');
     expect(el.classList.contains('pay-tag--points')).toBe(true);
   });
+
+  it('appends the category after the label when one is given', () => {
+    const fixture = TestBed.createComponent(PayTagBadge);
+    fixture.componentRef.setInput('tag', { ruleId: 12, payUnit: 'UNITS', tagLabel: 'uses units' });
+    fixture.componentRef.setInput('category', 'Cap');
+    fixture.detectChanges();
+
+    const el: HTMLElement = fixture.nativeElement.querySelector('.pay-tag');
+    expect(el.textContent?.trim().replace(/\s+/g, ' ')).toBe('uses units · Cap');
+  });
+
+  it('omits the category entirely when none is given', () => {
+    const fixture = TestBed.createComponent(PayTagBadge);
+    fixture.componentRef.setInput('tag', { ruleId: 12, payUnit: 'UNITS', tagLabel: 'uses units' });
+    fixture.detectChanges();
+
+    const el: HTMLElement = fixture.nativeElement.querySelector('.pay-tag');
+    expect(el.textContent?.trim()).toBe('uses units');
+  });
 });

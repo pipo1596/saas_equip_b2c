@@ -1,13 +1,18 @@
-import { Allotment, AllotmentQuota, AllotmentRule, Cart, CartItem, LineTag } from './cart';
+import { Allotment, AllotmentQuota, AllotmentRule, AllotmentUnitGrant, Cart, CartItem, LineTag } from './cart';
 import {
   amountDueAtCheckout,
+  effectiveLineTags,
   exceededQuotas,
+  exceededUnitGrants,
   exceededUnitRules,
+  lineTagByItemId,
   paidFromLines,
   pointsShortfall,
   quotaExceededMessage,
   quotaStatuses,
   resolvedAllocations,
+  unitGrantBalance,
+  unitGrantExceededMessage,
   unitRuleExceededMessage,
 } from './cart-totals';
 import { POINTS_ONLY_ALLOTMENT } from './cart.testing';
@@ -211,19 +216,149 @@ describe('paidFromLines', () => {
     // matches the reported case: the rule can really only give 400.
     const cart = makeOverdrawnPointsCart(20);
 
-    expect(paidFromLines(cart)).toEqual([{ ruleName: 'Points Allowance', unit: 'POINTS', amount: 400 }]);
+    expect(paidFromLines(cart)).toEqual([
+      { ruleName: 'Points Allowance', unit: 'POINTS', amount: 400, categoryBreakdown: [] },
+    ]);
   });
 
   it('shows the plain inCart amount unchanged when the rule is not over-drawn', () => {
     const cart = makeOverdrawnPointsCart(-50);
 
-    expect(paidFromLines(cart)).toEqual([{ ruleName: 'Points Allowance', unit: 'POINTS', amount: 350 }]);
+    expect(paidFromLines(cart)).toEqual([
+      { ruleName: 'Points Allowance', unit: 'POINTS', amount: 350, categoryBreakdown: [] },
+    ]);
   });
 
   it('omits a rule with nothing in cart', () => {
     const cart = makeOverdrawnPointsCart(-400);
 
     expect(paidFromLines(cart)).toEqual([]);
+  });
+
+  function unitsRuleWithGrants(): AllotmentRule {
+    return {
+      ...POINTS_ONLY_ALLOTMENT.rules[0],
+      ruleId: 12,
+      ruleName: 'Unit Allotment',
+      allotType: 'UNITS',
+      primaryUnit: 'UNITS',
+      points: null,
+      units: { total: 5, used: 0, inCart: 4, available: 1 },
+      covers: {
+        allAssortments: 'N',
+        categories: [],
+        unitGrants: [
+          { progCatId: 52, categoryName: 'Jacket', unitQty: 2 },
+          { progCatId: 53, categoryName: 'Jobshirt', unitQty: 1 },
+          { progCatId: 54, categoryName: 'Trouser', unitQty: 2 },
+        ],
+      },
+    };
+  }
+
+  it("breaks a multi-assortment units rule's own amount down by category, counting only items this rule actually tagged", () => {
+    const rule = unitsRuleWithGrants();
+    const jacket = makeItem({ cartItemId: 1, skuId: 1, quantity: 1, progCatIds: [52] });
+    const jobshirt = makeItem({ cartItemId: 2, skuId: 2, quantity: 2, progCatIds: [53] });
+    const trouser = makeItem({ cartItemId: 3, skuId: 3, quantity: 1, progCatIds: [54] });
+    // Same category as the jacket, but tagged to a *different* rule — must
+    // not be folded into this rule's own breakdown.
+    const otherRuleJacket = makeItem({ cartItemId: 4, skuId: 4, quantity: 9, progCatIds: [52] });
+    const cart: Cart = {
+      cartId: 1,
+      itemCount: 4,
+      subtotalPrice: 0,
+      subtotalPoints: 0,
+      items: [jacket, jobshirt, trouser, otherRuleJacket],
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        rules: [rule],
+        lineTags: [
+          makeTag({ cartItemId: 1, skuId: 1, ruleId: 12, payUnit: 'UNITS' }),
+          makeTag({ cartItemId: 2, skuId: 2, ruleId: 12, payUnit: 'UNITS' }),
+          makeTag({ cartItemId: 3, skuId: 3, ruleId: 12, payUnit: 'UNITS' }),
+          makeTag({ cartItemId: 4, skuId: 4, ruleId: 999, payUnit: 'UNITS' }),
+        ],
+      },
+    };
+
+    const [line] = paidFromLines(cart);
+    expect(line.categoryBreakdown).toEqual([
+      { categoryName: 'Jacket', amount: 1 },
+      { categoryName: 'Jobshirt', amount: 2 },
+      { categoryName: 'Trouser', amount: 1 },
+    ]);
+  });
+
+  it('omits a category with nothing tagged to it, rather than showing a zero line', () => {
+    const rule = unitsRuleWithGrants();
+    const jacket = makeItem({ cartItemId: 1, skuId: 1, quantity: 1, progCatIds: [52] });
+    const cart: Cart = {
+      cartId: 1,
+      itemCount: 1,
+      subtotalPrice: 0,
+      subtotalPoints: 0,
+      items: [jacket],
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        rules: [{ ...rule, units: { total: 5, used: 0, inCart: 1, available: 4 } }],
+        lineTags: [makeTag({ cartItemId: 1, skuId: 1, ruleId: 12, payUnit: 'UNITS' })],
+      },
+    };
+
+    expect(paidFromLines(cart)[0].categoryBreakdown).toEqual([{ categoryName: 'Jacket', amount: 1 }]);
+  });
+
+  it('leaves the breakdown empty for a units rule with only one assortment — nothing to break down', () => {
+    const rule: AllotmentRule = {
+      ...unitsRuleWithGrants(),
+      covers: {
+        allAssortments: 'N',
+        categories: [],
+        unitGrants: [{ progCatId: 52, categoryName: 'Jacket', unitQty: 5 }],
+      },
+    };
+    const jacket = makeItem({ cartItemId: 1, skuId: 1, quantity: 4, progCatIds: [52] });
+    const cart: Cart = {
+      cartId: 1,
+      itemCount: 1,
+      subtotalPrice: 0,
+      subtotalPoints: 0,
+      items: [jacket],
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        rules: [rule],
+        lineTags: [makeTag({ cartItemId: 1, skuId: 1, ruleId: 12, payUnit: 'UNITS' })],
+      },
+    };
+
+    expect(paidFromLines(cart)[0].categoryBreakdown).toEqual([]);
+  });
+
+  it('leaves the breakdown empty for a non-units rule, even one with multiple unit grants on it', () => {
+    const rule: AllotmentRule = {
+      ...unitsRuleWithGrants(),
+      allotType: 'DOLLAR_UNITS',
+      primaryUnit: 'DOLLARS',
+      dollars: { total: 200, used: 0, inCart: 50, available: 150 },
+    };
+    const jacket = makeItem({ cartItemId: 1, skuId: 1, quantity: 1, progCatIds: [52], lineTotalPrice: 50 });
+    const cart: Cart = {
+      cartId: 1,
+      itemCount: 1,
+      subtotalPrice: 50,
+      subtotalPoints: 0,
+      items: [jacket],
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        rules: [rule],
+        lineTags: [makeTag({ cartItemId: 1, skuId: 1, ruleId: 12, payUnit: 'DOLLARS' })],
+      },
+    };
+
+    const [line] = paidFromLines(cart);
+    expect(line.unit).toBe('DOLLARS');
+    expect(line.categoryBreakdown).toEqual([]);
   });
 });
 
@@ -394,5 +529,333 @@ describe('unitRuleExceededMessage', () => {
     expect(unitRuleExceededMessage(rule)).toBe(
       'Your Uniform Allowance is exceeded. Please adjust qty before checking out.',
     );
+  });
+});
+
+describe('unitGrantBalance', () => {
+  const CAP_GRANT: AllotmentUnitGrant = {
+    progCatId: 310,
+    categoryName: 'Cap',
+    unitQty: 2,
+    remaining: 1,
+    reserved: 1,
+    availableBeforeCart: 0,
+  };
+
+  function emptyCart(items: CartItem[] = []): Cart {
+    return { cartId: 1, itemCount: items.length, subtotalPrice: 0, subtotalPoints: 0, items, allotment: POINTS_ONLY_ALLOTMENT };
+  }
+
+  it("builds the grant's own Total/Used/In cart/Available straight off its posted remaining/reserved", () => {
+    expect(unitGrantBalance(CAP_GRANT, emptyCart())).toEqual({
+      total: 2,
+      used: 1,
+      reserved: 1,
+      inCart: 0,
+      available: 0,
+    });
+  });
+
+  it('falls back to "fully available, nothing posted" when the grant carries no remaining/reserved yet', () => {
+    const freshGrant: AllotmentUnitGrant = { progCatId: 60, categoryName: 'Tactical', unitQty: 5 };
+    expect(unitGrantBalance(freshGrant, emptyCart())).toEqual({
+      total: 5,
+      used: 0,
+      reserved: 0,
+      inCart: 0,
+      available: 5,
+    });
+  });
+
+  it("sums this cart's own items tagged to the grant's category as inCart, netting it out of available", () => {
+    const capInCart = makeItem({ cartItemId: 1, quantity: 1, progCatIds: [310] });
+    expect(unitGrantBalance(CAP_GRANT, emptyCart([capInCart]))).toEqual({
+      total: 2,
+      used: 1,
+      reserved: 1,
+      inCart: 1,
+      available: -1,
+    });
+  });
+
+  it("ignores a cart item tagged to a different category entirely", () => {
+    const shoeInCart = makeItem({ cartItemId: 1, quantity: 3, progCatIds: [322] });
+    expect(unitGrantBalance(CAP_GRANT, emptyCart([shoeInCart])).inCart).toBe(0);
+  });
+});
+
+describe('exceededUnitGrants / unitGrantExceededMessage', () => {
+  function unitsRuleWithGrants(): AllotmentRule {
+    return {
+      ...POINTS_ONLY_ALLOTMENT.rules[0],
+      ruleId: 12,
+      ruleName: 'Unit Allotment',
+      allotType: 'UNITS',
+      primaryUnit: 'UNITS',
+      points: null,
+      // Pooled total still has plenty of room (7 of 11 left) — the
+      // real-world case this exists for: Cap is drowning in overdraft
+      // (13 against a 2-unit grant) but Tactical/Polo's own surplus hides
+      // it from the rule's own pooled `available`.
+      units: { total: 11, used: 4, inCart: 13, available: 7 },
+      covers: {
+        allAssortments: 'N',
+        categories: [],
+        unitGrants: [
+          { progCatId: 310, categoryName: 'Cap', unitQty: 2, remaining: 2, reserved: 0 },
+          { progCatId: 322, categoryName: 'Polo', unitQty: 1, remaining: 1, reserved: 0 },
+          { progCatId: 60, categoryName: 'Tactical', unitQty: 5, remaining: 5, reserved: 0 },
+        ],
+      },
+    };
+  }
+
+  it("flags a specific grant the cart has drawn past its own real room, even though the rule's pooled total still looks fine", () => {
+    const rule = unitsRuleWithGrants();
+    const cap = makeItem({ cartItemId: 1, skuId: 1, quantity: 13, progCatIds: [310] });
+    const cart: Cart = {
+      cartId: 1,
+      itemCount: 1,
+      subtotalPrice: 0,
+      subtotalPoints: 0,
+      items: [cap],
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        rules: [rule],
+        lineTags: [makeTag({ cartItemId: 1, skuId: 1, ruleId: 12, payUnit: 'UNITS' })],
+      },
+    };
+
+    const exceeded = exceededUnitGrants(cart);
+    expect(exceeded).toHaveLength(1);
+    expect(exceeded[0].grant.categoryName).toBe('Cap');
+    expect(unitGrantExceededMessage(exceeded[0])).toBe(
+      'Your Unit Allotment for Cap is exceeded. Please adjust qty before checking out.',
+    );
+  });
+
+  it('stays empty when every grant is within its own room', () => {
+    const rule = unitsRuleWithGrants();
+    const cap = makeItem({ cartItemId: 1, skuId: 1, quantity: 2, progCatIds: [310] });
+    const cart: Cart = {
+      cartId: 1,
+      itemCount: 1,
+      subtotalPrice: 0,
+      subtotalPoints: 0,
+      items: [cap],
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        rules: [{ ...rule, units: { total: 11, used: 4, inCart: 2, available: 5 } }],
+        lineTags: [makeTag({ cartItemId: 1, skuId: 1, ruleId: 12, payUnit: 'UNITS' })],
+      },
+    };
+
+    expect(exceededUnitGrants(cart)).toEqual([]);
+  });
+
+  it('stays empty for a rule with only one assortment — already fully covered by exceededUnitRules', () => {
+    const singleGrantRule: AllotmentRule = {
+      ...unitsRuleWithGrants(),
+      units: { total: 2, used: 0, inCart: 13, available: -11 },
+      covers: {
+        allAssortments: 'N',
+        categories: [],
+        unitGrants: [{ progCatId: 310, categoryName: 'Cap', unitQty: 2, remaining: 2, reserved: 0 }],
+      },
+    };
+    const cap = makeItem({ cartItemId: 1, skuId: 1, quantity: 13, progCatIds: [310] });
+    const cart: Cart = {
+      cartId: 1,
+      itemCount: 1,
+      subtotalPrice: 0,
+      subtotalPoints: 0,
+      items: [cap],
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        rules: [singleGrantRule],
+        lineTags: [makeTag({ cartItemId: 1, skuId: 1, ruleId: 12, payUnit: 'UNITS' })],
+      },
+    };
+
+    expect(exceededUnitGrants(cart)).toEqual([]);
+  });
+
+  it('ignores a cart item tagged to a different rule entirely, even if it shares the exhausted category', () => {
+    const rule = unitsRuleWithGrants();
+    const capUnderThisRule = makeItem({ cartItemId: 1, skuId: 1, quantity: 1, progCatIds: [310] });
+    const capUnderOtherRule = makeItem({ cartItemId: 2, skuId: 2, quantity: 9, progCatIds: [310] });
+    const cart: Cart = {
+      cartId: 1,
+      itemCount: 2,
+      subtotalPrice: 0,
+      subtotalPoints: 0,
+      items: [capUnderThisRule, capUnderOtherRule],
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        rules: [rule],
+        lineTags: [
+          makeTag({ cartItemId: 1, skuId: 1, ruleId: 12, payUnit: 'UNITS' }),
+          makeTag({ cartItemId: 2, skuId: 2, ruleId: 999, payUnit: 'UNITS' }),
+        ],
+      },
+    };
+
+    expect(exceededUnitGrants(cart)).toEqual([]);
+  });
+});
+
+describe('effectiveLineTags', () => {
+  const UNITS_RULE: AllotmentRule = {
+    ...POINTS_ONLY_ALLOTMENT.rules[0],
+    ruleId: 12,
+    ruleName: 'Unit Allotment',
+    allotType: 'UNITS',
+    primaryUnit: 'UNITS',
+    points: null,
+    units: { total: 11, used: 4, inCart: 13, available: 7 },
+    covers: {
+      allAssortments: 'N',
+      categories: [],
+      unitGrants: [
+        { progCatId: 310, categoryName: 'Cap', unitQty: 2, remaining: 2, reserved: 0 },
+        { progCatId: 60, categoryName: 'Tactical', unitQty: 9, remaining: 9, reserved: 0 },
+      ],
+    },
+  };
+
+  const DOLLAR_RULE: AllotmentRule = {
+    ...POINTS_ONLY_ALLOTMENT.rules[0],
+    ruleId: 40,
+    ruleName: 'General Allotment',
+    allotType: 'DOLLAR',
+    primaryUnit: 'DOLLARS',
+    points: null,
+    dollars: { total: 500, used: 0, inCart: 0, available: 500 },
+    units: null,
+    covers: { allAssortments: 'Y', categories: [], unitGrants: [] },
+  };
+
+  it("reattributes a line to a dollar rule that still has room, once its own category has nothing real left at all", () => {
+    const exhaustedUnitsRule: AllotmentRule = {
+      ...UNITS_RULE,
+      covers: {
+        ...UNITS_RULE.covers,
+        unitGrants: [
+          { progCatId: 310, categoryName: 'Cap', unitQty: 2, remaining: 0, reserved: 0 },
+          { progCatId: 60, categoryName: 'Tactical', unitQty: 9, remaining: 9, reserved: 0 },
+        ],
+      },
+    };
+    const cap = makeItem({ cartItemId: 1, skuId: 1, quantity: 13, progCatIds: [310] });
+    const cart: Cart = {
+      cartId: 1,
+      itemCount: 1,
+      subtotalPrice: 0,
+      subtotalPoints: 0,
+      items: [cap],
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        rules: [exhaustedUnitsRule, DOLLAR_RULE],
+        lineTags: [makeTag({ cartItemId: 1, skuId: 1, ruleId: 12, payUnit: 'UNITS' })],
+      },
+    };
+
+    const effective = effectiveLineTags(cart);
+    expect(effective.get(1)).toEqual({
+      cartItemId: 1,
+      skuId: 1,
+      ruleId: 40,
+      payUnit: 'DOLLARS',
+      tagLabel: '$ allotment',
+      allocations: [],
+    });
+    // The real tag used for checkout math is untouched.
+    expect(lineTagByItemId(cart).get(1)?.ruleId).toBe(12);
+  });
+
+  it("keeps a line under its real units rule as long as its category still has *any* real room left, no matter how far the quantity is raised past it", () => {
+    // Cap only grants 2, and 13 are in the cart — wildly over — but the
+    // grant's own `remaining` (2) hasn't been touched by real usage, so
+    // there's still something genuine to cover part of this line with.
+    // Raising the quantity further must not move it on its own.
+    const cap = makeItem({ cartItemId: 1, skuId: 1, quantity: 13, progCatIds: [310] });
+    const cart: Cart = {
+      cartId: 1,
+      itemCount: 1,
+      subtotalPrice: 0,
+      subtotalPoints: 0,
+      items: [cap],
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        rules: [UNITS_RULE, DOLLAR_RULE],
+        lineTags: [makeTag({ cartItemId: 1, skuId: 1, ruleId: 12, payUnit: 'UNITS' })],
+      },
+    };
+
+    expect(effectiveLineTags(cart).get(1)?.ruleId).toBe(12);
+  });
+
+  it('leaves a line tagged to its real units rule when no dollar rule in scope has room for it, even once its category is fully spent', () => {
+    const exhaustedUnitsRule: AllotmentRule = {
+      ...UNITS_RULE,
+      covers: {
+        ...UNITS_RULE.covers,
+        unitGrants: [
+          { progCatId: 310, categoryName: 'Cap', unitQty: 2, remaining: 0, reserved: 0 },
+          { progCatId: 60, categoryName: 'Tactical', unitQty: 9, remaining: 9, reserved: 0 },
+        ],
+      },
+    };
+    const cap = makeItem({ cartItemId: 1, skuId: 1, quantity: 13, progCatIds: [310] });
+    const emptyDollarRule = { ...DOLLAR_RULE, dollars: { total: 500, used: 500, inCart: 0, available: 0 } };
+    const cart: Cart = {
+      cartId: 1,
+      itemCount: 1,
+      subtotalPrice: 0,
+      subtotalPoints: 0,
+      items: [cap],
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        rules: [exhaustedUnitsRule, emptyDollarRule],
+        lineTags: [makeTag({ cartItemId: 1, skuId: 1, ruleId: 12, payUnit: 'UNITS' })],
+      },
+    };
+
+    expect(effectiveLineTags(cart).get(1)?.ruleId).toBe(12);
+  });
+
+  it('leaves a line within its own category room untouched, even with a dollar rule in scope', () => {
+    const cap = makeItem({ cartItemId: 1, skuId: 1, quantity: 2, progCatIds: [310] });
+    const cart: Cart = {
+      cartId: 1,
+      itemCount: 1,
+      subtotalPrice: 0,
+      subtotalPoints: 0,
+      items: [cap],
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        rules: [{ ...UNITS_RULE, units: { total: 11, used: 4, inCart: 2, available: 5 } }, DOLLAR_RULE],
+        lineTags: [makeTag({ cartItemId: 1, skuId: 1, ruleId: 12, payUnit: 'UNITS' })],
+      },
+    };
+
+    expect(effectiveLineTags(cart).get(1)?.ruleId).toBe(12);
+  });
+
+  it('leaves a dollars/points tag alone — only a units tag is ever reattributed', () => {
+    const cart: Cart = {
+      cartId: 1,
+      itemCount: 1,
+      subtotalPrice: 0,
+      subtotalPoints: 0,
+      items: [makeItem({ cartItemId: 1, skuId: 1, quantity: 1 })],
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        rules: [UNITS_RULE, DOLLAR_RULE],
+        lineTags: [makeTag({ cartItemId: 1, skuId: 1, ruleId: 40, payUnit: 'DOLLARS' })],
+      },
+    };
+
+    expect(effectiveLineTags(cart).get(1)).toEqual(lineTagByItemId(cart).get(1));
   });
 });

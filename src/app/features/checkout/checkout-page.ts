@@ -20,10 +20,12 @@ import { CartService, formatBalanceAmount, formatCartItemOptions } from '../../c
 import {
   amountDueAtCheckout,
   exceededQuotas,
+  exceededUnitGrants,
   exceededUnitRules,
   paidFromLines,
   pointsShortfall,
   quotaExceededMessage,
+  unitGrantExceededMessage,
   unitRuleExceededMessage,
 } from '../../core/cart/cart-totals';
 import {
@@ -162,6 +164,11 @@ export class CheckoutPage implements OnInit {
   // viewing it and reaching this page.
   readonly exceededUnitRules = computed(() => exceededUnitRules(this.cart()));
   readonly unitRuleExceededMessage = unitRuleExceededMessage;
+  // Same defensive backstop as `exceededUnitRules`, but for a specific
+  // assortment the cart has over-drawn even while its rule's pooled total
+  // still looks fine overall.
+  readonly exceededUnitGrants = computed(() => exceededUnitGrants(this.cart()));
+  readonly unitGrantExceededMessage = unitGrantExceededMessage;
 
   // `FLAT` is the only rate type the API gives a cost for today — anything
   // else has nothing to show yet, so it's treated as "not costed" rather
@@ -241,6 +248,7 @@ export class CheckoutPage implements OnInit {
       this.orderTotal() === 0 &&
       this.exceededQuotas().length === 0 &&
       this.exceededUnitRules().length === 0 &&
+      this.exceededUnitGrants().length === 0 &&
       !!this.selectedAddress() &&
       !!this.selectedShipMethod() &&
       this.contactFormStatus() === 'VALID' &&

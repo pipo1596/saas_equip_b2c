@@ -17,7 +17,15 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import { switchMap } from 'rxjs';
 
-import { AllotmentRule, CartService, PayTag, ruleForCategories } from '../../../core/cart/cart';
+import {
+  AllotmentRule,
+  AllotmentUnitGrant,
+  CartService,
+  PayTag,
+  ruleForCategories,
+  unitGrantForCategories,
+} from '../../../core/cart/cart';
+import { unitGrantBalance } from '../../../core/cart/cart-totals';
 import { Breadcrumb, hasCrumbs } from '../../../core/catalog/breadcrumb';
 import {
   ProductAttribute,
@@ -149,6 +157,21 @@ export class ProductDetail implements OnInit {
   readonly coveringRule = computed<AllotmentRule | null>(() =>
     ruleForCategories(this.allotmentRules(), this.product()?.progCatIds ?? []),
   );
+  // The specific assortment grant this product actually draws from, now
+  // that units are tracked per assortment rather than as one pooled total
+  // — `null` for a non-units rule, or a units rule with no grant matching
+  // this product's own categories.
+  readonly coveringUnitGrant = computed<AllotmentUnitGrant | null>(() => {
+    const rule = this.coveringRule();
+    return rule ? unitGrantForCategories(rule, this.product()?.progCatIds ?? []) : null;
+  });
+  // That grant's own balance — what the coverage card shows instead of the
+  // rule's aggregate `units` total, so a Cap product doesn't display room
+  // that's really the Polo/Shirt/Tactical grants' own.
+  readonly coveringUnitGrantBalance = computed(() => {
+    const grant = this.coveringUnitGrant();
+    return grant ? unitGrantBalance(grant, this.cartService.cart()) : null;
+  });
   // The exact `selections()` object (by reference) that the currently-
   // loaded `resolvedSku` was actually fetched for — `selections.update()`
   // always produces a new object on any change, so comparing by reference

@@ -1279,6 +1279,83 @@ describe('ProductDetail', () => {
     expect(card.querySelector('.coverage-card__title')?.textContent?.trim()).toBe('Covered by your units');
   });
 
+  it("scopes the coverage card to just this product's own assortment grant, not the rule's pooled total across every assortment it covers", () => {
+    const fixture = TestBed.createComponent(ProductDetail);
+    fixture.componentRef.setInput('productPk', '12345');
+    fixture.detectChanges();
+
+    // Viewing a Cap (progCatId 310) — the rule also grants Tactical (60)
+    // and Polo (322), but the card should only ever talk about Cap.
+    expectRequest(httpMock, '*GET').flush({ ...RESPONSE, product: { ...PRODUCT, progCatIds: [310] } });
+    expectProductTagCartRequest(httpMock).flush({
+      cartId: null,
+      itemCount: 0,
+      subtotalPrice: 0,
+      subtotalPoints: null,
+      items: [],
+      allotment: {
+        programId: 3,
+        allotmentBar: null,
+        ruleCount: 1,
+        allotExclTaxFreight: 'N',
+        rules: [
+          {
+            ruleId: 12,
+            ruleName: 'Unit Allotment',
+            allotType: 'UNITS',
+            primaryUnit: 'UNITS',
+            isBarRule: 'N',
+            dollars: null,
+            // The rule's own pooled total (11) across every assortment —
+            // must never show up anywhere in the card once a specific
+            // grant is matched.
+            units: { total: 11, used: 4, inCart: 0, available: 7 },
+            points: null,
+            cycle: {
+              renewalBasis: 'FIXED',
+              renewalPeriodMonths: 12,
+              cycleStart: '2026-09-09',
+              cycleEnd: '2027-09-08',
+              renewsOn: '2027-09-09',
+              expirationDate: null,
+              onExpiration: 'SUSPEND',
+            },
+            covers: {
+              allAssortments: 'N',
+              categories: [],
+              unitGrants: [
+                { progCatId: 60, categoryName: 'Tactical', unitQty: 5 },
+                { progCatId: 310, categoryName: 'Cap', unitQty: 2, remaining: 1, reserved: 0, availableBeforeCart: 1 },
+                { progCatId: 322, categoryName: 'Polo', unitQty: 1, remaining: 1, reserved: 0, availableBeforeCart: 1 },
+              ],
+            },
+            carryover: { type: 'FORFEIT', pct: null, capAmount: null, carriedIn: null },
+            quotas: [],
+            requireApproval: 'N',
+            allowCcFallback: 'N',
+          },
+        ],
+        approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+        openOrders: null,
+        lineTags: [],
+        productTag: null,
+      },
+    });
+    fixture.detectChanges();
+
+    const card = fixture.nativeElement.querySelector('app-allotment-coverage-card');
+    expect(card.querySelector('.coverage-card__subtitle')?.textContent?.trim()).toBe(
+      'Cap items only · Renews Sep 9, 2027',
+    );
+    const values: HTMLElement[] = card.querySelectorAll('.balance-box__value');
+    expect(Array.from(values).map((el) => el.textContent?.trim())).toEqual([
+      '2 units',
+      '1 units',
+      '0 units',
+      '1 units',
+    ]);
+  });
+
   function unitAndDollarRules(units: { total: number; used: number; inCart: number; available: number }) {
     return [
       {

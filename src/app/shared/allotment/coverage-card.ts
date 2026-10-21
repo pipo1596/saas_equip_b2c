@@ -1,7 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 
-import { AllotmentRule, coverageLabel, tileBalance } from '../../core/cart/allotment';
+import { AllotmentRule, AllotmentUnitGrant, Balance, coverageLabel, tileBalance } from '../../core/cart/allotment';
 import { AllotmentBalanceBox } from './balance-box';
 
 // Product detail's "Covered by your {rule}" card — a compact preview of the
@@ -70,14 +70,30 @@ export class AllotmentCoverageCard {
   private static readonly datePipe = new DatePipe('en-US');
 
   readonly rule = input.required<AllotmentRule>();
+  // The specific assortment grant this product draws from, and that
+  // grant's own balance — present only for a units rule tracked per
+  // assortment, where the product being viewed matches one of its grants.
+  // Units are no longer one pooled total across every assortment a rule
+  // covers (e.g. Cap 2, Polo 1, Shirt 3), so this product's own card needs
+  // to show just its own grant's room, not the rule's aggregate.
+  readonly unitGrant = input<AllotmentUnitGrant | null>(null);
+  readonly unitGrantBalance = input<Balance | null>(null);
   readonly viewRule = output<void>();
 
-  readonly primaryBalance = computed(() => tileBalance(this.rule()));
+  readonly primaryBalance = computed(() => {
+    const grant = this.unitGrant();
+    const grantBalance = this.unitGrantBalance();
+    if (this.rule().primaryUnit === 'UNITS' && grant && grantBalance) {
+      return grantBalance;
+    }
+    return tileBalance(this.rule());
+  });
 
   readonly subtitle = computed(() => {
     const rule = this.rule();
     const renewsOn = rule.cycle.renewsOn;
-    const coverage = coverageLabel(rule);
+    const grant = this.unitGrant();
+    const coverage = rule.primaryUnit === 'UNITS' && grant ? `${grant.categoryName} items only` : coverageLabel(rule);
     return renewsOn
       ? `${coverage} · Renews ${AllotmentCoverageCard.datePipe.transform(renewsOn, 'MMM d, y')}`
       : coverage;

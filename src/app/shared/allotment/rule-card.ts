@@ -17,6 +17,14 @@ interface BalanceLine {
   unit: PayUnit;
 }
 
+interface UnitGrantLine {
+  progCatId: number;
+  categoryName: string;
+  unitQty: number;
+  remaining: number;
+  reserved: number;
+}
+
 // One rule's full breakdown — name, a one-line summary (its own amount,
 // cycle, and coverage), every non-null balance as a figure grid, then
 // carryover/quota/approval facts. Every value comes straight off the rule;
@@ -46,6 +54,19 @@ interface BalanceLine {
 
         @for (line of balanceLines(); track line.label) {
           <app-allotment-balance-box class="rule-card__balance-box" [balance]="line.balance" [unit]="line.unit" />
+        }
+
+        @if (unitGrantLines().length > 0) {
+          <ul class="rule-card__unit-grants">
+            @for (grant of unitGrantLines(); track grant.progCatId) {
+              <li>
+                {{ grant.categoryName }}: {{ grant.remaining }} of {{ grant.unitQty }} left
+                @if (grant.reserved > 0) {
+                  · {{ grant.reserved }} awaiting approval
+                }
+              </li>
+            }
+          </ul>
         }
 
         <ul class="rule-card__facts">
@@ -105,6 +126,31 @@ interface BalanceLine {
     .rule-card__balance-box {
       display: block;
       margin-bottom: 10px;
+    }
+    .rule-card__unit-grants {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin: 0 0 10px;
+      padding: 0;
+    }
+    .rule-card__unit-grants li {
+      font-size: 12px;
+      color: var(--slate-600);
+      line-height: 1.4;
+      padding-left: 13px;
+      position: relative;
+    }
+    .rule-card__unit-grants li::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 5px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--action);
     }
     .rule-card__facts {
       list-style: none;
@@ -166,6 +212,22 @@ export class AllotmentRuleCard {
   });
 
   readonly coverageText = computed(() => coverageLabel(this.rule()));
+
+  // One line per assortment this rule grants units to — "Cap: 1 of 2
+  // left", plus "1 awaiting approval" once something's reserved against it.
+  // `remaining`/`reserved` are optional on the grant itself (a fresh grant
+  // with no posted balance yet may not carry them at all), so they fall
+  // back to "nothing used yet" the same way the real API's own `remaining`
+  // already falls back to `unitQty` server-side.
+  readonly unitGrantLines = computed<UnitGrantLine[]>(() =>
+    this.rule().covers.unitGrants.map((grant) => ({
+      progCatId: grant.progCatId,
+      categoryName: grant.categoryName,
+      unitQty: grant.unitQty,
+      remaining: grant.remaining ?? grant.unitQty,
+      reserved: grant.reserved ?? 0,
+    })),
+  );
 
   readonly carryoverSummary = computed(() => {
     const { carryover } = this.rule();

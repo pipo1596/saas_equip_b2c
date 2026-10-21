@@ -14,6 +14,9 @@ import { PayTag } from '../../core/cart/allotment';
       <span class="pay-tag" [class.pay-tag--units]="tag()?.payUnit === 'UNITS'" [class.pay-tag--points]="tag()?.payUnit === 'POINTS'">
         <span class="pay-tag__dot" aria-hidden="true"></span>
         {{ label }}
+        @if (category(); as cat) {
+          · {{ cat }}
+        }
       </span>
     }
   `,
@@ -52,4 +55,10 @@ import { PayTag } from '../../core/cart/allotment';
 })
 export class PayTagBadge {
   readonly tag = input<PayTag | null>(null);
+  // The specific assortment this line draws from, for a units rule tracked
+  // per category (e.g. "Cap") — appended after the generic `tagLabel` so a
+  // multi-category Unit Allotment doesn't read the same on every line.
+  // `null` for a dollars/points tag, or a units rule with only one
+  // assortment (nothing extra to say).
+  readonly category = input<string | null>(null);
 }

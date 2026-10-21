@@ -107,6 +107,111 @@ describe('AllotmentRuleCard', () => {
     );
   });
 
+  function unitGrantLines(fixture: { nativeElement: HTMLElement }): string[] {
+    return Array.from(fixture.nativeElement.querySelectorAll('.rule-card__unit-grants li')).map(
+      (li) => li.textContent?.trim().replace(/\s+/g, ' ') ?? '',
+    );
+  }
+
+  it('shows "N of total left" per assortment, plus an awaiting-approval note once something is reserved', () => {
+    const fixture = TestBed.createComponent(AllotmentRuleCard);
+    fixture.componentRef.setInput('rule', {
+      ...BASE_RULE,
+      primaryUnit: 'UNITS',
+      units: { total: 3, used: 1, inCart: 0, available: 2 },
+      covers: {
+        allAssortments: 'N',
+        categories: [],
+        unitGrants: [
+          { progCatId: 310, categoryName: 'Cap', unitQty: 2, remaining: 1, reserved: 1, availableBeforeCart: 0 },
+          { progCatId: 322, categoryName: 'Polo', unitQty: 1, remaining: 1, reserved: 0, availableBeforeCart: 1 },
+        ],
+      },
+    });
+    fixture.detectChanges();
+
+    expect(unitGrantLines(fixture)).toEqual([
+      'Cap: 1 of 2 left · 1 awaiting approval',
+      'Polo: 1 of 1 left',
+    ]);
+  });
+
+  it('falls back to "fully available" when a grant carries no posted balance yet', () => {
+    const fixture = TestBed.createComponent(AllotmentRuleCard);
+    fixture.componentRef.setInput('rule', {
+      ...BASE_RULE,
+      primaryUnit: 'UNITS',
+      units: { total: 5, used: 0, inCart: 0, available: 5 },
+      covers: {
+        allAssortments: 'N',
+        categories: [],
+        unitGrants: [{ progCatId: 60, categoryName: 'Tactical', unitQty: 5 }],
+      },
+    });
+    fixture.detectChanges();
+
+    expect(unitGrantLines(fixture)).toEqual(['Tactical: 5 of 5 left']);
+  });
+
+  it('shows no unit-grant list for a rule with no unit grants at all', () => {
+    const fixture = TestBed.createComponent(AllotmentRuleCard);
+    fixture.componentRef.setInput('rule', BASE_RULE);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.rule-card__unit-grants')).toBeNull();
+  });
+
+  it("doesn't repeat itself when `categories` names the exact same assortments as `unitGrants` — the reported duplicate badge", () => {
+    const fixture = TestBed.createComponent(AllotmentRuleCard);
+    fixture.componentRef.setInput('rule', {
+      ...BASE_RULE,
+      primaryUnit: 'UNITS',
+      units: { total: 5, used: 2, inCart: 0, available: 3 },
+      covers: {
+        allAssortments: 'N',
+        // Same three category names as `unitGrants`, just via the plain
+        // `categories` list — this is what produced "Jacket, Jobshirt,
+        // Trouser · Jacket, Jobshirt, Trouser items only" in the real
+        // report.
+        categories: [
+          { progCatId: 52, categoryName: 'Jacket' },
+          { progCatId: 53, categoryName: 'Jobshirt' },
+          { progCatId: 54, categoryName: 'Trouser' },
+        ],
+        unitGrants: [
+          { progCatId: 52, categoryName: 'Jacket', unitQty: 2 },
+          { progCatId: 53, categoryName: 'Jobshirt', unitQty: 1 },
+          { progCatId: 54, categoryName: 'Trouser', unitQty: 2 },
+        ],
+      },
+    });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.rule-card__coverage')?.textContent?.trim()).toBe(
+      'Jacket, Jobshirt, Trouser items only',
+    );
+  });
+
+  it('keeps both halves when `categories` and `unitGrants` genuinely name different assortments', () => {
+    const fixture = TestBed.createComponent(AllotmentRuleCard);
+    fixture.componentRef.setInput('rule', {
+      ...BASE_RULE,
+      allotType: 'DOLLAR_UNITS',
+      primaryUnit: 'DOLLARS',
+      units: { total: 5, used: 2, inCart: 0, available: 3 },
+      covers: {
+        allAssortments: 'N',
+        categories: [{ progCatId: 1, categoryName: 'Apparel' }],
+        unitGrants: [{ progCatId: 60, categoryName: 'Tactical', unitQty: 5 }],
+      },
+    });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.rule-card__coverage')?.textContent?.trim()).toBe(
+      'Apparel · Tactical items only',
+    );
+  });
+
   it('renders one balance-box row per non-null balance, each in its own unit', () => {
     const fixture = TestBed.createComponent(AllotmentRuleCard);
     fixture.componentRef.setInput('rule', {

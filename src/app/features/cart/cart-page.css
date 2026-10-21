@@ -57,6 +57,11 @@ a.cart-page__thumb-link {
   flex: 1;
   min-width: 0;
 }
+.cart-page__item-balance-box {
+  display: block;
+  margin: 6px 0;
+  max-width: 360px;
+}
 .cart-page__name {
   display: inline-block;
   font-family: var(--font-display);
@@ -279,6 +284,16 @@ a.cart-page__thumb-link {
   text-transform: uppercase;
   color: var(--slate-500);
   margin: 0 0 8px;
+}
+.cart-page__category-breakdown {
+  list-style: none;
+  margin: -4px 0 8px;
+  padding: 0 0 0 12px;
+  font-size: 12px;
+  color: var(--slate-500);
+}
+.cart-page__category-breakdown li {
+  padding: 2px 0;
 }
 .cart-page__summary-amount--dollars {
   color: var(--action);

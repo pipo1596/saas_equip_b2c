@@ -28,6 +28,9 @@
       @for (rule of exceededUnitRules(); track rule.ruleId) {
         <div class="alert alert-warning" role="alert">{{ unitRuleExceededMessage(rule) }}</div>
       }
+      @for (exceeded of exceededUnitGrants(); track exceeded.rule.ruleId + '-' + exceeded.grant.progCatId) {
+        <div class="alert alert-warning" role="alert">{{ unitGrantExceededMessage(exceeded) }}</div>
+      }
 
       @if (cart().items.length === 0) {
         <div class="cart-page__empty text-center py-5">
@@ -113,6 +116,16 @@
                       {{ formatAmount(line.amount, line.unit) }}
                     </b>
                   </div>
+                  @if (line.categoryBreakdown.length > 0) {
+                    <ul class="cart-page__category-breakdown mb-2">
+                      @for (category of line.categoryBreakdown; track category.categoryName) {
+                        <li class="d-flex justify-content-between align-items-baseline">
+                          <span>{{ category.categoryName }}</span>
+                          <span>{{ formatAmount(category.amount, line.unit) }}</span>
+                        </li>
+                      }
+                    </ul>
+                  }
                 }
                 @if (!pointsOnly()) {
                   <hr />
@@ -134,7 +147,7 @@
                 </div>
               }
 
-              @if (exceededQuotas().length === 0 && exceededUnitRules().length === 0) {
+              @if (exceededQuotas().length === 0 && exceededUnitRules().length === 0 && exceededUnitGrants().length === 0) {
                 <a routerLink="/checkout" class="cart-page__checkout">
                   <span class="cart-page__checkout-title">Checkout</span>
                 </a>
@@ -180,7 +193,10 @@
         }
       </div>
       @if (splitAllocations(item).length === 0) {
-        <app-pay-tag [tag]="lineTag(item.cartItemId)" />
+        <app-pay-tag [tag]="lineTag(item.cartItemId)" [category]="unitCategoryFor(item)" />
+      }
+      @if (unitGrantBalanceFor(item); as balance) {
+        <app-allotment-balance-box class="cart-page__item-balance-box" [balance]="balance" unit="UNITS" />
       }
       @if (item.isAvailable === 'N') {
         <p class="cart-page__flag text-danger">No longer available</p>
@@ -188,6 +204,9 @@
         <p class="cart-page__flag">
           Price updated to {{ item.currentPrice | currency }} since you added this.
         </p>
+      }
+      @if (unitCategoryExhaustedNoteFor(item); as note) {
+        <p class="cart-page__fallback-note">{{ note }}</p>
       }
       @for (note of fallbackNotesFor(item); track note) {
         <p class="cart-page__fallback-note">{{ note }}</p>

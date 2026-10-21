@@ -162,6 +162,74 @@ describe('CartPage', () => {
     expect(summary.textContent).toContain('20 pts');
   });
 
+  it("breaks a multi-assortment unit allotment's 'Paid from' line down by category", () => {
+    const fixture = TestBed.createComponent(CartPage);
+    fixture.detectChanges();
+
+    const UNITS_RULE = {
+      ruleId: 12,
+      ruleName: 'Unit Allotment',
+      allotType: 'UNITS' as const,
+      primaryUnit: 'UNITS' as const,
+      isBarRule: 'N' as const,
+      dollars: null,
+      units: { total: 5, used: 0, inCart: 3, available: 2 },
+      points: null,
+      cycle: {
+        renewalBasis: 'FIXED' as const,
+        renewalPeriodMonths: 12,
+        cycleStart: '2026-09-09',
+        cycleEnd: '2027-09-08',
+        renewsOn: '2027-09-09',
+        expirationDate: null,
+        onExpiration: 'SUSPEND' as const,
+      },
+      covers: {
+        allAssortments: 'N' as const,
+        categories: [],
+        unitGrants: [
+          { progCatId: 52, categoryName: 'Jacket', unitQty: 3 },
+          { progCatId: 53, categoryName: 'Duty Belt', unitQty: 2 },
+        ],
+      },
+      carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
+      quotas: [],
+      requireApproval: 'N' as const,
+      allowCcFallback: 'N' as const,
+      fallbackRuleIds: [],
+    };
+    flushInitialCartLoads(httpMock, {
+      ...CART,
+      items: [
+        { ...CART.items[0], progCatIds: [52] },
+        { ...CART.items[1], progCatIds: [53] },
+      ],
+      allotment: {
+        programId: 3,
+        allotmentBar: null,
+        ruleCount: 1,
+        allotExclTaxFreight: 'N',
+        rules: [UNITS_RULE],
+        approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+        openOrders: null,
+        lineTags: [
+          { cartItemId: 9001, skuId: 9001, ruleId: 12, payUnit: 'UNITS' as const, tagLabel: 'Unit Allotment', allocations: [] },
+          { cartItemId: 9002, skuId: 9002, ruleId: 12, payUnit: 'UNITS' as const, tagLabel: 'Unit Allotment', allocations: [] },
+        ],
+        productTag: null,
+      },
+    });
+    fixture.detectChanges();
+
+    const summary: HTMLElement = fixture.nativeElement.querySelector('.cart-page__summary');
+    expect(summary.textContent).toContain('Unit Allotment');
+    const breakdown: HTMLElement[] = Array.from(summary.querySelectorAll('.cart-page__category-breakdown li'));
+    expect(breakdown.map((li) => li.textContent?.trim().replace(/\s+/g, ' '))).toEqual([
+      'Jacket2 units',
+      'Duty Belt1 units',
+    ]);
+  });
+
   it('shows no Balance line when every line is tagged and the points allotment fully covers the order', () => {
     const fixture = TestBed.createComponent(CartPage);
     fixture.detectChanges();
@@ -550,6 +618,377 @@ describe('CartPage', () => {
 
       expect(fixture.nativeElement.textContent).not.toContain('is exceeded');
       expect(fixture.nativeElement.querySelector('a.cart-page__checkout')).not.toBeNull();
+    });
+
+    it("flags a specific assortment the cart has over-drawn and disables Checkout, even though the rule's pooled total still looks fine", () => {
+      const fixture = TestBed.createComponent(CartPage);
+      fixture.detectChanges();
+      const MULTI_GRANT_RULE = {
+        ...UNITS_RULE,
+        // Plenty of room overall (7 of 11) — Tactical's own surplus masks
+        // the Cap-specific overdraft in this pooled figure.
+        units: { total: 11, used: 4, inCart: 13, available: 7 },
+        covers: {
+          allAssortments: 'N' as const,
+          categories: [],
+          unitGrants: [
+            { progCatId: 52, categoryName: 'Cap', unitQty: 2, remaining: 2, reserved: 0 },
+            { progCatId: 3, categoryName: 'Tactical', unitQty: 9, remaining: 9, reserved: 0 },
+          ],
+        },
+      };
+      flushInitialCartLoads(httpMock, {
+        ...CART,
+        items: [{ ...CART.items[0], quantity: 13, progCatIds: [52] }, CART.items[1]],
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 1,
+          allotExclTaxFreight: 'N',
+          rules: [MULTI_GRANT_RULE],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [
+            { cartItemId: 9001, skuId: 9001, ruleId: 31, payUnit: 'UNITS' as const, tagLabel: 'Unit Allotment', allocations: [] },
+          ],
+        },
+      });
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.textContent).toContain(
+        'Your Unit Allotment for Cap is exceeded. Please adjust qty before checking out.',
+      );
+      expect(fixture.nativeElement.querySelector('a.cart-page__checkout')).toBeNull();
+      const checkoutBtn: HTMLButtonElement = fixture.nativeElement.querySelector('button.cart-page__checkout');
+      expect(checkoutBtn.disabled).toBe(true);
+    });
+  });
+
+  describe('per-item unit category', () => {
+    const MULTI_GRANT_RULE = {
+      ruleId: 31,
+      ruleName: 'Unit Allotment',
+      allotType: 'UNITS' as const,
+      primaryUnit: 'UNITS' as const,
+      isBarRule: 'N' as const,
+      dollars: null,
+      points: null,
+      cycle: {
+        renewalBasis: 'FIXED' as const,
+        renewalPeriodMonths: 12,
+        cycleStart: '2026-09-09',
+        cycleEnd: '2027-09-08',
+        renewsOn: '2027-09-09',
+        expirationDate: null,
+        onExpiration: 'SUSPEND' as const,
+      },
+      covers: {
+        allAssortments: 'N' as const,
+        categories: [],
+        unitGrants: [
+          { progCatId: 52, categoryName: 'Cap', unitQty: 2, remaining: 2, reserved: 0 },
+          { progCatId: 3, categoryName: 'Tactical', unitQty: 9, remaining: 9, reserved: 0 },
+        ],
+      },
+      carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
+      quotas: [],
+      requireApproval: 'N' as const,
+      allowCcFallback: 'N' as const,
+      fallbackRuleIds: [] as number[],
+    };
+
+    it("shows the matching assortment next to the pay-tag badge for a multi-category units rule", () => {
+      const fixture = TestBed.createComponent(CartPage);
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, {
+        ...CART,
+        items: [{ ...CART.items[0], quantity: 1, progCatIds: [52] }, CART.items[1]],
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 1,
+          allotExclTaxFreight: 'N',
+          rules: [{ ...MULTI_GRANT_RULE, units: { total: 11, used: 4, inCart: 1, available: 6 } }],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [
+            { cartItemId: 9001, skuId: 9001, ruleId: 31, payUnit: 'UNITS' as const, tagLabel: 'uses units', allocations: [] },
+          ],
+        },
+      });
+      fixture.detectChanges();
+
+      const row: HTMLElement = fixture.nativeElement.querySelectorAll('.cart-page__row')[0];
+      expect(row.querySelector('.pay-tag')?.textContent?.trim().replace(/\s+/g, ' ')).toBe('uses units · Cap');
+    });
+
+    it('omits the category for a rule with only one assortment', () => {
+      const fixture = TestBed.createComponent(CartPage);
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, {
+        ...CART,
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 1,
+          allotExclTaxFreight: 'N',
+          rules: [
+            {
+              ...MULTI_GRANT_RULE,
+              units: { total: 5, used: 0, inCart: 2, available: 3 },
+              covers: {
+                allAssortments: 'N',
+                categories: [],
+                unitGrants: [{ progCatId: 52, categoryName: 'Cap', unitQty: 5 }],
+              },
+            },
+          ],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [
+            { cartItemId: 9001, skuId: 9001, ruleId: 31, payUnit: 'UNITS' as const, tagLabel: 'uses units', allocations: [] },
+          ],
+        },
+      });
+      fixture.detectChanges();
+
+      const row: HTMLElement = fixture.nativeElement.querySelectorAll('.cart-page__row')[0];
+      expect(row.querySelector('.pay-tag')?.textContent?.trim()).toBe('uses units');
+    });
+
+    it("moves an over-drawn line under a dollar allotment that can actually cover it, instead of noting it", () => {
+      const fixture = TestBed.createComponent(CartPage);
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, {
+        ...CART,
+        items: [{ ...CART.items[0], quantity: 13, progCatIds: [52] }, CART.items[1]],
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 2,
+          allotExclTaxFreight: 'N',
+          rules: [
+            {
+              ...MULTI_GRANT_RULE,
+              units: { total: 11, used: 4, inCart: 13, available: 7 },
+              // Cap is fully spent (`remaining: 0`), not just outgrown by
+              // this line's own quantity — that's what makes the move
+              // kick in (see the "stays put" test right below).
+              covers: {
+                allAssortments: 'N' as const,
+                categories: [],
+                unitGrants: [
+                  { progCatId: 52, categoryName: 'Cap', unitQty: 2, remaining: 0, reserved: 0 },
+                  { progCatId: 3, categoryName: 'Tactical', unitQty: 9, remaining: 9, reserved: 0 },
+                ],
+              },
+            },
+            {
+              ruleId: 40,
+              ruleName: 'General Allotment',
+              allotType: 'DOLLAR' as const,
+              primaryUnit: 'DOLLARS' as const,
+              isBarRule: 'N' as const,
+              dollars: { total: 500, used: 0, inCart: 0, available: 500 },
+              units: null,
+              points: null,
+              cycle: MULTI_GRANT_RULE.cycle,
+              covers: { allAssortments: 'Y' as const, categories: [], unitGrants: [] },
+              carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
+              quotas: [],
+              requireApproval: 'N' as const,
+              allowCcFallback: 'N' as const,
+              fallbackRuleIds: [],
+            },
+          ],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [
+            { cartItemId: 9001, skuId: 9001, ruleId: 31, payUnit: 'UNITS' as const, tagLabel: 'uses units', allocations: [] },
+          ],
+        },
+      });
+      fixture.detectChanges();
+
+      const row: HTMLElement = fixture.nativeElement.querySelectorAll('.cart-page__row')[0];
+      expect(row.querySelector('.pay-tag')?.textContent?.trim()).toBe('$ allotment');
+      const groupHeadings: HTMLElement[] = fixture.nativeElement.querySelectorAll('.allotment-group__name');
+      expect(Array.from(groupHeadings).map((h) => h.textContent?.trim())).toContain('General Allotment');
+      // Still blocks checkout and still shows the top-of-page warning — the
+      // real backend charge is unaffected by where this line is shown.
+      expect(fixture.nativeElement.textContent).not.toContain('maxed out');
+      expect(fixture.nativeElement.textContent).toContain(
+        'Your Unit Allotment for Cap is exceeded. Please adjust qty before checking out.',
+      );
+      expect(fixture.nativeElement.querySelector('a.cart-page__checkout')).toBeNull();
+    });
+
+    it("keeps an over-drawn line under its real units group as long as the category still has real room left, however far the quantity is raised", () => {
+      const fixture = TestBed.createComponent(CartPage);
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, {
+        ...CART,
+        items: [{ ...CART.items[0], quantity: 13, progCatIds: [52] }, CART.items[1]],
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 2,
+          allotExclTaxFreight: 'N',
+          rules: [
+            // Cap's own `remaining` (2) hasn't itself been touched by real
+            // usage — unlike the test above, there's still something
+            // genuine to cover part of this line with, so it must stay put
+            // even though 13 are in the cart against a 2-unit grant.
+            { ...MULTI_GRANT_RULE, units: { total: 11, used: 4, inCart: 13, available: 7 } },
+            {
+              ruleId: 40,
+              ruleName: 'General Allotment',
+              allotType: 'DOLLAR' as const,
+              primaryUnit: 'DOLLARS' as const,
+              isBarRule: 'N' as const,
+              dollars: { total: 500, used: 0, inCart: 0, available: 500 },
+              units: null,
+              points: null,
+              cycle: MULTI_GRANT_RULE.cycle,
+              covers: { allAssortments: 'Y' as const, categories: [], unitGrants: [] },
+              carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
+              quotas: [],
+              requireApproval: 'N' as const,
+              allowCcFallback: 'N' as const,
+              fallbackRuleIds: [],
+            },
+          ],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [
+            { cartItemId: 9001, skuId: 9001, ruleId: 31, payUnit: 'UNITS' as const, tagLabel: 'uses units', allocations: [] },
+          ],
+        },
+      });
+      fixture.detectChanges();
+
+      const row: HTMLElement = fixture.nativeElement.querySelectorAll('.cart-page__row')[0];
+      expect(row.querySelector('.pay-tag')?.textContent?.trim().replace(/\s+/g, ' ')).toBe('uses units · Cap');
+      const groupHeadings: HTMLElement[] = fixture.nativeElement.querySelectorAll('.allotment-group__name');
+      expect(Array.from(groupHeadings).map((h) => h.textContent?.trim())).not.toContain('General Allotment');
+      // Still exceeded/blocked — the real charge is still over the grant.
+      expect(fixture.nativeElement.textContent).toContain(
+        'Your Unit Allotment for Cap is exceeded. Please adjust qty before checking out.',
+      );
+    });
+
+    it("falls back to a generic note when the rule has no configured fallback", () => {
+      const fixture = TestBed.createComponent(CartPage);
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, {
+        ...CART,
+        items: [{ ...CART.items[0], quantity: 13, progCatIds: [52] }, CART.items[1]],
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 1,
+          allotExclTaxFreight: 'N',
+          rules: [{ ...MULTI_GRANT_RULE, units: { total: 11, used: 4, inCart: 13, available: 7 } }],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [
+            { cartItemId: 9001, skuId: 9001, ruleId: 31, payUnit: 'UNITS' as const, tagLabel: 'uses units', allocations: [] },
+          ],
+        },
+      });
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.textContent).toContain(
+        'Your Cap allotment is maxed out — this would really need another allotment or your personal card.',
+      );
+    });
+
+    it('shows no exhaustion note for a line within its category\'s own room', () => {
+      const fixture = TestBed.createComponent(CartPage);
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, {
+        ...CART,
+        items: [{ ...CART.items[0], quantity: 1, progCatIds: [52] }, CART.items[1]],
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 1,
+          allotExclTaxFreight: 'N',
+          rules: [{ ...MULTI_GRANT_RULE, units: { total: 11, used: 4, inCart: 1, available: 6 } }],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [
+            { cartItemId: 9001, skuId: 9001, ruleId: 31, payUnit: 'UNITS' as const, tagLabel: 'uses units', allocations: [] },
+          ],
+        },
+      });
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.textContent).not.toContain('maxed out');
+    });
+
+    it("shows this line's own assortment grant balance (Total/Used/In cart/Available), not the rule's pooled total", () => {
+      const fixture = TestBed.createComponent(CartPage);
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, {
+        ...CART,
+        items: [{ ...CART.items[0], quantity: 1, progCatIds: [52] }, CART.items[1]],
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 1,
+          allotExclTaxFreight: 'N',
+          rules: [{ ...MULTI_GRANT_RULE, units: { total: 11, used: 4, inCart: 1, available: 6 } }],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [
+            { cartItemId: 9001, skuId: 9001, ruleId: 31, payUnit: 'UNITS' as const, tagLabel: 'uses units', allocations: [] },
+          ],
+        },
+      });
+      fixture.detectChanges();
+
+      const row: HTMLElement = fixture.nativeElement.querySelectorAll('.cart-page__row')[0];
+      const values: NodeListOf<HTMLElement> = row.querySelectorAll('.cart-page__item-balance-box .balance-box__value');
+      expect(Array.from(values).map((el) => el.textContent?.trim())).toEqual([
+        '2 units',
+        '0 units',
+        '1 units',
+        '1 units',
+      ]);
+    });
+
+    it('shows no per-item balance box for a rule with only one assortment', () => {
+      const fixture = TestBed.createComponent(CartPage);
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, {
+        ...CART,
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 1,
+          allotExclTaxFreight: 'N',
+          rules: [
+            {
+              ...MULTI_GRANT_RULE,
+              units: { total: 5, used: 0, inCart: 2, available: 3 },
+              covers: {
+                allAssortments: 'N',
+                categories: [],
+                unitGrants: [{ progCatId: 52, categoryName: 'Cap', unitQty: 5 }],
+              },
+            },
+          ],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [
+            { cartItemId: 9001, skuId: 9001, ruleId: 31, payUnit: 'UNITS' as const, tagLabel: 'uses units', allocations: [] },
+          ],
+        },
+      });
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.cart-page__item-balance-box')).toBeNull();
     });
   });
 

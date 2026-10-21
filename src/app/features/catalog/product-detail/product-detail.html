@@ -189,7 +189,12 @@
             }
 
             @if (coveringRule(); as rule) {
-              <app-allotment-coverage-card [rule]="rule" (viewRule)="viewRule()" />
+              <app-allotment-coverage-card
+                [rule]="rule"
+                [unitGrant]="coveringUnitGrant()"
+                [unitGrantBalance]="coveringUnitGrantBalance()"
+                (viewRule)="viewRule()"
+              />
             }
 
             <div class="d-flex align-items-center gap-3 mt-4">

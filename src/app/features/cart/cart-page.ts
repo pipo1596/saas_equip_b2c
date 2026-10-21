@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 
 import {
   AllotmentRule,
+  Balance,
   CartItem,
   CartService,
   LineAllocation,
@@ -14,16 +15,20 @@ import {
   formatBalanceAmount,
   formatCartItemOptions,
   tileBalance,
+  unitGrantForCategories,
 } from '../../core/cart/cart';
 import {
   amountDueAtCheckout,
+  effectiveLineTags,
   exceededQuotas,
+  exceededUnitGrants,
   exceededUnitRules,
-  lineTagByItemId,
   paidFromLines,
   pointsShortfall,
   quotaExceededMessage,
   resolvedAllocations,
+  unitGrantBalance,
+  unitGrantExceededMessage,
   unitRuleExceededMessage,
 } from '../../core/cart/cart-totals';
 import { LocationSelectionService } from '../../core/location/location-selection';
@@ -72,7 +77,13 @@ export class CartPage implements OnInit {
   readonly formatAmount = formatBalanceAmount;
   readonly tileBalance = tileBalance;
 
-  private readonly tagsByItemId = computed(() => lineTagByItemId(this.cart()));
+  // A line whose own category has genuinely run out gets reattributed here
+  // to whichever dollar allotment can really cover it (see
+  // `effectiveLineTags`'s own comment) — everything below that reads this
+  // (grouping, the pay-tag badge, price formatting) reflects that, even
+  // though the real backend charge (checked separately via
+  // `exceededUnitGrants`/`amountDueAtCheckout`) is unaffected.
+  private readonly tagsByItemId = computed(() => effectiveLineTags(this.cart()));
 
   // One group per rule that's either the *home* allotment for at least one
   // line, or lent an amount to cover another group's overflow — a rule
@@ -129,9 +140,75 @@ export class CartPage implements OnInit {
   readonly quotaExceededMessage = quotaExceededMessage;
   readonly exceededUnitRules = computed(() => exceededUnitRules(this.cart()));
   readonly unitRuleExceededMessage = unitRuleExceededMessage;
+  // Catches a specific assortment the cart has over-drawn even when its
+  // rule's own pooled total (`exceededUnitRules`, above) still looks fine
+  // because another category inside the same rule has enough surplus to
+  // mask it.
+  readonly exceededUnitGrants = computed(() => exceededUnitGrants(this.cart()));
+  readonly unitGrantExceededMessage = unitGrantExceededMessage;
 
   lineTag(cartItemId: number): PayTag | null {
     return this.tagsByItemId().get(cartItemId) ?? null;
+  }
+
+  // The specific assortment this line's own units tag draws from (e.g.
+  // "Cap"), for the pay-tag badge — `null` for a dollars/points tag, or a
+  // units rule with only one assortment granted (nothing extra to say
+  // beyond the generic "uses units" label already showing).
+  unitCategoryFor(item: CartItem): string | null {
+    const tag = this.tagsByItemId().get(item.cartItemId);
+    if (!tag || tag.payUnit !== 'UNITS' || tag.ruleId === null) {
+      return null;
+    }
+    const rule = (this.cart().allotment?.rules ?? []).find((candidate) => candidate.ruleId === tag.ruleId);
+    if (!rule || rule.covers.unitGrants.length <= 1) {
+      return null;
+    }
+    return unitGrantForCategories(rule, item.progCatIds)?.categoryName ?? null;
+  }
+
+  // For a line whose own category is one of the ones `exceededUnitGrants`
+  // has flagged, *and* no dollar allotment in scope could cover it either
+  // (see `effectiveLineTags` — when one can, the line is already shown
+  // under that dollar allotment instead, and this never fires for it). The
+  // backend still charges it to this rule regardless of any of this
+  // (that's what blocks checkout); this is just explaining why, using the
+  // same fallback chain its group's own subtitle already shows as "Then
+  // uses: ...".
+  unitCategoryExhaustedNoteFor(item: CartItem): string | null {
+    const tag = this.tagsByItemId().get(item.cartItemId);
+    if (!tag || tag.payUnit !== 'UNITS' || tag.ruleId === null) {
+      return null;
+    }
+    const exceeded = this.exceededUnitGrants().find(
+      (candidate) => candidate.rule.ruleId === tag.ruleId && item.progCatIds.includes(candidate.grant.progCatId),
+    );
+    if (!exceeded) {
+      return null;
+    }
+    const [fallback] = fallbackChain(exceeded.rule, this.cart().allotment?.rules ?? []);
+    return fallback
+      ? `Your ${exceeded.grant.categoryName} allotment is maxed out — this would really be billed to your ${fallback.ruleName} instead.`
+      : `Your ${exceeded.grant.categoryName} allotment is maxed out — this would really need another allotment or your personal card.`;
+  }
+
+  // Total/Used/In cart/Available for this line's own specific assortment
+  // grant — e.g. a Cap line shows the Cap grant's own figures, not the
+  // rule's pooled total across every assortment it grants (that's what the
+  // group header's own balance box already shows). `null` for a
+  // dollars/points line, or a units rule with only one assortment (the
+  // group header's balance box already says the same thing).
+  unitGrantBalanceFor(item: CartItem): Balance | null {
+    const tag = this.tagsByItemId().get(item.cartItemId);
+    if (!tag || tag.payUnit !== 'UNITS' || tag.ruleId === null) {
+      return null;
+    }
+    const rule = (this.cart().allotment?.rules ?? []).find((candidate) => candidate.ruleId === tag.ruleId);
+    if (!rule || rule.covers.unitGrants.length <= 1) {
+      return null;
+    }
+    const grant = unitGrantForCategories(rule, item.progCatIds);
+    return grant ? unitGrantBalance(grant, this.cart()) : null;
   }
 
   // The allotment that's actually this line's own (the first one applied)

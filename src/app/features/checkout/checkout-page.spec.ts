@@ -967,6 +967,130 @@ describe('CheckoutPage', () => {
     );
   });
 
+  it("breaks a multi-assortment unit allotment's 'Paid from' line down by category", () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    fixture.detectChanges();
+    const UNITS_RULE = {
+      ruleId: 12,
+      ruleName: 'Unit Allotment',
+      allotType: 'UNITS' as const,
+      primaryUnit: 'UNITS' as const,
+      isBarRule: 'N' as const,
+      dollars: null,
+      units: { total: 5, used: 0, inCart: 3, available: 2 },
+      points: null,
+      cycle: {
+        renewalBasis: 'FIXED' as const,
+        renewalPeriodMonths: 12,
+        cycleStart: '2026-09-09',
+        cycleEnd: '2027-09-08',
+        renewsOn: '2027-09-09',
+        expirationDate: null,
+        onExpiration: 'SUSPEND' as const,
+      },
+      covers: {
+        allAssortments: 'N' as const,
+        categories: [],
+        unitGrants: [
+          { progCatId: 52, categoryName: 'Jacket', unitQty: 3 },
+          { progCatId: 53, categoryName: 'Duty Belt', unitQty: 2 },
+        ],
+      },
+      carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
+      quotas: [],
+      requireApproval: 'N' as const,
+      allowCcFallback: 'N' as const,
+      fallbackRuleIds: [],
+    };
+    flushInitialCartLoads(httpMock, {
+      ...CART,
+      itemCount: 2,
+      items: [
+        { ...CART.items[0], progCatIds: [52] },
+        { ...CART.items[0], cartItemId: 9002, skuId: 9002, quantity: 1, progCatIds: [53] },
+      ],
+      allotment: {
+        programId: 3,
+        allotmentBar: null,
+        ruleCount: 1,
+        allotExclTaxFreight: 'N',
+        rules: [UNITS_RULE],
+        approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+        openOrders: null,
+        lineTags: [
+          { cartItemId: 9001, skuId: 9001, ruleId: 12, payUnit: 'UNITS' as const, tagLabel: 'Unit Allotment', allocations: [] },
+          { cartItemId: 9002, skuId: 9002, ruleId: 12, payUnit: 'UNITS' as const, tagLabel: 'Unit Allotment', allocations: [] },
+        ],
+        productTag: null,
+      },
+    });
+    flushCheckoutData(httpMock, {
+      cust_addrs: [PRIMARY_ADDRESS],
+      ship_addrs: [PRIMARY_ADDRESS],
+      ship_mthds: [DEFAULT_SHIP_METHOD],
+      tax_rates: [QC_TAX_RATE],
+    });
+    fixture.detectChanges();
+
+    const summary: HTMLElement = fixture.nativeElement.querySelector('.checkout-page__summary');
+    expect(summary.textContent).toContain('Unit Allotment');
+    const breakdown: HTMLElement[] = Array.from(summary.querySelectorAll('.checkout-page__category-breakdown li'));
+    expect(breakdown.map((li) => li.textContent?.trim().replace(/\s+/g, ''))).toEqual([
+      'Jacket2units',
+      'DutyBelt1units',
+    ]);
+  });
+
+  it("blocks placing the order when a specific assortment is over-drawn, even though the rule's pooled total still looks fine", () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    const page = fixture.componentInstance;
+    fixture.detectChanges();
+    const MULTI_GRANT_RULE = {
+      ...CART_WITH_SHIPPING_AND_TAX_COVERED.allotment!.rules[0],
+      ruleId: 12,
+      ruleName: 'Unit Allotment',
+      allotType: 'UNITS' as const,
+      primaryUnit: 'UNITS' as const,
+      dollars: null,
+      // Plenty of room overall (7 of 11) — Tactical's surplus masks the
+      // Cap-specific overdraft in this pooled figure.
+      units: { total: 11, used: 4, inCart: 13, available: 7 },
+      covers: {
+        allAssortments: 'N' as const,
+        categories: [],
+        unitGrants: [
+          { progCatId: 60, categoryName: 'Cap', unitQty: 2, remaining: 2, reserved: 0 },
+          { progCatId: 61, categoryName: 'Tactical', unitQty: 9, remaining: 9, reserved: 0 },
+        ],
+      },
+    };
+    flushInitialCartLoads(httpMock, {
+      ...CART_WITH_SHIPPING_AND_TAX_COVERED,
+      items: [{ ...CART.items[0], quantity: 13, progCatIds: [60] }],
+      allotment: {
+        ...CART_WITH_SHIPPING_AND_TAX_COVERED.allotment!,
+        rules: [MULTI_GRANT_RULE],
+        lineTags: [
+          { cartItemId: 9001, skuId: 9001, ruleId: 12, payUnit: 'UNITS' as const, tagLabel: 'Unit Allotment', allocations: [] },
+        ],
+      },
+    });
+    flushCheckoutData(httpMock, {
+      cust_addrs: [PRIMARY_ADDRESS],
+      ship_addrs: [PRIMARY_ADDRESS],
+      ship_mthds: [DEFAULT_SHIP_METHOD],
+      tax_rates: [QC_TAX_RATE],
+    });
+    fixture.detectChanges();
+    page.contactForm.setValue({ email: 'pat@example.com', firstName: 'Pat', lastName: 'Doe', phone: '555-0100', extension: '' });
+    fixture.detectChanges();
+
+    expect(page.canPlaceOrder()).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain(
+      'Your Unit Allotment for Cap is exceeded. Please adjust qty before checking out.',
+    );
+  });
+
   it('should not block a points-only order over leftover dollar shipping/tax it never sees or pays', () => {
     const fixture = TestBed.createComponent(CheckoutPage);
     const page = fixture.componentInstance;
