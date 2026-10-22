@@ -78,6 +78,41 @@ describe('Home', () => {
     expect(home.tenantSettings()?.hero_img).toBe('/photos/partner-2/hero.jpg');
   });
 
+  it("shows the active location and tenant's company name in the hero eyebrow", () => {
+    const fixture = TestBed.createComponent(Home);
+    const home = fixture.componentInstance;
+    const auth = TestBed.inject(AuthService);
+    auth.session.set({
+      ...FAKE_SESSION,
+      locations: [
+        { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Metro EMS Station 4' },
+      ],
+    });
+    home.ngOnInit();
+    TestBed.inject(HttpTestingController)
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS')
+      .flush({ comp_name: 'Metro EMS' } as never);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.hero__eyebrow')?.textContent?.trim()).toBe(
+      'Metro EMS Station 4 · Metro EMS',
+    );
+  });
+
+  it("falls back to \"Select location\" in the hero eyebrow when no location is active yet", () => {
+    const fixture = TestBed.createComponent(Home);
+    const home = fixture.componentInstance;
+    home.ngOnInit();
+    TestBed.inject(HttpTestingController)
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS')
+      .flush({ comp_name: 'Metro EMS' } as never);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.hero__eyebrow')?.textContent?.trim()).toBe(
+      'Select location · Metro EMS',
+    );
+  });
+
   it('should not throw when scrolling the category carousel before it renders', () => {
     const fixture = TestBed.createComponent(Home);
     const home = fixture.componentInstance;

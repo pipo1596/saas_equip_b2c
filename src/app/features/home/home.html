@@ -17,7 +17,7 @@
 <section class="hero container p-0">
   <div class="hero__card">
     <div class="hero__content">
-      <p class="hero__eyebrow">Field paramedic · Metro EMS</p>
+      <p class="hero__eyebrow">{{ activeLocation()?.locationName ?? 'Select location' }} · {{ tenantSettings()?.comp_name }}</p>
       <h1>Welcome back, {{ firstName() ?? 'there' }}.</h1>
       <p class="hero__sub">
         Here's where your account stands today. Shop your allotment, track orders, and stay

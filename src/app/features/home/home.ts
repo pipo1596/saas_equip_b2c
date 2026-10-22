@@ -41,6 +41,7 @@ export class Home implements OnInit {
   readonly tenantSettings = this.tenantSettingsService.settings;
   readonly firstName = this.authService.firstName;
   readonly categories = this.catalogViewService.categories;
+  readonly activeLocation = this.locationSelectionService.activeLocation;
 
   // The header already keeps the shared cart (and its allotment block)
   // fresh for the whole app — this page just reads it, rather than
