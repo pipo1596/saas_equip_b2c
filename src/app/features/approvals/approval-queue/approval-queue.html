@@ -12,10 +12,19 @@
     <h1 class="approval-queue__title mb-3">Approvals</h1>
 
     @if (loading()) {
-      <div class="d-flex justify-content-center py-5">
-        <div class="spinner-border text-primary" role="status">
-          <span class="visually-hidden">Loading approvals…</span>
-        </div>
+      <div class="approval-queue__table" role="status">
+        <span class="visually-hidden">Loading approvals…</span>
+        @for (n of [1, 2, 3, 4]; track n) {
+          <div class="approval-queue__row" aria-hidden="true">
+            <div class="skeleton skeleton--text" style="width: 80px"></div>
+            <div class="skeleton skeleton--text" style="width: 100px"></div>
+            <div class="skeleton skeleton--text" style="width: 70px"></div>
+            <div class="skeleton skeleton--text" style="width: 110px"></div>
+            <div class="skeleton skeleton--text" style="width: 60px"></div>
+            <div class="skeleton skeleton--text" style="width: 80px"></div>
+            <div class="skeleton skeleton--text" style="width: 70px"></div>
+          </div>
+        }
       </div>
     } @else if (error(); as message) {
       <div class="alert alert-danger" role="alert">{{ message }}</div>

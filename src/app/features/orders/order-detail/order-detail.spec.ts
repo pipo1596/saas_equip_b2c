@@ -136,6 +136,20 @@ describe('OrderDetailPage', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
+  it('shows a skeleton placeholder while the order is still loading, then the real content once it resolves', () => {
+    const { fixture } = createPage();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.skeleton').length).toBeGreaterThan(0);
+    expect(fixture.nativeElement.querySelector('.order-detail__item-name')).toBeNull();
+
+    flushOrderGet(httpMock, BASE_ORDER);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.skeleton').length).toBe(0);
+    expect(fixture.nativeElement.querySelector('.order-detail__item-name')).not.toBeNull();
+  });
+
   it('loads the order on init and exposes it', () => {
     const { fixture, page } = createPage();
     fixture.detectChanges();

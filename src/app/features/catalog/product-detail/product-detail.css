@@ -300,3 +300,27 @@
   border-color: var(--slate-400);
   color: var(--navy);
 }
+
+/* ---------- loading skeleton (sizing specific to this page) ---------- */
+/* Base `.skeleton`/shimmer lives in shared.css — these are just this
+   page's own shape modifiers. */
+.skeleton--price {
+  height: 26px;
+  width: 45%;
+}
+.skeleton--chip {
+  width: 64px;
+  height: 38px;
+  border-radius: 4px;
+}
+.skeleton--stepper {
+  width: 132px;
+  height: 52px;
+  border-radius: 4px;
+  flex: none;
+}
+.skeleton--button {
+  flex: 1;
+  height: 52px;
+  border-radius: 4px;
+}

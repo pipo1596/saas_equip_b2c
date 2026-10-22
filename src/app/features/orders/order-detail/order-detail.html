@@ -15,9 +15,46 @@
     </nav>
 
     @if (loading()) {
-      <div class="d-flex justify-content-center py-5">
-        <div class="spinner-border text-primary" role="status">
-          <span class="visually-hidden">Loading order…</span>
+      <div role="status">
+        <span class="visually-hidden">Loading order…</span>
+        <div class="order-detail__banner order-detail__banner--grey" aria-hidden="true">
+          <div class="skeleton skeleton--text" style="width: 220px; height: 15px"></div>
+        </div>
+        <div class="row g-4 mt-1" aria-hidden="true">
+          <div class="col-lg-8">
+            <section class="order-detail__panel">
+              <div class="skeleton skeleton--text mb-3" style="width: 80px; height: 16px"></div>
+              @for (n of [1, 2]; track n) {
+                <div class="order-detail__item">
+                  <div class="order-detail__item-thumb skeleton"></div>
+                  <div class="order-detail__item-body">
+                    <div class="skeleton skeleton--text mb-1" style="width: 90%"></div>
+                    <div class="skeleton skeleton--text" style="width: 50%; height: 11px"></div>
+                  </div>
+                </div>
+              }
+            </section>
+            <section class="order-detail__panel">
+              <div class="skeleton skeleton--text mb-3" style="width: 150px; height: 16px"></div>
+              <div class="row">
+                @for (n of [1, 2, 3]; track n) {
+                  <div class="col-md-4">
+                    <div class="skeleton skeleton--text mb-2" style="width: 60%; height: 11px"></div>
+                    <div class="skeleton skeleton--text mb-1" style="width: 85%"></div>
+                    <div class="skeleton skeleton--text" style="width: 70%"></div>
+                  </div>
+                }
+              </div>
+            </section>
+          </div>
+          <div class="col-lg-4">
+            <section class="order-detail__panel order-detail__summary">
+              <div class="skeleton skeleton--text mb-3" style="width: 110px; height: 16px"></div>
+              <div class="skeleton skeleton--text mb-3" style="width: 80%"></div>
+              <div class="skeleton skeleton--text mb-4" style="width: 60%"></div>
+              <div class="skeleton" style="width: 100%; height: 38px; border-radius: 4px"></div>
+            </section>
+          </div>
         </div>
       </div>
     } @else if (notFound()) {

@@ -77,6 +77,23 @@ describe('ApprovalQueue', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
+  it('shows a skeleton placeholder while the queue is still loading, then the real rows once it resolves', () => {
+    const fixture = TestBed.createComponent(ApprovalQueue);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.skeleton').length).toBeGreaterThan(0);
+    expect(fixture.nativeElement.querySelector('.approval-queue__order-number')).toBeNull();
+
+    flushApprovals(httpMock, {
+      pagination: { page: 1, pageSize: 25, totalRows: 1, totalPages: 1 },
+      data: [ROW],
+    });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.skeleton').length).toBe(0);
+    expect(fixture.nativeElement.querySelector('.approval-queue__order-number')).not.toBeNull();
+  });
+
   it('loads page 1 on init', () => {
     const fixture = TestBed.createComponent(ApprovalQueue);
     fixture.detectChanges();

@@ -77,6 +77,23 @@ describe('OrderHistoryPage', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
+  it('shows a skeleton placeholder while orders are still loading, then the real rows once they resolve', () => {
+    const fixture = TestBed.createComponent(OrderHistoryPage);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.skeleton').length).toBeGreaterThan(0);
+    expect(fixture.nativeElement.querySelector('.order-history__order-number')).toBeNull();
+
+    flushOrdersList(httpMock, {
+      pagination: { page: 1, pageSize: 25, totalRows: 1, totalPages: 1 },
+      data: [SUMMARY],
+    });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.skeleton').length).toBe(0);
+    expect(fixture.nativeElement.querySelector('.order-history__order-number')).not.toBeNull();
+  });
+
   it('loads page 1 with no status filter on init', () => {
     const fixture = TestBed.createComponent(OrderHistoryPage);
     fixture.detectChanges();

@@ -97,10 +97,25 @@
     </div>
 
     @if (loading()) {
-      <div class="d-flex justify-content-center py-5">
-        <div class="spinner-border text-primary" role="status">
-          <span class="visually-hidden">Loading orders…</span>
-        </div>
+      <div class="order-history__table" role="status">
+        <span class="visually-hidden">Loading orders…</span>
+        @for (n of [1, 2, 3, 4]; track n) {
+          <div class="order-history__row" aria-hidden="true">
+            <div class="order-history__row-order">
+              <div class="skeleton skeleton--text" style="width: 90px"></div>
+              <div class="skeleton skeleton--text" style="width: 140px; height: 11px"></div>
+            </div>
+            <div class="order-history__row-items">
+              <div class="order-history__thumbs">
+                <div class="order-history__thumb skeleton"></div>
+                <div class="order-history__thumb skeleton"></div>
+              </div>
+            </div>
+            <div class="skeleton" style="width: 80px; height: 22px; border-radius: 999px"></div>
+            <div class="skeleton" style="width: 60px; height: 15px; justify-self: end"></div>
+            <div></div>
+          </div>
+        }
       </div>
     } @else if (error(); as message) {
       <div class="alert alert-danger" role="alert">{{ message }}</div>

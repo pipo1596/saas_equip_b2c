@@ -175,6 +175,21 @@ describe('ProductDetail', () => {
     expect(fixture.nativeElement.querySelector('h1').textContent.trim()).toBe('Product');
   });
 
+  it('shows a skeleton placeholder while the product is still loading, then the real content once it resolves', () => {
+    const fixture = TestBed.createComponent(ProductDetail);
+    fixture.componentRef.setInput('productPk', '12345');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.skeleton').length).toBeGreaterThan(0);
+    expect(fixture.nativeElement.querySelector('.btn-add-to-cart')).toBeNull();
+
+    expectRequest(httpMock, '*GET').flush(RESPONSE);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.skeleton').length).toBe(0);
+    expect(fixture.nativeElement.querySelector('.btn-add-to-cart')).not.toBeNull();
+  });
+
   it('should not throw when scrolling the thumbnail carousel before it renders', () => {
     const fixture = TestBed.createComponent(ProductDetail);
     expect(() => fixture.componentInstance.scrollThumbs(1)).not.toThrow();

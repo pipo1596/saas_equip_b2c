@@ -261,6 +261,21 @@ describe('CheckoutPage', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
+  it('shows a skeleton placeholder while checkout is still loading, then the real content once it resolves', () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.skeleton').length).toBeGreaterThan(0);
+    expect(fixture.nativeElement.querySelector('#contact-email')).toBeNull();
+
+    flushInitialCartLoads(httpMock, CART);
+    flushCheckoutData(httpMock, { cust_addrs: [], ship_addrs: [], ship_mthds: [], tax_rates: [] });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.skeleton').length).toBe(0);
+    expect(fixture.nativeElement.querySelector('#contact-email')).not.toBeNull();
+  });
+
   it('should pre-fill the contact form from the logged-in session, formatting the phone number', () => {
     TestBed.inject(AuthService).session.set(FAKE_SESSION);
 

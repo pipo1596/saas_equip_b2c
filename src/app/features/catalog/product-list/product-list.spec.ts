@@ -106,6 +106,24 @@ describe('ProductList', () => {
     expect(fixture.nativeElement.textContent).toContain('Category');
   });
 
+  it('shows a skeleton card grid while products are still loading, then the real cards once they resolve', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', '5510');
+    auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.skeleton').length).toBeGreaterThan(0);
+    expect(fixture.nativeElement.querySelector('.product-card__title')).toBeNull();
+
+    expectProductsRequest(httpMock).flush(SAMPLE);
+    expectCategoriesRequest(httpMock).flush({ categories: [] });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.skeleton').length).toBe(0);
+    expect(fixture.nativeElement.querySelector('.product-card__title')).not.toBeNull();
+  });
+
   it('should show the bound category name as the page title', () => {
     const fixture = TestBed.createComponent(ProductList);
     fixture.componentRef.setInput('categoryId', '321');

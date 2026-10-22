@@ -109,6 +109,20 @@ describe('CartPage', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
+  it('shows a skeleton placeholder while the cart is still loading, then the real content once it resolves', () => {
+    const fixture = TestBed.createComponent(CartPage);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.skeleton').length).toBeGreaterThan(0);
+    expect(fixture.nativeElement.querySelector('.cart-page__name')).toBeNull();
+
+    flushInitialCartLoads(httpMock, CART);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.skeleton').length).toBe(0);
+    expect(fixture.nativeElement.querySelector('.cart-page__name')).not.toBeNull();
+  });
+
   it('should load the cart on init and render its lines', () => {
     const fixture = TestBed.createComponent(CartPage);
     fixture.detectChanges();

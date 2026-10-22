@@ -12,9 +12,29 @@
     <h1 class="cart-page__title mb-3">Your Cart</h1>
 
     @if (loading()) {
-      <div class="d-flex justify-content-center py-5">
-        <div class="spinner-border text-primary" role="status">
-          <span class="visually-hidden">Loading your cart…</span>
+      <div class="row g-4" role="status">
+        <span class="visually-hidden">Loading your cart…</span>
+        <div class="col-lg-8" aria-hidden="true">
+          <div class="cart-page__items">
+            @for (n of [1, 2, 3]; track n) {
+              <div class="cart-page__row">
+                <div class="cart-page__thumb skeleton"></div>
+                <div class="cart-page__body">
+                  <div class="skeleton skeleton--text mb-2" style="width: 55%"></div>
+                  <div class="skeleton skeleton--text" style="width: 35%; height: 11px"></div>
+                </div>
+                <div class="skeleton" style="width: 110px; height: 52px; border-radius: 4px"></div>
+              </div>
+            }
+          </div>
+        </div>
+        <div class="col-lg-4" aria-hidden="true">
+          <div class="cart-page__summary">
+            <div class="skeleton skeleton--text mb-3" style="width: 50%; height: 16px"></div>
+            <div class="skeleton skeleton--text mb-3" style="width: 80%"></div>
+            <div class="skeleton skeleton--text mb-4" style="width: 60%"></div>
+            <div class="skeleton" style="width: 100%; height: 52px; border-radius: 4px"></div>
+          </div>
         </div>
       </div>
     } @else {

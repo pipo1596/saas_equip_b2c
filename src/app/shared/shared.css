@@ -27,3 +27,40 @@
     transition: none !important;
   }
 }
+
+/* ---------- loading skeleton ---------- */
+/* A shimmering gray placeholder block, shaped (via modifier classes or
+   inline sizing) like whatever real content it's standing in for — so a
+   page doesn't visibly jump once the real content replaces it, the way a
+   centered spinner over blank space does. Needs a light, solid background
+   behind it (e.g. `bg-white`) wherever it doesn't already sit on one —
+   its own gray is close in lightness to this app's own page background,
+   easy to lose against it otherwise. */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--slate-100);
+  border-radius: 6px;
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+  }
+}
+.skeleton--text {
+  height: 14px;
+  width: 100%;
+}
