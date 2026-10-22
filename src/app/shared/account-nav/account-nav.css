@@ -1,0 +1,29 @@
+.account-nav {
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.account-nav__link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 6px;
+  color: var(--slate-900);
+  text-decoration: none;
+  font-size: 14.5px;
+}
+.account-nav__link:hover {
+  background: var(--slate-100);
+}
+.account-nav__link--active {
+  background: color-mix(in srgb, var(--action) 10%, white);
+  color: var(--action);
+  font-weight: 600;
+}
+.account-nav__link--active:hover {
+  background: color-mix(in srgb, var(--action) 10%, white);
+}

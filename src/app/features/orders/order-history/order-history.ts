@@ -26,6 +26,7 @@ import {
   orderStatusLabel,
   orderStatusTone,
 } from '../../../core/order/order';
+import { AccountNav } from '../../../shared/account-nav/account-nav';
 import { Footer } from '../../../shared/footer/footer';
 import { Header } from '../../../shared/header/header';
 
@@ -48,7 +49,7 @@ const STATUS_CHIPS: { label: string; value: string }[] = [
 
 @Component({
   selector: 'app-order-history-page',
-  imports: [Header, Footer, RouterLink, CurrencyPipe, ReactiveFormsModule],
+  imports: [Header, Footer, RouterLink, CurrencyPipe, ReactiveFormsModule, AccountNav],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './order-history.html',
   styleUrls: ['../../../shared/shared.css', './order-history.css'],

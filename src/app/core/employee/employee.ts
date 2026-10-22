@@ -20,23 +20,71 @@ export interface Impersonation {
   actorLevel: 'L1' | 'L2';
 }
 
-// Field names beyond empId/firstName/lastName/locations are best guesses
-// following the login response's naming convention — confirm/adjust once
-// more of the real APCEMPLYEE payload is known.
+export interface EmployeeCustomer {
+  custId: number;
+  name: string;
+  logoUrl: string | null;
+}
+
+export interface EmployeeSupportContact {
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+}
+
+export interface EmployeePersonalInfo {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+}
+
+// `status` is a best guess beyond the one confirmed value ('ACTIVE') — left
+// as a plain string rather than a closed union until more values are seen.
+export interface EmployeeEmployment {
+  roleId: number;
+  roleName: string;
+  rank: string | null;
+  hireDate: string | null;
+  employeeNumber: string | null;
+  badgeNumber: string | null;
+  status: string;
+}
+
+// `mfaMethod`/`mfaDestination` are rendered straight from the API as given
+// — the exact wording/casing for `mfaMethod` ('Email' vs 'EMAIL', etc.)
+// isn't confirmed yet, and `mfaDestination` is assumed to already arrive
+// masked (e.g. "j•••••@example.com") rather than something this app masks
+// itself.
+export interface EmployeeSecurity {
+  mfaEnabled: 'Y' | 'N';
+  mfaMethod: string | null;
+  mfaDestination: string | null;
+  passwordChangedTs: string | null;
+}
+
+export interface EmployeeProfile {
+  customer: EmployeeCustomer;
+  support: EmployeeSupportContact;
+  personal: EmployeePersonalInfo;
+  employment: EmployeeEmployment;
+  security: EmployeeSecurity;
+}
+
 export interface EmployeeDetails {
   empId: string;
   firstName: string;
   lastName: string;
   locations: EmployeeLocation[];
-  email?: string;
-  phone?: string;
-  jobTitle?: string;
-  department?: string;
+  // `null` only for a legacy/partial response that predates this block —
+  // a real, current `*GET` always sends it.
+  profile: EmployeeProfile | null;
   impersonation: Impersonation | null;
 }
 
-interface RawEmployeeDetails extends Omit<EmployeeDetails, 'impersonation'> {
+interface RawEmployeeDetails extends Omit<EmployeeDetails, 'impersonation' | 'profile'> {
   impersonation?: Impersonation | null;
+  profile?: EmployeeProfile | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -64,7 +112,7 @@ export class EmployeeService {
       this.request$ = this.http
         .post<RawEmployeeDetails>(this.dispatchUrl, { empId, sessionId, action: '*GET' })
         .pipe(
-          map((raw) => ({ ...raw, impersonation: raw.impersonation ?? null })),
+          map((raw) => ({ ...raw, impersonation: raw.impersonation ?? null, profile: raw.profile ?? null })),
           tap((employee) => this.employee.set(employee)),
           shareReplay(1),
         );

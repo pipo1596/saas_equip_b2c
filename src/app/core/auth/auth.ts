@@ -301,8 +301,8 @@ export class AuthService {
         ...session,
         firstName: employee.firstName || session.firstName,
         lastName: employee.lastName || session.lastName,
-        email: employee.email || session.email,
-        phone: employee.phone || session.phone,
+        email: employee.profile?.personal.email || session.email,
+        phone: employee.profile?.personal.phone || session.phone,
         locations: employee.locations ?? session.locations,
         impersonation: employee.impersonation,
       };

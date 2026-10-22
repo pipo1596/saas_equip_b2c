@@ -77,6 +77,18 @@ describe('OrderHistoryPage', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
+  it('shows the account nav with "My orders" marked as the current page', () => {
+    const fixture = TestBed.createComponent(OrderHistoryPage);
+    fixture.detectChanges();
+    flushOrdersList(httpMock, { pagination: { page: 1, pageSize: 25, totalRows: 0, totalPages: 0 }, data: [] });
+    fixture.detectChanges();
+
+    const ordersLink: HTMLAnchorElement = fixture.nativeElement.querySelector(
+      'app-account-nav a[href="/orders"]',
+    );
+    expect(ordersLink.getAttribute('aria-current')).toBe('page');
+  });
+
   it('shows a skeleton placeholder while orders are still loading, then the real rows once they resolve', () => {
     const fixture = TestBed.createComponent(OrderHistoryPage);
     fixture.detectChanges();

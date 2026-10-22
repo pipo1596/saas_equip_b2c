@@ -381,4 +381,13 @@ describe('Home', () => {
       expect(awaitingStat?.getAttribute('href')).toBe('/orders?status=PENDING_APPROVAL');
     });
   });
+
+  it('links the "My account" quick-action tile to the account page', () => {
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+
+    const actions: HTMLAnchorElement[] = fixture.nativeElement.querySelectorAll('.action');
+    const myAccount = Array.from(actions).find((el) => el.textContent?.includes('My account'));
+    expect(myAccount?.getAttribute('href')).toBe('/account');
+  });
 });

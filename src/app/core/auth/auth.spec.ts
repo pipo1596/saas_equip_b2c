@@ -138,8 +138,7 @@ describe('AuthService', () => {
       empId: FAKE_EMP_ID,
       firstName: FAKE_FIRST_NAME,
       lastName: FAKE_LAST_NAME,
-      email: FAKE_EMAIL,
-      phone: FAKE_PHONE,
+      profile: { personal: { email: FAKE_EMAIL, phone: FAKE_PHONE } },
     });
 
     expect(service.session()?.email).toBe(FAKE_EMAIL);

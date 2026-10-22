@@ -71,6 +71,11 @@ export const routes: Routes = [
       import('./features/orders/order-detail/order-detail').then((m) => m.OrderDetailPage),
   },
   {
+    path: 'account',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/account/account-page').then((m) => m.AccountPage),
+  },
+  {
     path: 'approvals',
     canActivate: [authGuard],
     loadComponent: () =>

@@ -1,0 +1,63 @@
+<nav aria-label="Account" class="account-nav bg-white">
+  <a
+    routerLink="/account"
+    class="account-nav__link"
+    [class.account-nav__link--active]="active() === 'account'"
+    [attr.aria-current]="active() === 'account' ? 'page' : null"
+  >
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
+    </svg>
+    My account
+  </a>
+  <a
+    routerLink="/orders"
+    class="account-nav__link"
+    [class.account-nav__link--active]="active() === 'orders'"
+    [attr.aria-current]="active() === 'orders' ? 'page' : null"
+  >
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M4 7l8-4 8 4v10l-8 4-8-4z" />
+      <path d="M4 7l8 4 8-4M12 11v10" />
+    </svg>
+    My orders
+  </a>
+  <a routerLink="/home" class="account-nav__link">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v10M9 10h4.5a1.5 1.5 0 0 1 0 3H10a1.5 1.5 0 0 0 0 3H15" />
+    </svg>
+    My Allotment
+  </a>
+</nav>
