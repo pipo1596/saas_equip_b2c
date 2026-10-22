@@ -180,14 +180,17 @@ describe('ProductDetail', () => {
     expect(() => fixture.componentInstance.scrollThumbs(1)).not.toThrow();
   });
 
-  it('should show the name passed in the query param immediately, before the API responds', () => {
+  it('falls back to the generic "Product" title while the API call is still in flight, then shows the real title once it resolves', () => {
     const fixture = TestBed.createComponent(ProductDetail);
     fixture.componentRef.setInput('productPk', '12345');
-    fixture.componentRef.setInput('name', "Men's Trail Jacket");
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('h1').textContent.trim()).toBe("Men's Trail Jacket");
+    expect(fixture.nativeElement.querySelector('h1').textContent.trim()).toBe('Product');
+
     expectRequest(httpMock, '*GET').flush(RESPONSE);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('h1').textContent.trim()).toBe(PRODUCT.title);
   });
 
   it('sends a null locationId while no location is active yet', () => {

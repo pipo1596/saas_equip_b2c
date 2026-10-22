@@ -31,15 +31,15 @@ describe('charsetDecodeInterceptor', () => {
   }
 
   // Builds the exact real-world broken payload: an otherwise-ASCII JSON
-  // body with "®" serialized as the single raw ISO-8859-1 byte (0xAE) —
-  // not valid UTF-8 on its own — exactly how the vendor API actually sends
-  // it when it declares `charset=ISO-8859-1`.
-  function iso88591Body(prefix: string, suffix: string): ArrayBuffer {
+  // body with one character serialized as a single raw byte — not valid
+  // UTF-8 on its own — exactly how the vendor API actually sends it when
+  // it declares `charset=ISO-8859-1`.
+  function singleByteBody(prefix: string, byte: number, suffix: string): ArrayBuffer {
     const prefixBytes = new TextEncoder().encode(prefix);
     const suffixBytes = new TextEncoder().encode(suffix);
     const bytes = new Uint8Array(prefixBytes.length + 1 + suffixBytes.length);
     bytes.set(prefixBytes, 0);
-    bytes[prefixBytes.length] = 0xae; // Registered sign (®) in ISO-8859-1.
+    bytes[prefixBytes.length] = byte;
     bytes.set(suffixBytes, prefixBytes.length + 1);
     return bytes.buffer;
   }
@@ -49,11 +49,67 @@ describe('charsetDecodeInterceptor', () => {
     http.post<{ value: string }>('/cgi/test', {}).subscribe((res) => (result = res));
 
     const req = httpMock.expectOne('/cgi/test');
-    req.flush(iso88591Body('{"value":"Wesson', '"}'), {
+    req.flush(singleByteBody('{"value":"Wesson', 0xae, '"}'), {
       headers: { 'Content-Type': 'text/html; charset=ISO-8859-1' },
     });
 
     expect(result?.value).toBe('Wesson®');
+  });
+
+  it("recovers a windows-1252-only character (a curly apostrophe, byte 0x92) rather than the literal ISO-8859-1 control code some engines produce for it", () => {
+    // The real bug this guards against: byte 0x92 is an *undefined control
+    // character* (U+0092) under a strict ISO-8859-1 mapping, but a
+    // printable right single quotation mark (U+2019) under windows-1252 —
+    // what admin tools actually emit, and what the "ISO-8859-1" label is
+    // supposed to mean for real-world content per the Encoding Standard.
+    let result: { value: string } | undefined;
+    http.post<{ value: string }>('/cgi/test', {}).subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne('/cgi/test');
+    req.flush(singleByteBody('{"value":"Bates Men', 0x92, 's High Shine Duty Oxford"}'), {
+      headers: { 'Content-Type': 'text/html; charset=ISO-8859-1' },
+    });
+
+    expect(result?.value).toBe('Bates Men’s High Shine Duty Oxford');
+  });
+
+  it('fixes a curly apostrophe the backend mis-serialized as a literal "\\u0092" JSON escape (the original byte value used as a code point), matching the real reported title bug', () => {
+    // The backend's own bug, separate from the raw-byte one above: the
+    // response text contains the six literal ASCII characters making up
+    // the escape "\u0092" (not a raw 0x92 byte) — `JSON.parse` resolves
+    // that into the single C1 control character U+0092, which this needs
+    // to then recognize and remap to the real U+2019.
+    let result: { title: string } | undefined;
+    http.post<{ title: string }>('/cgi/test', {}).subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne('/cgi/test');
+    req.flush(utf8Bytes('{"title":"Bates Men\\u0092s High Shine Duty Oxford"}'), {
+      headers: { 'Content-Type': 'text/html; charset=ISO-8859-1' },
+    });
+
+    expect(result?.title).toBe('Bates Men’s High Shine Duty Oxford');
+  });
+
+  it('fixes the same mis-serialized escape nested inside an object, not just a top-level field', () => {
+    let result: { product: { title: string } } | undefined;
+    http.post<{ product: { title: string } }>('/cgi/test', {}).subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne('/cgi/test');
+    req.flush(utf8Bytes('{"product":{"title":"It\\u0092s here"}}'), {
+      headers: { 'Content-Type': 'text/html; charset=ISO-8859-1' },
+    });
+
+    expect(result?.product.title).toBe('It’s here');
+  });
+
+  it('leaves a C1 code with no windows-1252 override (0x81) as-is, rather than guessing', () => {
+    let result: { value: string } | undefined;
+    http.post<{ value: string }>('/cgi/test', {}).subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne('/cgi/test');
+    req.flush(utf8Bytes('{"value":"a\\u0081b"}'), { headers: { 'Content-Type': 'application/json' } });
+
+    expect(result?.value).toBe('a\u0081b');
   });
 
   it('still parses a normal UTF-8 response correctly when no charset is declared', () => {

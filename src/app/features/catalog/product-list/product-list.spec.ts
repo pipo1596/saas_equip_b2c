@@ -176,9 +176,7 @@ describe('ProductList', () => {
 
     const card = fixture.nativeElement.querySelector('.product-card');
     expect(card.tagName).toBe('A');
-    expect(card.getAttribute('href')).toBe(
-      '/product/4021?name=Sworn%20duty%20shirt,%20long%20sleeve&categoryId=5510',
-    );
+    expect(card.getAttribute('href')).toBe('/product/4021?categoryId=5510');
   });
 
   it('should show the dollar price range on the card', () => {
@@ -397,7 +395,7 @@ describe('ProductList', () => {
     fixture.detectChanges();
 
     const card = fixture.nativeElement.querySelector('.product-card');
-    expect(card.getAttribute('href')).toBe('/product/4021?name=Sworn%20duty%20shirt,%20long%20sleeve');
+    expect(card.getAttribute('href')).toBe('/product/4021');
   });
 
   it('should render the API breadcrumb trail when browsing a real category', () => {

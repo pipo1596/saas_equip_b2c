@@ -73,17 +73,14 @@ export class ProductDetail implements OnInit {
 
   @ViewChild('thumbTrack') private readonly thumbTrack?: ElementRef<HTMLElement>;
 
-  // Bound from the route: `productPk` is the path param, `name` an optional
-  // `?name=` query param passed along from the listing page so a title can
-  // show immediately while the real product data is still loading.
-  // `categoryId` is the listing's own category id, passed along the same
-  // way, so the breadcrumb can match the exact path the shopper actually
+  // Bound from the route: `productPk` is the path param. `categoryId` is
+  // the listing's own category id, passed along as a `?categoryId=` query
+  // param so the breadcrumb can match the exact path the shopper actually
   // took — absent for a deep link, search result, or bucket page.
   // `cartItemId`, passed when a shopper clicks an existing line in their
   // cart, puts the page in edit mode: the matching line's options/quantity
   // are pre-selected, and "Add to Cart" becomes "Update Cart" instead.
   readonly productPk = input('');
-  readonly name = input('');
   readonly categoryId = input('');
   readonly cartItemId = input('');
 
@@ -182,10 +179,8 @@ export class ProductDetail implements OnInit {
   private readonly resolvedSkuSelections = signal<Partial<Record<string, number>> | null>(null);
 
   // Editing a cart line already implies knowing that line's own product
-  // title (it's sitting right there in the shared cart signal) — so an
-  // edit link doesn't need to also carry `?name=` the way a listing page's
-  // link does; this is what lets the title still show immediately even
-  // when it's absent.
+  // title — it's sitting right there in the shared cart signal, so it can
+  // show immediately without waiting on this page's own `*GET`.
   private readonly editingCartItemTitle = computed(() => {
     if (!this.isEditing()) {
       return null;
@@ -194,9 +189,7 @@ export class ProductDetail implements OnInit {
     return this.cartService.cart().items.find((line) => line.cartItemId === id)?.productTitle ?? null;
   });
 
-  readonly pageTitle = computed(
-    () => this.product()?.title || this.editingCartItemTitle() || this.name() || 'Product',
-  );
+  readonly pageTitle = computed(() => this.product()?.title || this.editingCartItemTitle() || 'Product');
 
   // Shown as a starting "$79.99–$94.99" (or just "$79.99" when every SKU
   // shares one price) before a selection resolves to an exact SKU — `null`

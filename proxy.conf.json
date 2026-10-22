@@ -1,11 +1,11 @@
 {
   "/cgi": {
-    "target": "http://edmontonfire.itestv2.uniformworks.ca",
+    "target": "https://stjohnsfirehd.uniformworksdemo.ca",
     "secure": false,
     "changeOrigin": true
   },
   "/photos": {
-    "target": "http://edmontonfire.itestv2.uniformworks.ca",
+    "target": "https://stjohnsfirehd.uniformworksdemo.ca",
     "secure": false,
     "changeOrigin": true
   }
