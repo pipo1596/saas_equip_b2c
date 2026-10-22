@@ -14,6 +14,7 @@ const CART: Cart = {
   subtotalPrice: 269.97,
   subtotalPoints: 450,
   allotment: null,
+  roleRequiresApproval: 'N',
   items: [
     {
       cartItemId: 9001,

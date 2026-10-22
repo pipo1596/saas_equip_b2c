@@ -169,6 +169,9 @@ export class CheckoutPage implements OnInit {
   // still looks fine overall.
   readonly exceededUnitGrants = computed(() => exceededUnitGrants(this.cart()));
   readonly unitGrantExceededMessage = unitGrantExceededMessage;
+  // Informational only — driven by the shopper's role, not anything about
+  // the cart itself, so it never factors into `canPlaceOrder`.
+  readonly requiresApproval = computed(() => this.cart().roleRequiresApproval === 'Y');
 
   // `FLAT` is the only rate type the API gives a cost for today — anything
   // else has nothing to show yet, so it's treated as "not costed" rather

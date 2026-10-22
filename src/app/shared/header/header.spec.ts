@@ -863,6 +863,7 @@ describe('Header', () => {
       subtotalPrice: 89.99,
       subtotalPoints: null,
       allotment: null,
+      roleRequiresApproval: 'N',
       items: [
         {
           cartItemId: 9001,
@@ -1011,6 +1012,7 @@ describe('Header', () => {
       subtotalPrice: 89.99,
       subtotalPoints: null,
       allotment: null,
+      roleRequiresApproval: 'N',
       items: [
         {
           cartItemId: 9001,
@@ -1137,6 +1139,7 @@ describe('Header', () => {
         subtotalPrice: 0,
         subtotalPoints: null,
         items: [],
+        roleRequiresApproval: 'N' as const,
         allotment: {
           programId: 3,
           allotmentBar: null,
@@ -1235,6 +1238,7 @@ describe('Header', () => {
         subtotalPrice: 0,
         subtotalPoints: null,
         items: [],
+        roleRequiresApproval: 'N',
         allotment: {
           programId: 3,
           allotmentBar: null,
@@ -1341,6 +1345,7 @@ describe('Header', () => {
       subtotalPrice: 0,
       subtotalPoints: null,
       items: [],
+      roleRequiresApproval: 'N' as const,
     };
 
     const DOLLAR_RULE = {

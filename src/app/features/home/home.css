@@ -71,23 +71,36 @@
   background: rgba(255, 255, 255, 0.055);
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 12px;
-  padding: 14px 15px 15px;
+  padding: 12px 13px 13px;
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+a.stat:hover,
+a.stat:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.18);
 }
 .stat__label {
-  font-size: 12px;
+  font-size: 11.5px;
   color: #9db6cd;
   display: flex;
   align-items: center;
-  gap: 7px;
-  margin-bottom: 9px;
+  gap: 6px;
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .stat__label svg {
+  flex: none;
   color: #7fa8d0;
 }
 .stat__value {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 23px;
+  font-size: 19px;
   letter-spacing: -0.5px;
 }
 .stat__value small {

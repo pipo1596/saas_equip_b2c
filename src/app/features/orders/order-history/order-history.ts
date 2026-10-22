@@ -1,5 +1,14 @@
 import { CurrencyPipe, isPlatformBrowser } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnInit, PLATFORM_ID, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  PLATFORM_ID,
+  computed,
+  inject,
+  input,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -54,6 +63,11 @@ export class OrderHistoryPage implements OnInit {
   // anywhere, including their own order history.
   readonly pointsOnly = this.cartService.pointsOnly;
 
+  // Lets a link from elsewhere (e.g. the home page's "Awaiting approval"
+  // tile) land here pre-filtered — only read once, on init; the status
+  // chips/`setFilter` take over from there for the rest of the visit.
+  readonly status = input('');
+
   readonly statusChips = STATUS_CHIPS;
   readonly statusFilter = signal('');
   readonly page = signal(1);
@@ -107,6 +121,7 @@ export class OrderHistoryPage implements OnInit {
     if (!this.isBrowser) {
       return;
     }
+    this.statusFilter.set(this.status());
     this.load();
   }
 

@@ -10,7 +10,18 @@
       </ol>
     </nav>
 
-    <h1 class="checkout-page__title mb-3">Checkout</h1>
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <h1 class="checkout-page__title mb-0">Checkout</h1>
+      @if (requiresApproval()) {
+        <span class="checkout-page__approval-badge">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5l3 3" />
+          </svg>
+          Approval required
+        </span>
+      }
+    </div>
 
     @if (loading()) {
       <div class="row g-4" role="status">
@@ -383,6 +394,18 @@
               }
               @if (placeOrderError(); as message) {
                 <div class="alert alert-danger mb-3" role="alert">{{ message }}</div>
+              }
+              @if (requiresApproval()) {
+                <div class="alert alert-primary d-flex gap-2 mb-3" role="status">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="flex-shrink-0">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 8v5M12 16h.01" />
+                  </svg>
+                  <span>
+                    <strong>This purchase requires approval.</strong>
+                    Click Place order to proceed with checkout.
+                  </span>
+                </div>
               }
 
               <button

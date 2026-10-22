@@ -12,6 +12,7 @@ const CART: Cart = {
   subtotalPrice: 259.97,
   subtotalPoints: 450,
   allotment: null,
+  roleRequiresApproval: 'N',
   items: [
     {
       cartItemId: 9001,
@@ -129,6 +130,7 @@ describe('CartService', () => {
       subtotalPoints: null,
       items: [],
       allotment: null,
+      roleRequiresApproval: 'N',
     });
   });
 
@@ -165,6 +167,35 @@ describe('CartService', () => {
         productPk: 12345,
       });
       req.flush(CART);
+    });
+
+    it('shares one in-flight request across concurrent calls with the same params, instead of firing a second *GET', () => {
+      let first: Cart | undefined;
+      let second: Cart | undefined;
+      service.load(LOCATION_ID).subscribe((cart) => (first = cart));
+      service.load(LOCATION_ID).subscribe((cart) => (second = cart));
+
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush(CART);
+
+      expect(first).toEqual(CART);
+      expect(second).toEqual(CART);
+    });
+
+    it('does not share across calls with different params (e.g. a productPk lookup vs. the plain reload)', () => {
+      service.load(LOCATION_ID).subscribe();
+      service.load(LOCATION_ID, 12345).subscribe();
+
+      const requests = httpMock.match('/cgi/APPSCDSPCH?SEPGM=APCCART');
+      expect(requests.length).toBe(2);
+      requests.forEach((req) => req.flush(CART));
+    });
+
+    it('fires a fresh *GET for a later call once the in-flight one has already settled', () => {
+      service.load(LOCATION_ID).subscribe();
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush(CART);
+
+      service.load(LOCATION_ID).subscribe();
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush(CART);
     });
 
     it('normalizes a null items list to []', () => {
@@ -431,6 +462,7 @@ describe('CartService', () => {
         subtotalPoints: null,
         items: [],
         allotment: null,
+        roleRequiresApproval: 'N',
       };
       service.removeItem(9001, LOCATION_ID).subscribe();
 
@@ -487,6 +519,7 @@ describe('CartService', () => {
         subtotalPoints: null,
         items: [],
         allotment: null,
+        roleRequiresApproval: 'N',
       };
       service.clear(LOCATION_ID).subscribe();
 

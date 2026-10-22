@@ -333,6 +333,7 @@ describe('Home', () => {
       const stats: HTMLElement[] = fixture.nativeElement.querySelectorAll('.stat');
       const openOrdersStat = Array.from(stats).find((el) => el.textContent?.includes('Open orders'));
       expect(openOrdersStat?.querySelector('.stat__value')?.textContent?.trim()).toBe('—');
+      expect(openOrdersStat?.getAttribute('href')).toBe('/orders');
     });
 
     it('shows an Approvals tile (with a "—" count) when the shopper can approve orders', () => {
@@ -353,6 +354,9 @@ describe('Home', () => {
 
       expect(fixture.nativeElement.textContent).toContain('Approvals');
       expect(fixture.nativeElement.textContent).not.toContain('Awaiting approval');
+      const stats: HTMLElement[] = fixture.nativeElement.querySelectorAll('.stat');
+      const approvalsStat = Array.from(stats).find((el) => el.textContent?.includes('Approvals'));
+      expect(approvalsStat?.getAttribute('href')).toBe('/approvals');
     });
 
     it("shows an Awaiting approval tile when the shopper's own orders wait on someone else", () => {
@@ -372,6 +376,9 @@ describe('Home', () => {
       fixture.detectChanges();
 
       expect(fixture.nativeElement.textContent).toContain('Awaiting approval');
+      const stats: HTMLElement[] = fixture.nativeElement.querySelectorAll('.stat');
+      const awaitingStat = Array.from(stats).find((el) => el.textContent?.includes('Awaiting approval'));
+      expect(awaitingStat?.getAttribute('href')).toBe('/orders?status=PENDING_APPROVAL');
     });
   });
 });

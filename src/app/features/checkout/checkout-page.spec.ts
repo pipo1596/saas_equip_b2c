@@ -15,6 +15,7 @@ const CART: Cart = {
   subtotalPrice: 179.98,
   subtotalPoints: null,
   allotment: null,
+  roleRequiresApproval: 'N',
   items: [
     {
       cartItemId: 9001,
@@ -345,6 +346,30 @@ describe('CheckoutPage', () => {
     expect(host.querySelector<HTMLInputElement>('#contact-last-name')).not.toBeNull();
     expect(host.querySelector<HTMLInputElement>('#contact-phone')).not.toBeNull();
     expect(host.querySelector<HTMLInputElement>('#contact-extension')).not.toBeNull();
+  });
+
+  it('shows an approval-required badge and notice when the role requires it, but not when it does not', () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    fixture.detectChanges();
+    flushInitialCartLoads(httpMock, { ...CART, roleRequiresApproval: 'Y' });
+    flushCheckoutData(httpMock, { cust_addrs: [], ship_addrs: [], ship_mthds: [], tax_rates: [] });
+    fixture.detectChanges();
+
+    const host: HTMLElement = fixture.nativeElement;
+    expect(host.querySelector('.checkout-page__approval-badge')).not.toBeNull();
+    expect(host.textContent).toContain('This purchase requires approval.');
+  });
+
+  it('shows neither the badge nor the notice when the role does not require approval', () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    fixture.detectChanges();
+    flushInitialCartLoads(httpMock, { ...CART, roleRequiresApproval: 'N' });
+    flushCheckoutData(httpMock, { cust_addrs: [], ship_addrs: [], ship_mthds: [], tax_rates: [] });
+    fixture.detectChanges();
+
+    const host: HTMLElement = fixture.nativeElement;
+    expect(host.querySelector('.checkout-page__approval-badge')).toBeNull();
+    expect(host.textContent).not.toContain('This purchase requires approval.');
   });
 
   it("should show each item's quantity × unit-price math alongside its line total, for every line", () => {

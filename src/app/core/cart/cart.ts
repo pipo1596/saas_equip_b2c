@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { Observable, finalize, map, tap } from 'rxjs';
+import { Observable, finalize, map, shareReplay, tap } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import { Allotment, RawAllotment, normalizeAllotment } from './allotment';
@@ -82,6 +82,13 @@ export interface Cart {
   // `null` only when the allotment lookup itself failed — never blocks the
   // rest of the cart from loading.
   allotment: Allotment | null;
+  // 'Y' means placing this order will send it for approval rather than
+  // straight to processing — driven by the shopper's role, not by anything
+  // about the cart's own contents. Purely informational on checkout: it
+  // doesn't block `canPlaceOrder`, it just sets expectations up front
+  // instead of only surfacing via `order.status === 'PENDING_APPROVAL'`
+  // after the order's already placed.
+  roleRequiresApproval: 'Y' | 'N';
 }
 
 // What an employee who's never added anything gets back from `*GET` — not
@@ -95,6 +102,7 @@ const EMPTY_CART: Cart = {
   subtotalPoints: null,
   items: [],
   allotment: null,
+  roleRequiresApproval: 'N',
 };
 
 interface RawCartItem extends Omit<CartItem, 'options' | 'progCatIds'> {
@@ -109,6 +117,7 @@ interface RawCart {
   subtotalPoints: number | null;
   items: RawCartItem[] | null;
   allotment: RawAllotment | null;
+  roleRequiresApproval: 'Y' | 'N';
 }
 
 interface ApiFailure {
@@ -202,16 +211,45 @@ export class CartService {
     this.rulesMenuOpen.set(false);
   }
 
+  // Keyed by the exact (locationId, productPk) pair so a caller mid-flight
+  // on one shape (e.g. the header's own plain reload) never gets handed
+  // back a response meant for another (e.g. product detail's `productTag`
+  // lookup) — cleared as soon as that request settles, so this only ever
+  // coalesces genuinely-concurrent calls, never serves a stale response to
+  // one that lands after the in-flight one has already resolved.
+  private readonly pendingLoads = new Map<string, Observable<Cart>>();
+
   // `locationId` scopes the allotment breakdown to the shopper's active
   // location (the same value passed to `APCTPCVEW`) — `null` only in the
   // narrow window before one's known yet. `productPk`, product detail page
   // only, also returns `allotment.productTag` for that specific product.
+  //
+  // The header's own effect calls this on every navigation (it's
+  // re-instantiated per route) with the same `locationId` a page like cart
+  // or checkout also calls it with in its own `ngOnInit` — without
+  // de-duping, both fire their own full `*GET` within the same tick. This
+  // shares one in-flight request across every caller with matching params
+  // instead.
   load(locationId: number | null, productPk?: number): Observable<Cart> {
+    const key = `${locationId}:${productPk ?? ''}`;
+    const pending = this.pendingLoads.get(key);
+    if (pending) {
+      return pending;
+    }
+
     this.loading.set(true);
-    return this.request(
+    const request$ = this.request(
       { action: '*GET', locationId, ...(productPk !== undefined ? { productPk } : {}) },
       'We could not load your cart.',
-    ).pipe(finalize(() => this.loading.set(false)));
+    ).pipe(
+      finalize(() => {
+        this.loading.set(false);
+        this.pendingLoads.delete(key);
+      }),
+      shareReplay(1),
+    );
+    this.pendingLoads.set(key, request$);
+    return request$;
   }
 
   // `qty` is how many to add *on top of* whatever's already there, not a

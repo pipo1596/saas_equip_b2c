@@ -23,7 +23,7 @@
         Here's where your account stands today. Shop your allotment, track orders, and stay
         current with your department.
       </p>
-      <div class="stats row row-cols-1 row-cols-sm-3 g-3">
+      <div class="stats row row-cols-2 row-cols-lg-4 g-3">
         @for (rule of allotmentRules(); track rule.ruleId) {
           @if (tileBalance(rule); as balance) {
             <div class="stat">
@@ -42,7 +42,7 @@
             </div>
           }
         }
-        <div class="stat">
+        <a class="stat" routerLink="/orders">
           <div class="stat__label">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M3 7h13v10H3z" />
@@ -53,10 +53,10 @@
             Open orders
           </div>
           <div class="stat__value">{{ openOrders() ?? '—' }}</div>
-        </div>
+        </a>
         @if (approvals(); as approvals) {
           @if (approvals.canApprove === 'Y') {
-            <div class="stat">
+            <a class="stat" routerLink="/approvals">
               <div class="stat__label">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M9 12l2 2 4-4" />
@@ -66,9 +66,9 @@
               </div>
               <div class="stat__value">{{ approvals.pendingApprovals ?? '—' }}</div>
               <div class="stat__meta">Orders waiting on your review</div>
-            </div>
+            </a>
           } @else {
-            <div class="stat">
+            <a class="stat" [routerLink]="['/orders']" [queryParams]="{ status: 'PENDING_APPROVAL' }">
               <div class="stat__label">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M9 12l2 2 4-4" />
@@ -78,7 +78,7 @@
               </div>
               <div class="stat__value">{{ approvals.awaitingApproval ?? '—' }}</div>
               <div class="stat__meta warn">Your own orders waiting on someone else</div>
-            </div>
+            </a>
           }
         }
       </div>

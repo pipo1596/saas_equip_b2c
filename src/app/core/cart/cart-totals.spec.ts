@@ -131,6 +131,7 @@ function makeOverdrawnPointsCart(overdraftPoints: number): Cart {
     subtotalPrice: 0,
     subtotalPoints: 400 + overdraftPoints,
     items: [item],
+    roleRequiresApproval: 'N',
     allotment: {
       ...allotment,
       lineTags: [
@@ -184,6 +185,7 @@ describe('pointsShortfall', () => {
       subtotalPrice: 0,
       subtotalPoints: 19,
       items: [coveredItem, uncoveredItem],
+      roleRequiresApproval: 'N',
       allotment: {
         ...POINTS_ONLY_ALLOTMENT,
         rules: [rule],
@@ -270,6 +272,7 @@ describe('paidFromLines', () => {
       subtotalPrice: 0,
       subtotalPoints: 0,
       items: [jacket, jobshirt, trouser, otherRuleJacket],
+      roleRequiresApproval: 'N',
       allotment: {
         ...POINTS_ONLY_ALLOTMENT,
         rules: [rule],
@@ -299,6 +302,7 @@ describe('paidFromLines', () => {
       subtotalPrice: 0,
       subtotalPoints: 0,
       items: [jacket],
+      roleRequiresApproval: 'N',
       allotment: {
         ...POINTS_ONLY_ALLOTMENT,
         rules: [{ ...rule, units: { total: 5, used: 0, inCart: 1, available: 4 } }],
@@ -325,6 +329,7 @@ describe('paidFromLines', () => {
       subtotalPrice: 0,
       subtotalPoints: 0,
       items: [jacket],
+      roleRequiresApproval: 'N',
       allotment: {
         ...POINTS_ONLY_ALLOTMENT,
         rules: [rule],
@@ -349,6 +354,7 @@ describe('paidFromLines', () => {
       subtotalPrice: 50,
       subtotalPoints: 0,
       items: [jacket],
+      roleRequiresApproval: 'N',
       allotment: {
         ...POINTS_ONLY_ALLOTMENT,
         rules: [rule],
@@ -401,6 +407,7 @@ function cartWithQuotas(quotas: AllotmentQuota[], items: CartItem[]): Cart {
     subtotalPrice: 0,
     subtotalPoints: 0,
     items,
+    roleRequiresApproval: 'N',
     allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [rule] },
   };
 }
@@ -496,28 +503,28 @@ function ruleWithUnits(overrides: Partial<AllotmentRule> = {}): AllotmentRule {
 describe('exceededUnitRules', () => {
   it('is empty when a units rule is not over-drawn', () => {
     const rule = ruleWithUnits({ units: { total: 10, used: 0, inCart: 5, available: 5 } });
-    const cart: Cart = { cartId: 1, itemCount: 0, subtotalPrice: 0, subtotalPoints: 0, items: [], allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [rule] } };
+    const cart: Cart = { cartId: 1, itemCount: 0, subtotalPrice: 0, subtotalPoints: 0, items: [], roleRequiresApproval: 'N', allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [rule] } };
 
     expect(exceededUnitRules(cart)).toEqual([]);
   });
 
   it("includes a units rule the cart's own contents have driven negative", () => {
     const rule = ruleWithUnits({ units: { total: 10, used: 4, inCart: 8, available: -2 } });
-    const cart: Cart = { cartId: 1, itemCount: 0, subtotalPrice: 0, subtotalPoints: 0, items: [], allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [rule] } };
+    const cart: Cart = { cartId: 1, itemCount: 0, subtotalPrice: 0, subtotalPoints: 0, items: [], roleRequiresApproval: 'N', allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [rule] } };
 
     expect(exceededUnitRules(cart)).toEqual([rule]);
   });
 
   it('excludes a rule that is over-drawn but has nothing in the cart against it', () => {
     const rule = ruleWithUnits({ units: { total: 10, used: 12, inCart: 0, available: -2 } });
-    const cart: Cart = { cartId: 1, itemCount: 0, subtotalPrice: 0, subtotalPoints: 0, items: [], allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [rule] } };
+    const cart: Cart = { cartId: 1, itemCount: 0, subtotalPrice: 0, subtotalPoints: 0, items: [], roleRequiresApproval: 'N', allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [rule] } };
 
     expect(exceededUnitRules(cart)).toEqual([]);
   });
 
   it('excludes a rule with no units balance at all (a dollars/points-only rule)', () => {
     const rule = ruleWithUnits({ units: null });
-    const cart: Cart = { cartId: 1, itemCount: 0, subtotalPrice: 0, subtotalPoints: 0, items: [], allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [rule] } };
+    const cart: Cart = { cartId: 1, itemCount: 0, subtotalPrice: 0, subtotalPoints: 0, items: [], roleRequiresApproval: 'N', allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [rule] } };
 
     expect(exceededUnitRules(cart)).toEqual([]);
   });
@@ -543,7 +550,7 @@ describe('unitGrantBalance', () => {
   };
 
   function emptyCart(items: CartItem[] = []): Cart {
-    return { cartId: 1, itemCount: items.length, subtotalPrice: 0, subtotalPoints: 0, items, allotment: POINTS_ONLY_ALLOTMENT };
+    return { cartId: 1, itemCount: items.length, subtotalPrice: 0, subtotalPoints: 0, items, roleRequiresApproval: 'N', allotment: POINTS_ONLY_ALLOTMENT };
   }
 
   it("builds the grant's own Total/Used/In cart/Available straight off its posted remaining/reserved", () => {
@@ -619,6 +626,7 @@ describe('exceededUnitGrants / unitGrantExceededMessage', () => {
       subtotalPrice: 0,
       subtotalPoints: 0,
       items: [cap],
+      roleRequiresApproval: 'N',
       allotment: {
         ...POINTS_ONLY_ALLOTMENT,
         rules: [rule],
@@ -643,6 +651,7 @@ describe('exceededUnitGrants / unitGrantExceededMessage', () => {
       subtotalPrice: 0,
       subtotalPoints: 0,
       items: [cap],
+      roleRequiresApproval: 'N',
       allotment: {
         ...POINTS_ONLY_ALLOTMENT,
         rules: [{ ...rule, units: { total: 11, used: 4, inCart: 2, available: 5 } }],
@@ -670,6 +679,7 @@ describe('exceededUnitGrants / unitGrantExceededMessage', () => {
       subtotalPrice: 0,
       subtotalPoints: 0,
       items: [cap],
+      roleRequiresApproval: 'N',
       allotment: {
         ...POINTS_ONLY_ALLOTMENT,
         rules: [singleGrantRule],
@@ -690,6 +700,7 @@ describe('exceededUnitGrants / unitGrantExceededMessage', () => {
       subtotalPrice: 0,
       subtotalPoints: 0,
       items: [capUnderThisRule, capUnderOtherRule],
+      roleRequiresApproval: 'N',
       allotment: {
         ...POINTS_ONLY_ALLOTMENT,
         rules: [rule],
@@ -753,6 +764,7 @@ describe('effectiveLineTags', () => {
       subtotalPrice: 0,
       subtotalPoints: 0,
       items: [cap],
+      roleRequiresApproval: 'N',
       allotment: {
         ...POINTS_ONLY_ALLOTMENT,
         rules: [exhaustedUnitsRule, DOLLAR_RULE],
@@ -785,6 +797,7 @@ describe('effectiveLineTags', () => {
       subtotalPrice: 0,
       subtotalPoints: 0,
       items: [cap],
+      roleRequiresApproval: 'N',
       allotment: {
         ...POINTS_ONLY_ALLOTMENT,
         rules: [UNITS_RULE, DOLLAR_RULE],
@@ -814,6 +827,7 @@ describe('effectiveLineTags', () => {
       subtotalPrice: 0,
       subtotalPoints: 0,
       items: [cap],
+      roleRequiresApproval: 'N',
       allotment: {
         ...POINTS_ONLY_ALLOTMENT,
         rules: [exhaustedUnitsRule, emptyDollarRule],
@@ -832,6 +846,7 @@ describe('effectiveLineTags', () => {
       subtotalPrice: 0,
       subtotalPoints: 0,
       items: [cap],
+      roleRequiresApproval: 'N',
       allotment: {
         ...POINTS_ONLY_ALLOTMENT,
         rules: [{ ...UNITS_RULE, units: { total: 11, used: 4, inCart: 2, available: 5 } }, DOLLAR_RULE],
@@ -849,6 +864,7 @@ describe('effectiveLineTags', () => {
       subtotalPrice: 0,
       subtotalPoints: 0,
       items: [makeItem({ cartItemId: 1, skuId: 1, quantity: 1 })],
+      roleRequiresApproval: 'N',
       allotment: {
         ...POINTS_ONLY_ALLOTMENT,
         rules: [UNITS_RULE, DOLLAR_RULE],
