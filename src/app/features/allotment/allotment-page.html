@@ -1,0 +1,263 @@
+<app-header />
+
+<section class="allotment-page">
+  <div class="container py-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a routerLink="/home">Home</a></li>
+        <li class="breadcrumb-item active" aria-current="page">My Allotment</li>
+      </ol>
+    </nav>
+
+    <h1 class="allotment-page__title my-3 fs-4">My Allotment</h1>
+
+    <div class="row g-4">
+      <aside class="col-lg-3">
+        <app-account-nav active="allotment" />
+      </aside>
+
+      <div class="col-lg-9">
+        @if (loading()) {
+          <div role="status">
+            <span class="visually-hidden">Loading your allotment…</span>
+            <div class="allotment-page__panel mb-4" aria-hidden="true">
+              <div class="skeleton skeleton--text mb-2" style="width: 140px; height: 13px"></div>
+              <div class="skeleton skeleton--text mb-3" style="width: 200px; height: 26px"></div>
+              <div class="skeleton" style="width: 100%; height: 6px; border-radius: 999px"></div>
+            </div>
+            @for (n of [1, 2]; track n) {
+              <div class="allotment-page__panel mb-4" aria-hidden="true">
+                <div class="skeleton skeleton--text mb-2" style="width: 160px; height: 16px"></div>
+                <div class="skeleton skeleton--text mb-3" style="width: 240px"></div>
+                <div class="skeleton" style="width: 100%; height: 70px; border-radius: 8px"></div>
+              </div>
+            }
+          </div>
+        } @else if (error(); as message) {
+          <div
+            class="alert alert-danger d-flex align-items-center justify-content-between gap-3"
+            role="alert"
+          >
+            <span>{{ message }}</span>
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-danger flex-shrink-0"
+              (click)="load()"
+            >
+              Retry
+            </button>
+          </div>
+        } @else if (hasNoAllotment()) {
+          <div class="allotment-page__panel text-center text-secondary py-5">
+            No allotment is set up for your role.
+          </div>
+        } @else {
+          @if (allotmentBar(); as bar) {
+            <section
+              aria-label="Allotment summary"
+              class="allotment-page__panel allotment-page__hero mb-4"
+            >
+              <p class="allotment-page__hero-label">{{ bar.label }}</p>
+              <p class="allotment-page__hero-value">
+                {{ formatBalanceAmount(bar.available, 'DOLLARS') }} available
+              </p>
+              <div class="track"><i [style.width.%]="allotmentBarMeterPct()"></i></div>
+              @if (allotmentBarRenewsOn(); as renews) {
+                <p class="allotment-page__hero-meta">Renews {{ renews | date: 'MMM d, y' }}</p>
+              }
+            </section>
+          }
+
+          @if (summary()?.allotExclTaxFreight === 'Y') {
+            <div class="alert alert-info mb-4">
+              Tax and shipping are not covered by your allotment.
+            </div>
+          }
+
+          <section aria-label="Allotment rules">
+            @for (rule of rules(); track rule.ruleId) {
+              <div class="allotment-page__panel mb-4">
+                <app-allotment-rule-card [rule]="rule" />
+              </div>
+            }
+          </section>
+
+          @if (pending().length > 0) {
+            <section aria-labelledby="h-pending" class="allotment-page__panel mb-4">
+              <h2 id="h-pending" class="allotment-page__section-title">Waiting for approval</h2>
+              @for (hold of pending(); track pendingKey(hold)) {
+                <div class="allotment-page__pending-row">
+                  <div class="allotment-page__pending-info">
+                    <a
+                      [routerLink]="['/orders', hold.orderId]"
+                      class="allotment-page__pending-order"
+                    >
+                      {{ hold.orderNumber }}
+                    </a>
+                    <span class="allotment-page__pending-meta">
+                      {{ hold.ruleName }}
+                      @if (hold.categoryName) {
+                        · {{ hold.categoryName }}
+                      }
+                      · {{ orderStatusLabel(hold.orderStatus) }} ·
+                      {{ formatAllotmentTimestamp(hold.placedTs) }}
+                    </span>
+                  </div>
+                  <span class="allotment-page__pending-amount">{{
+                    formatSignedAllotmentAmount(hold)
+                  }}</span>
+                </div>
+              }
+            </section>
+          }
+
+          <section aria-labelledby="h-history">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+              <h2 id="h-history" class="allotment-page__section-title mb-0">Transaction History</h2>
+              <div class="allotment-page__scope-toggle" role="group" aria-label="History range">
+                <button
+                  type="button"
+                  [class.active]="scope() === 'CURRENT'"
+                  (click)="setScope('CURRENT')"
+                >
+                  This cycle
+                </button>
+                <button type="button" [class.active]="scope() === 'ALL'" (click)="setScope('ALL')">
+                  All history
+                </button>
+              </div>
+            </div>
+
+            @if (txnError(); as message) {
+              <div class="allotment-page__panel">
+                <div
+                  class="alert alert-danger d-flex align-items-center justify-content-between gap-3 mb-0"
+                  role="alert"
+                >
+                  <span>{{ message }}</span>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger flex-shrink-0"
+                    (click)="retryTransactions()"
+                  >
+                    Retry
+                  </button>
+                </div>
+              </div>
+            } @else if (txnLoading()) {
+              <div class="allotment-page__panel" role="status" aria-hidden="true">
+                <span class="visually-hidden">Loading history…</span>
+                @for (n of [1, 2, 3]; track n) {
+                  <div class="allotment-page__table-row">
+                    <div class="skeleton skeleton--text" style="width: 90px"></div>
+                    <div class="skeleton skeleton--text" style="width: 90px"></div>
+                    <div class="skeleton skeleton--text" style="width: 70%"></div>
+                    <div class="skeleton skeleton--text" style="width: 60px"></div>
+                    <div class="skeleton skeleton--text" style="width: 60%"></div>
+                    <div class="skeleton skeleton--text" style="width: 70px"></div>
+                  </div>
+                }
+              </div>
+            } @else if (history().length === 0) {
+              <div class="allotment-page__panel text-center text-secondary py-4">
+                @if (scope() === 'CURRENT') {
+                  <p class="mb-2">No activity this cycle.</p>
+                  <button type="button" class="btn btn-link p-0" (click)="setScope('ALL')">
+                    View all history
+                  </button>
+                } @else {
+                  <p class="mb-0">No activity found.</p>
+                }
+              </div>
+            } @else {
+              @for (group of groupedHistory(); track group.ruleId) {
+                <div class="allotment-page__panel allotment-page__history-group mb-4">
+                  <h3 class="allotment-page__history-group-title">
+                    {{ group.ruleName }}
+                    @if (group.headerAmount) {
+                      {{ group.headerAmount }}
+                    }
+                  </h3>
+                  <div class="allotment-page__table">
+                    <div class="allotment-page__table-head">
+                      <span>Date</span>
+                      <span>Type</span>
+                      <span>Category</span>
+                      <span>Amount</span>
+                      <span>Reason</span>
+                      <span>Balance after</span>
+                    </div>
+                    @for (row of group.rows; track row.transactionId) {
+                      <div class="allotment-page__table-row">
+                        <span class="allotment-page__table-date">{{
+                          formatAllotmentTimestamp(row.postedTs)
+                        }}</span>
+                        <span
+                          class="allotment-page__type-pill"
+                          [class.allotment-page__type-pill--up]="row.signedAmount > 0"
+                          [class.allotment-page__type-pill--down]="row.signedAmount < 0"
+                        >
+                          {{ allotmentTxnLabel(row.txnType, row.signedAmount) }}
+                        </span>
+                        <span>{{ row.categoryName ?? '—' }}</span>
+                        <span
+                          class="allotment-page__table-amount"
+                          [class.allotment-page__table-amount--up]="row.signedAmount > 0"
+                          [class.allotment-page__table-amount--down]="row.signedAmount < 0"
+                        >
+                          {{ formatSignedAllotmentAmount(row) }}
+                        </span>
+                        <span>
+                          @if (row.orderId) {
+                            <a [routerLink]="['/orders', row.orderId]">{{ row.orderNumber }}</a>
+                          } @else if (row.reason) {
+                            {{ row.reason }}
+                          } @else {
+                            —
+                          }
+                        </span>
+                        <span>{{
+                          row.balanceAfter !== null
+                            ? formatBalanceAmount(row.balanceAfter, row.amountType)
+                            : '—'
+                        }}</span>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+
+              @if (pagination(); as p) {
+                @if (p.totalPages > 1) {
+                  <nav class="allotment-page__pager" aria-label="Transaction history pages">
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary btn-sm"
+                      [disabled]="p.page <= 1"
+                      (click)="goToPage(p.page - 1)"
+                    >
+                      Previous
+                    </button>
+                    <span class="allotment-page__pager-label"
+                      >Page {{ p.page }} of {{ p.totalPages }}</span
+                    >
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary btn-sm"
+                      [disabled]="p.page >= p.totalPages"
+                      (click)="goToPage(p.page + 1)"
+                    >
+                      Next
+                    </button>
+                  </nav>
+                }
+              }
+            }
+          </section>
+        }
+      </div>
+    </div>
+  </div>
+</section>
+
+<app-footer />

@@ -37,14 +37,16 @@ describe('AccountNav', () => {
     expect(accountLink.classList).not.toContain('account-nav__link--active');
   });
 
-  it('links "My Allotment" to home, and never marks it active', () => {
+  it('marks "My Allotment" as the current page when active is "allotment"', () => {
     const fixture = TestBed.createComponent(AccountNav);
-    fixture.componentRef.setInput('active', 'account');
+    fixture.componentRef.setInput('active', 'allotment');
     fixture.detectChanges();
 
-    const allotmentLink: HTMLAnchorElement = fixture.nativeElement.querySelector('a[href="/home"]');
+    const allotmentLink: HTMLAnchorElement = fixture.nativeElement.querySelector('a[href="/allotment"]');
+    const accountLink: HTMLAnchorElement = fixture.nativeElement.querySelector('a[href="/account"]');
     expect(allotmentLink.textContent).toContain('My Allotment');
-    expect(allotmentLink.getAttribute('aria-current')).toBeNull();
-    expect(allotmentLink.classList).not.toContain('account-nav__link--active');
+    expect(allotmentLink.getAttribute('aria-current')).toBe('page');
+    expect(allotmentLink.classList).toContain('account-nav__link--active');
+    expect(accountLink.getAttribute('aria-current')).toBeNull();
   });
 });

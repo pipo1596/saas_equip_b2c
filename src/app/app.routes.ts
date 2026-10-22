@@ -76,6 +76,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/account/account-page').then((m) => m.AccountPage),
   },
   {
+    path: 'allotment',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/allotment/allotment-page').then((m) => m.AllotmentPage),
+  },
+  {
     path: 'approvals',
     canActivate: [authGuard],
     loadComponent: () =>
