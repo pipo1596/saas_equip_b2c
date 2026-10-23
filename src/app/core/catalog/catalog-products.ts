@@ -73,23 +73,45 @@ export interface OptionFacetGroup {
   values: OptionFacetValue[];
 }
 
-export interface ProductSearchResult {
+// `*PRODUCT_LIST` — the grid itself, re-fetched on every scope/search/filter/
+// page change. Split from the facets so paging never waits on recomputing
+// them (see `ProductFacetsResult`).
+export interface ProductListResult {
   // Only present when `categoryId` was sent and it resolves to a real
   // category in this location's program — `null` for a bucket scope, the
   // unscoped full catalog, or a search, and also `null` if the lookup
-  // itself just failed. Never blocks `products`/the facets from loading.
+  // itself just failed. Never blocks `products` from loading.
   breadcrumb: Breadcrumb | null;
   products: Product[];
   totalCount: number;
   page: number;
   pageSize: number;
+}
+
+interface RawProductListResult extends Omit<ProductListResult, 'breadcrumb' | 'products'> {
+  breadcrumb: RawBreadcrumb | null;
+  products: RawProduct[] | null;
+}
+
+// `*PRODUCT_FACETS` — the sidebar. Re-fetched only when scope/search/filters
+// change, never on a bare page change (its counts don't depend on `page`).
+export interface ProductFacetsResult {
   categoryFacets: CategoryFacet[];
   optionFacets: OptionFacetGroup[];
 }
 
-interface RawProductSearchResult extends Omit<ProductSearchResult, 'breadcrumb' | 'products'> {
-  breadcrumb: RawBreadcrumb | null;
-  products: RawProduct[] | null;
+interface RawProductFacetsResult {
+  categoryFacets: CategoryFacet[] | null;
+  optionFacets: (Omit<OptionFacetGroup, 'values'> & { values: OptionFacetValue[] | null })[] | null;
+}
+
+// A failure is always `{ success: false, message }`; a success response
+// never has a `success` key at all — discriminate on a field that's only
+// ever present on success (`products`/`categoryFacets` below), matching the
+// pattern already used for `*GET`/`*AVAIL`/`*GET_SKU` in `product-detail.ts`.
+interface ApiFailure {
+  success: false;
+  message: string | null;
 }
 
 export interface ProductSearchParams {
@@ -129,7 +151,7 @@ function buildOptionFiltersString(
 // The live API sometimes sends `null` for an array field (e.g. a product
 // with no color variants) instead of `[]` — normalize once here so nothing
 // downstream has to defensively null-check every list.
-function normalizeSearchResult(result: RawProductSearchResult): ProductSearchResult {
+function normalizeProductListResult(result: RawProductListResult): ProductListResult {
   return {
     ...result,
     breadcrumb: normalizeBreadcrumb(result.breadcrumb),
@@ -144,6 +166,11 @@ function normalizeSearchResult(result: RawProductSearchResult): ProductSearchRes
       })),
       progCatIds: product.progCatIds ?? [],
     })),
+  };
+}
+
+function normalizeFacetsResult(result: RawProductFacetsResult): ProductFacetsResult {
+  return {
     categoryFacets: result.categoryFacets ?? [],
     optionFacets: (result.optionFacets ?? []).map((group) => ({
       ...group,
@@ -152,25 +179,63 @@ function normalizeSearchResult(result: RawProductSearchResult): ProductSearchRes
   };
 }
 
+// Both actions take identical request fields (see the integration guide) —
+// built once here and sent twice with a different `action`.
+function buildRequestBody(
+  action: '*PRODUCT_LIST' | '*PRODUCT_FACETS',
+  params: ProductSearchParams,
+): Record<string, unknown> {
+  const { locationId, categoryId, bucket, search, optionFilters, page, pageSize } = params;
+  const optionFiltersString = buildOptionFiltersString(optionFilters);
+  return {
+    action,
+    locationId,
+    ...(categoryId !== undefined ? { categoryId } : {}),
+    ...(bucket !== undefined ? { bucket } : {}),
+    ...(search ? { search } : {}),
+    ...(optionFiltersString ? { optionFilters: optionFiltersString } : {}),
+    ...(page !== undefined ? { page } : {}),
+    ...(pageSize !== undefined ? { pageSize } : {}),
+  };
+}
+
 @Injectable({ providedIn: 'root' })
 export class CatalogProductsService {
   private readonly http = inject(HttpClient);
   private readonly dispatchUrl = `${environment.apiBaseUrl}/cgi/APPSCDSPCH?SEPGM=APCTPCVEW`;
 
-  search(params: ProductSearchParams): Observable<ProductSearchResult> {
-    const { locationId, categoryId, bucket, search, optionFilters, page, pageSize } = params;
-    const optionFiltersString = buildOptionFiltersString(optionFilters);
+  // The grid itself — call on every scope/search/filter/page change.
+  searchList(params: ProductSearchParams): Observable<ProductListResult> {
     return this.http
-      .post<RawProductSearchResult>(this.dispatchUrl, {
-        action: '*PRODUCTS',
-        locationId,
-        ...(categoryId !== undefined ? { categoryId } : {}),
-        ...(bucket !== undefined ? { bucket } : {}),
-        ...(search ? { search } : {}),
-        ...(optionFiltersString ? { optionFilters: optionFiltersString } : {}),
-        ...(page !== undefined ? { page } : {}),
-        ...(pageSize !== undefined ? { pageSize } : {}),
-      })
-      .pipe(map((result) => normalizeSearchResult(result)));
+      .post<RawProductListResult | ApiFailure>(
+        this.dispatchUrl,
+        buildRequestBody('*PRODUCT_LIST', params),
+      )
+      .pipe(
+        map((response) => {
+          if (!('products' in response)) {
+            throw new Error(response.message ?? 'We could not load products right now.');
+          }
+          return normalizeProductListResult(response);
+        }),
+      );
+  }
+
+  // The sidebar — call on a scope/search/filter change, but skip on a bare
+  // page change (its counts don't depend on `page`).
+  searchFacets(params: ProductSearchParams): Observable<ProductFacetsResult> {
+    return this.http
+      .post<RawProductFacetsResult | ApiFailure>(
+        this.dispatchUrl,
+        buildRequestBody('*PRODUCT_FACETS', params),
+      )
+      .pipe(
+        map((response) => {
+          if (!('categoryFacets' in response)) {
+            throw new Error(response.message ?? 'We could not load filters right now.');
+          }
+          return normalizeFacetsResult(response);
+        }),
+      );
   }
 }

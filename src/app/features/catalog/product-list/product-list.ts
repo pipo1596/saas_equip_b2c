@@ -20,6 +20,7 @@ import {
   CategoryFacet,
   OptionFacetGroup,
   Product,
+  ProductSearchParams,
 } from '../../../core/catalog/catalog-products';
 import { CatalogViewService } from '../../../core/catalog/catalog-view';
 import { LocationSelectionService } from '../../../core/location/location-selection';
@@ -155,8 +156,15 @@ export class ProductList {
   // closed" for a freshly (re)loaded set of groups, while still letting the
   // user freely expand/collapse any of them afterward.
   readonly collapsedGroups = signal<ReadonlySet<string>>(new Set());
+  // Gates the grid only — `*PRODUCT_LIST` and `*PRODUCT_FACETS` are now
+  // separate calls so the grid can render as soon as its own call resolves,
+  // without waiting on the sidebar (see the integration guide's call
+  // patterns). The sidebar has its own `facetsLoading` below.
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+  // Only true while a facets re-fetch is actually in flight — a bare page
+  // change never sets this, since facets don't depend on `page`.
+  readonly facetsLoading = signal(false);
 
   readonly pageSize = PAGE_SIZE;
   readonly totalPages = computed(() => Math.max(1, Math.ceil(this.totalCount() / this.pageSize)));
@@ -189,6 +197,17 @@ export class ProductList {
     }
   });
 
+  // Bumped on every new request of each kind — a response is only applied if
+  // it's still the latest one of its kind by the time it arrives, so a slow
+  // response to an old scope/filter/page can't clobber a newer one that
+  // happened to resolve first (see the integration guide's "drop stale
+  // responses" guidance).
+  private listRequestId = 0;
+  private facetsRequestId = 0;
+  // The scope+filters key the sidebar facets were last fetched for — a bare
+  // page change doesn't touch this, so it never re-triggers a facets fetch.
+  private lastFacetsKey: string | null = null;
+
   private readonly loadProductsOnQueryChange = effect(() => {
     const scope = this.scope();
     const optionFilters = this.selectedOptions();
@@ -199,52 +218,88 @@ export class ProductList {
       return;
     }
 
-    const hasActiveOptionFilters = Object.values(optionFilters).some(
-      (values) => (values?.length ?? 0) > 0,
-    );
+    const params: ProductSearchParams = {
+      locationId: location.locationId,
+      ...(scope.kind === 'category' ? { categoryId: scope.categoryId } : {}),
+      ...(scope.kind === 'bucket' ? { bucket: scope.bucket } : {}),
+      ...(scope.kind === 'search' ? { search: scope.search } : {}),
+      optionFilters,
+      page,
+      pageSize: this.pageSize,
+    };
 
+    this.loadProductList(params);
+
+    const facetsKey = JSON.stringify({ scope, optionFilters });
+    if (facetsKey !== this.lastFacetsKey) {
+      this.lastFacetsKey = facetsKey;
+      this.loadFacets(params);
+    }
+  });
+
+  private loadProductList(params: ProductSearchParams): void {
+    const requestId = ++this.listRequestId;
     this.loading.set(true);
     this.error.set(null);
-    this.catalogProductsService
-      .search({
-        locationId: location.locationId,
-        ...(scope.kind === 'category' ? { categoryId: scope.categoryId } : {}),
-        ...(scope.kind === 'bucket' ? { bucket: scope.bucket } : {}),
-        ...(scope.kind === 'search' ? { search: scope.search } : {}),
-        optionFilters,
-        page,
-        pageSize: this.pageSize,
-      })
-      .subscribe({
-        next: (result) => {
-          this.products.set(result.products);
-          this.totalCount.set(result.totalCount);
-          this.breadcrumb.set(result.breadcrumb);
-          this.categoryFacets.set(result.categoryFacets);
-          // Only refresh the option facet groups themselves from an
-          // unfiltered response — once a value is selected, the backend
-          // narrows (and sometimes reorders/drops) facets to match, which
-          // made the sidebar visibly shuffle around right as someone used
-          // it. Freeze it at whatever it looked like before any filter was
-          // applied; `resetOnRouteChange` clears selections (and so
-          // re-arms this) whenever the category/search scope itself
-          // changes. `categoryFacets` doesn't need the same treatment —
-          // its counts are scope-only and unaffected by optionFilters.
-          if (!hasActiveOptionFilters) {
-            const sorted = sortOptionGroupsByPriority(result.optionFacets);
-            this.optionFacets.set(sorted);
-            this.collapsedGroups.set(
-              new Set(sorted.slice(1).map((group) => group.optionName)),
-            );
-          }
-          this.loading.set(false);
-        },
-        error: () => {
-          this.loading.set(false);
-          this.error.set('We could not load products right now. Please try again.');
-        },
-      });
-  });
+    this.catalogProductsService.searchList(params).subscribe({
+      next: (result) => {
+        if (requestId !== this.listRequestId) {
+          return;
+        }
+        this.products.set(result.products);
+        this.totalCount.set(result.totalCount);
+        this.breadcrumb.set(result.breadcrumb);
+        this.loading.set(false);
+      },
+      error: () => {
+        if (requestId !== this.listRequestId) {
+          return;
+        }
+        this.loading.set(false);
+        this.error.set('We could not load products right now. Please try again.');
+      },
+    });
+  }
+
+  private loadFacets(params: ProductSearchParams): void {
+    const requestId = ++this.facetsRequestId;
+    const hasActiveOptionFilters = Object.values(params.optionFilters ?? {}).some(
+      (values) => (values?.length ?? 0) > 0,
+    );
+    this.facetsLoading.set(true);
+    this.catalogProductsService.searchFacets(params).subscribe({
+      next: (result) => {
+        if (requestId !== this.facetsRequestId) {
+          return;
+        }
+        this.categoryFacets.set(result.categoryFacets);
+        // Only refresh the option facet groups themselves from an
+        // unfiltered response — once a value is selected, the backend
+        // narrows (and sometimes reorders/drops) facets to match, which
+        // made the sidebar visibly shuffle around right as someone used
+        // it. Freeze it at whatever it looked like before any filter was
+        // applied; `resetOnRouteChange` clears selections (and so re-arms
+        // this) whenever the category/search scope itself changes.
+        // `categoryFacets` doesn't need the same treatment — its counts
+        // are scope-only and unaffected by optionFilters.
+        if (!hasActiveOptionFilters) {
+          const sorted = sortOptionGroupsByPriority(result.optionFacets);
+          this.optionFacets.set(sorted);
+          this.collapsedGroups.set(new Set(sorted.slice(1).map((group) => group.optionName)));
+        }
+        this.facetsLoading.set(false);
+      },
+      // A facets failure shouldn't blank the grid — leave the sidebar
+      // showing whatever it last had (or its loading skeleton clears and
+      // `hasFacets` decides whether to show anything at all).
+      error: () => {
+        if (requestId !== this.facetsRequestId) {
+          return;
+        }
+        this.facetsLoading.set(false);
+      },
+    });
+  }
 
   // A preview, not the authoritative tag — matches the product's own
   // program categories against the active allotment's rules, same as the

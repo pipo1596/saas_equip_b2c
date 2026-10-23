@@ -7,14 +7,14 @@ import { AuthService } from '../../../core/auth/auth';
 import { FAKE_SESSION } from '../../../core/auth/auth.testing';
 import { CartService } from '../../../core/cart/cart';
 import { POINTS_ONLY_ALLOTMENT } from '../../../core/cart/cart.testing';
-import { ProductSearchResult } from '../../../core/catalog/catalog-products';
+import { ProductFacetsResult, ProductListResult } from '../../../core/catalog/catalog-products';
 import { ProductList } from './product-list';
 
 const LOCATIONS = [
   { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Edmonton Fire Dept Chief' },
 ];
 
-const SAMPLE: ProductSearchResult = {
+const SAMPLE_LIST: ProductListResult = {
   breadcrumb: null,
   products: [
     {
@@ -34,6 +34,9 @@ const SAMPLE: ProductSearchResult = {
   totalCount: 32,
   page: 1,
   pageSize: 24,
+};
+
+const SAMPLE_FACETS: ProductFacetsResult = {
   categoryFacets: [{ progCatId: 5510, categoryName: 'Long sleeve', count: 14 }],
   optionFacets: [
     {
@@ -50,13 +53,29 @@ const SAMPLE: ProductSearchResult = {
 // `<app-header/>` is rendered by this page and independently hits the exact
 // same SEPGM (APCTPCVEW, action *MENU) once a location is active, and also
 // APCTPSTNGS for tenant settings — so a plain `expectOne(url)` can't tell
-// the products call apart from the header's own incidental one.
-function expectProductsRequest(httpMock: HttpTestingController): TestRequest {
+// the grid's own calls apart from the header's own incidental one.
+function expectProductListRequest(httpMock: HttpTestingController): TestRequest {
   const matches = httpMock.match(
-    (req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCTPCVEW' && req.body?.action === '*PRODUCTS',
+    (req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCTPCVEW' && req.body?.action === '*PRODUCT_LIST',
   );
   expect(matches.length).toBe(1);
   return matches[0];
+}
+
+function expectProductFacetsRequest(httpMock: HttpTestingController): TestRequest {
+  const matches = httpMock.match(
+    (req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCTPCVEW' && req.body?.action === '*PRODUCT_FACETS',
+  );
+  expect(matches.length).toBe(1);
+  return matches[0];
+}
+
+function expectNoProductFacetsRequest(httpMock: HttpTestingController): void {
+  expect(
+    httpMock.match(
+      (req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCTPCVEW' && req.body?.action === '*PRODUCT_FACETS',
+    ),
+  ).toHaveLength(0);
 }
 
 // This page also loads the same leaf-category list the Home page's "Shop by
@@ -68,6 +87,17 @@ function expectCategoriesRequest(httpMock: HttpTestingController): TestRequest {
   );
   expect(matches.length).toBe(1);
   return matches[0];
+}
+
+// Flushes the two calls fired together on first load / a scope/filter
+// change (see the product-grid API's call patterns).
+function flushBoth(
+  httpMock: HttpTestingController,
+  listOverrides: Partial<ProductListResult> = {},
+  facetsOverrides: Partial<ProductFacetsResult> = {},
+): void {
+  expectProductListRequest(httpMock).flush({ ...SAMPLE_LIST, ...listOverrides });
+  expectProductFacetsRequest(httpMock).flush({ ...SAMPLE_FACETS, ...facetsOverrides });
 }
 
 function categoryFacetNames(fixture: { nativeElement: HTMLElement }): string[] {
@@ -116,7 +146,7 @@ describe('ProductList', () => {
     expect(fixture.nativeElement.querySelectorAll('.skeleton').length).toBeGreaterThan(0);
     expect(fixture.nativeElement.querySelector('.product-card__title')).toBeNull();
 
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
     expectCategoriesRequest(httpMock).flush({ categories: [] });
     fixture.detectChanges();
 
@@ -154,7 +184,7 @@ describe('ProductList', () => {
 
     expect(
       httpMock.match(
-        (req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCTPCVEW' && req.body?.action === '*PRODUCTS',
+        (req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCTPCVEW' && req.body?.action === '*PRODUCT_LIST',
       ),
     ).toHaveLength(0);
   });
@@ -169,15 +199,33 @@ describe('ProductList', () => {
     });
     fixture.detectChanges();
 
-    const req = expectProductsRequest(httpMock);
+    const req = expectProductListRequest(httpMock);
     expect(req.request.body).toEqual({
-      action: '*PRODUCTS',
+      action: '*PRODUCT_LIST',
       locationId: 18,
       categoryId: 5510,
       page: 1,
       pageSize: 24,
     });
-    req.flush(SAMPLE);
+    req.flush(SAMPLE_LIST);
+    expectProductFacetsRequest(httpMock).flush(SAMPLE_FACETS);
+  });
+
+  it('should fire *PRODUCT_LIST and *PRODUCT_FACETS together, *PRODUCT_LIST first', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', '5510');
+    auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
+    fixture.detectChanges();
+
+    const pending = httpMock.match(
+      (req) =>
+        req.url === '/cgi/APPSCDSPCH?SEPGM=APCTPCVEW' &&
+        (req.body?.action === '*PRODUCT_LIST' || req.body?.action === '*PRODUCT_FACETS'),
+    );
+    expect(pending.map((req) => req.request.body.action)).toEqual(['*PRODUCT_LIST', '*PRODUCT_FACETS']);
+    pending[0].flush(SAMPLE_LIST);
+    pending[1].flush(SAMPLE_FACETS);
   });
 
   it('should link each product card to its product detail page', () => {
@@ -189,7 +237,7 @@ describe('ProductList', () => {
       locations: LOCATIONS,
     });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
     fixture.detectChanges();
 
     const card = fixture.nativeElement.querySelector('.product-card');
@@ -203,7 +251,7 @@ describe('ProductList', () => {
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
     fixture.detectChanges();
 
     const priceEl: HTMLElement = fixture.nativeElement.querySelector('.product-card__price');
@@ -217,9 +265,8 @@ describe('ProductList', () => {
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush({
-      ...SAMPLE,
-      products: [{ ...SAMPLE.products[0], priceRange: { min: 54, max: 54 } }],
+    flushBoth(httpMock, {
+      products: [{ ...SAMPLE_LIST.products[0], priceRange: { min: 54, max: 54 } }],
     });
     fixture.detectChanges();
 
@@ -234,7 +281,7 @@ describe('ProductList', () => {
     fixture.componentRef.setInput('categoryId', '5510');
     auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
     fixture.detectChanges();
 
     const priceEl: HTMLElement = fixture.nativeElement.querySelector('.product-card__price');
@@ -266,7 +313,7 @@ describe('ProductList', () => {
       fixture.componentRef.setInput('categoryId', '5510');
       auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
       fixture.detectChanges();
-      expectProductsRequest(httpMock).flush(SAMPLE);
+      flushBoth(httpMock);
       fixture.detectChanges();
 
       const tag: HTMLElement = fixture.nativeElement.querySelector('.pay-tag');
@@ -287,7 +334,7 @@ describe('ProductList', () => {
       fixture.componentRef.setInput('categoryId', '5510');
       auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
       fixture.detectChanges();
-      expectProductsRequest(httpMock).flush(SAMPLE);
+      flushBoth(httpMock);
       fixture.detectChanges();
 
       expect(fixture.nativeElement.querySelector('.pay-tag')).toBeNull();
@@ -308,7 +355,7 @@ describe('ProductList', () => {
       fixture.componentRef.setInput('categoryId', '5510');
       auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
       fixture.detectChanges();
-      expectProductsRequest(httpMock).flush(SAMPLE);
+      flushBoth(httpMock);
       fixture.detectChanges();
 
       const tag: HTMLElement = fixture.nativeElement.querySelector('.pay-tag');
@@ -336,7 +383,7 @@ describe('ProductList', () => {
       fixture.componentRef.setInput('categoryId', '5510');
       auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
       fixture.detectChanges();
-      expectProductsRequest(httpMock).flush(SAMPLE);
+      flushBoth(httpMock);
       fixture.detectChanges();
 
       expect(fixture.nativeElement.querySelector('.pay-tag')).toBeNull();
@@ -366,7 +413,7 @@ describe('ProductList', () => {
       fixture.componentRef.setInput('categoryId', '5510');
       auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
       fixture.detectChanges();
-      expectProductsRequest(httpMock).flush(SAMPLE);
+      flushBoth(httpMock);
       fixture.detectChanges();
 
       const tag: HTMLElement = fixture.nativeElement.querySelector('.pay-tag');
@@ -393,7 +440,7 @@ describe('ProductList', () => {
       fixture.componentRef.setInput('categoryId', '5510');
       auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
       fixture.detectChanges();
-      expectProductsRequest(httpMock).flush(SAMPLE);
+      flushBoth(httpMock);
       fixture.detectChanges();
 
       expect(fixture.nativeElement.querySelector('.pay-tag')).toBeNull();
@@ -409,7 +456,7 @@ describe('ProductList', () => {
       locations: LOCATIONS,
     });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
     fixture.detectChanges();
 
     const card = fixture.nativeElement.querySelector('.product-card');
@@ -422,8 +469,7 @@ describe('ProductList', () => {
     fixture.componentRef.setInput('categoryId', '45');
     auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush({
-      ...SAMPLE,
+    flushBoth(httpMock, {
       breadcrumb: {
         programId: 3,
         programName: 'ANB Standard Program',
@@ -450,7 +496,7 @@ describe('ProductList', () => {
     fixture.componentRef.setInput('categoryId', 'full-catalog');
     auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
     fixture.detectChanges();
 
     const crumbs: HTMLLIElement[] = fixture.nativeElement.querySelectorAll('.breadcrumb-item');
@@ -466,7 +512,7 @@ describe('ProductList', () => {
       locations: LOCATIONS,
     });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
     fixture.detectChanges();
 
     const swatch: HTMLElement = fixture.nativeElement.querySelector('.product-card .swatch');
@@ -483,11 +529,10 @@ describe('ProductList', () => {
       locations: LOCATIONS,
     });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush({
-      ...SAMPLE,
+    flushBoth(httpMock, {
       products: [
         {
-          ...SAMPLE.products[0],
+          ...SAMPLE_LIST.products[0],
           colors: [
             { valueDesc: 'Black', valueCode: 'BLACK', valueSwtchColor: 'black', valueSwtchImage: '/black.png' },
           ],
@@ -510,15 +555,16 @@ describe('ProductList', () => {
     });
     fixture.detectChanges();
 
-    const req = expectProductsRequest(httpMock);
+    const req = expectProductListRequest(httpMock);
     expect(req.request.body).toEqual({
-      action: '*PRODUCTS',
+      action: '*PRODUCT_LIST',
       locationId: 18,
       bucket: 'FOOTWEAR',
       page: 1,
       pageSize: 24,
     });
-    req.flush(SAMPLE);
+    req.flush(SAMPLE_LIST);
+    expectProductFacetsRequest(httpMock).flush(SAMPLE_FACETS);
   });
 
   it('should query the full catalog with neither categoryId nor bucket for "full-catalog"', () => {
@@ -531,14 +577,15 @@ describe('ProductList', () => {
     });
     fixture.detectChanges();
 
-    const req = expectProductsRequest(httpMock);
+    const req = expectProductListRequest(httpMock);
     expect(req.request.body).toEqual({
-      action: '*PRODUCTS',
+      action: '*PRODUCT_LIST',
       locationId: 18,
       page: 1,
       pageSize: 24,
     });
-    req.flush(SAMPLE);
+    req.flush(SAMPLE_LIST);
+    expectProductFacetsRequest(httpMock).flush(SAMPLE_FACETS);
   });
 
   it('should query by search keyword when q is set and no categoryId is bound', () => {
@@ -551,15 +598,16 @@ describe('ProductList', () => {
     });
     fixture.detectChanges();
 
-    const req = expectProductsRequest(httpMock);
+    const req = expectProductListRequest(httpMock);
     expect(req.request.body).toEqual({
-      action: '*PRODUCTS',
+      action: '*PRODUCT_LIST',
       locationId: 18,
       search: 'steel toe boots',
       page: 1,
       pageSize: 24,
     });
-    req.flush(SAMPLE);
+    req.flush(SAMPLE_LIST);
+    expectProductFacetsRequest(httpMock).flush(SAMPLE_FACETS);
   });
 
   it('should render the returned products, count, and facets', () => {
@@ -572,7 +620,7 @@ describe('ProductList', () => {
     });
     fixture.detectChanges();
 
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
     fixture.detectChanges();
 
     const text = fixture.nativeElement.textContent;
@@ -591,25 +639,38 @@ describe('ProductList', () => {
       locations: LOCATIONS,
     });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
 
+    // A bare page change fires only *PRODUCT_LIST — facets don't depend on
+    // the page.
     fixture.componentInstance.goToPage(2);
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    expectProductListRequest(httpMock).flush(SAMPLE_LIST);
+    expectNoProductFacetsRequest(httpMock);
 
     fixture.componentInstance.toggleOption('Size', 'M');
     fixture.detectChanges();
 
-    const req = expectProductsRequest(httpMock);
+    const req = expectProductListRequest(httpMock);
     expect(req.request.body).toEqual({
-      action: '*PRODUCTS',
+      action: '*PRODUCT_LIST',
       locationId: 18,
       categoryId: 5510,
       optionFilters: 'Size:M',
       page: 1,
       pageSize: 24,
     });
-    req.flush(SAMPLE);
+    req.flush(SAMPLE_LIST);
+    const facetsReq = expectProductFacetsRequest(httpMock);
+    expect(facetsReq.request.body).toEqual({
+      action: '*PRODUCT_FACETS',
+      locationId: 18,
+      categoryId: 5510,
+      optionFilters: 'Size:M',
+      page: 1,
+      pageSize: 24,
+    });
+    facetsReq.flush(SAMPLE_FACETS);
     expect(fixture.componentInstance.page()).toBe(1);
   });
 
@@ -622,29 +683,30 @@ describe('ProductList', () => {
       locations: LOCATIONS,
     });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
 
     fixture.componentInstance.toggleOption('Size', 'S');
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
 
     fixture.componentInstance.toggleOption('Size', 'M');
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
 
     fixture.componentInstance.toggleOption('Color', 'Black');
     fixture.detectChanges();
 
-    const req = expectProductsRequest(httpMock);
+    const req = expectProductListRequest(httpMock);
     expect(req.request.body).toEqual({
-      action: '*PRODUCTS',
+      action: '*PRODUCT_LIST',
       locationId: 18,
       categoryId: 5510,
       optionFilters: 'Size:S,M;Color:Black',
       page: 1,
       pageSize: 24,
     });
-    req.flush(SAMPLE);
+    req.flush(SAMPLE_LIST);
+    expectProductFacetsRequest(httpMock).flush(SAMPLE_FACETS);
   });
 
   it('should clear only one option group, leaving the other selected, reset to page 1, and refetch', () => {
@@ -656,18 +718,19 @@ describe('ProductList', () => {
       locations: LOCATIONS,
     });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
 
     fixture.componentInstance.toggleOption('Size', 'M');
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
     fixture.componentInstance.toggleOption('Color', 'Black');
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
 
     fixture.componentInstance.goToPage(2);
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush({ ...SAMPLE, page: 2 });
+    expectProductListRequest(httpMock).flush({ ...SAMPLE_LIST, page: 2 });
+    expectNoProductFacetsRequest(httpMock);
 
     fixture.componentInstance.clearOptionFilter('Size');
     fixture.detectChanges();
@@ -676,16 +739,17 @@ describe('ProductList', () => {
     expect(fixture.componentInstance.selectedOptions()['Color']).toEqual(['Black']);
     expect(fixture.componentInstance.page()).toBe(1);
 
-    const req = expectProductsRequest(httpMock);
+    const req = expectProductListRequest(httpMock);
     expect(req.request.body).toEqual({
-      action: '*PRODUCTS',
+      action: '*PRODUCT_LIST',
       locationId: 18,
       categoryId: 5510,
       optionFilters: 'Color:Black',
       page: 1,
       pageSize: 24,
     });
-    req.flush(SAMPLE);
+    req.flush(SAMPLE_LIST);
+    expectProductFacetsRequest(httpMock).flush(SAMPLE_FACETS);
   });
 
   it('should freeze the sidebar option facets once a filter is applied, instead of letting the narrowed response reshuffle them', () => {
@@ -697,10 +761,10 @@ describe('ProductList', () => {
       locations: LOCATIONS,
     });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
 
-    // SAMPLE lists Size then Color, but Color sorts ahead of Size.
-    const expectedSorted = [SAMPLE.optionFacets[1], SAMPLE.optionFacets[0]];
+    // SAMPLE_FACETS lists Size then Color, but Color sorts ahead of Size.
+    const expectedSorted = [SAMPLE_FACETS.optionFacets[1], SAMPLE_FACETS.optionFacets[0]];
     expect(fixture.componentInstance.optionFacets()).toEqual(expectedSorted);
 
     // Once size M is selected, the backend narrows the facets it returns —
@@ -708,8 +772,7 @@ describe('ProductList', () => {
     // than reshuffling to match this narrowed response.
     fixture.componentInstance.toggleOption('Size', 'M');
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush({
-      ...SAMPLE,
+    flushBoth(httpMock, undefined, {
       optionFacets: [{ optionName: 'Size', values: [{ value: 'M', valueCode: '', count: 3 }] }],
     });
 
@@ -719,8 +782,7 @@ describe('ProductList', () => {
     // refresh again at that point.
     fixture.componentInstance.toggleOption('Size', 'M');
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush({
-      ...SAMPLE,
+    flushBoth(httpMock, undefined, {
       optionFacets: [{ optionName: 'Size', values: [{ value: 'L', valueCode: '', count: 5 }] }],
     });
 
@@ -738,8 +800,7 @@ describe('ProductList', () => {
       locations: LOCATIONS,
     });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush({
-      ...SAMPLE,
+    flushBoth(httpMock, undefined, {
       optionFacets: [
         { optionName: 'Body', values: [{ value: 'Reg', valueCode: '', count: 2 }] },
         { optionName: 'Size', values: [{ value: 'M', valueCode: '', count: 9 }] },
@@ -765,8 +826,7 @@ describe('ProductList', () => {
       locations: LOCATIONS,
     });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush({
-      ...SAMPLE,
+    flushBoth(httpMock, undefined, {
       optionFacets: [
         { optionName: 'Body', values: [{ value: 'Reg', valueCode: '', count: 2 }] },
         { optionName: 'Body/Sleeve', values: [{ value: 'Long', valueCode: '', count: 2 }] },
@@ -796,8 +856,7 @@ describe('ProductList', () => {
       locations: LOCATIONS,
     });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush({
-      ...SAMPLE,
+    flushBoth(httpMock, undefined, {
       optionFacets: [
         { optionName: 'Body', values: [{ value: 'Reg', valueCode: '', count: 2 }] },
         { optionName: ' SIZE ', values: [{ value: 'M', valueCode: '', count: 9 }] },
@@ -819,8 +878,7 @@ describe('ProductList', () => {
       locations: LOCATIONS,
     });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush({
-      ...SAMPLE,
+    flushBoth(httpMock, undefined, {
       optionFacets: [
         { optionName: 'Body', values: [{ value: 'Reg', valueCode: '', count: 2 }] },
         { optionName: 'Fit', values: [{ value: 'Slim', valueCode: '', count: 4 }] },
@@ -842,8 +900,7 @@ describe('ProductList', () => {
       locations: LOCATIONS,
     });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush({
-      ...SAMPLE,
+    flushBoth(httpMock, undefined, {
       optionFacets: [
         { optionName: 'Body', values: [{ value: 'Reg', valueCode: '', count: 2 }] },
         { optionName: 'Size', values: [{ value: 'M', valueCode: '', count: 9 }] },
@@ -866,7 +923,7 @@ describe('ProductList', () => {
       locations: LOCATIONS,
     });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
 
     // Color outranks Size in the sort priority, so with both present here,
     // Color is the one left expanded and Size is the one collapsed.
@@ -888,12 +945,12 @@ describe('ProductList', () => {
       locations: LOCATIONS,
     });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
 
     fixture.componentInstance.toggleOption('Size', 'M');
     fixture.detectChanges();
     const updatedCategoryFacets = [{ progCatId: 5510, categoryName: 'Long sleeve', count: 3 }];
-    expectProductsRequest(httpMock).flush({ ...SAMPLE, categoryFacets: updatedCategoryFacets });
+    flushBoth(httpMock, undefined, { categoryFacets: updatedCategoryFacets });
 
     expect(fixture.componentInstance.categoryFacets()).toEqual(updatedCategoryFacets);
   });
@@ -908,8 +965,7 @@ describe('ProductList', () => {
     });
     fixture.detectChanges();
 
-    expectProductsRequest(httpMock).flush({
-      ...SAMPLE,
+    flushBoth(httpMock, undefined, {
       categoryFacets: [
         // A parent/group node with no products of its own directly in it.
         { progCatId: 100, categoryName: 'Apparel', count: 0 },
@@ -939,8 +995,7 @@ describe('ProductList', () => {
     });
     fixture.detectChanges();
 
-    expectProductsRequest(httpMock).flush({
-      ...SAMPLE,
+    flushBoth(httpMock, undefined, {
       categoryFacets: [
         { progCatId: 100, categoryName: 'Apparel', count: 0 },
         { progCatId: 200, categoryName: 'Accessory', count: 12 },
@@ -961,26 +1016,27 @@ describe('ProductList', () => {
       locations: LOCATIONS,
     });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
 
     fixture.componentInstance.toggleOption('Size', 'M');
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
     expect(fixture.componentInstance.selectedOptions()['Size']).toEqual(['M']);
 
     fixture.componentRef.setInput('categoryId', '321');
     fixture.detectChanges();
 
     expect(fixture.componentInstance.selectedOptions()).toEqual({});
-    const req = expectProductsRequest(httpMock);
+    const req = expectProductListRequest(httpMock);
     expect(req.request.body).toEqual({
-      action: '*PRODUCTS',
+      action: '*PRODUCT_LIST',
       locationId: 18,
       categoryId: 321,
       page: 1,
       pageSize: 24,
     });
-    req.flush(SAMPLE);
+    req.flush(SAMPLE_LIST);
+    expectProductFacetsRequest(httpMock).flush(SAMPLE_FACETS);
   });
 
   it('should scroll the results back into view when toggling an option filter', () => {
@@ -992,7 +1048,7 @@ describe('ProductList', () => {
       locations: LOCATIONS,
     });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
 
     // jsdom (used here) doesn't implement scrollIntoView at all — stub it
     // the way a real browser's version would exist, so the component can
@@ -1004,13 +1060,13 @@ describe('ProductList', () => {
     fixture.componentInstance.toggleOption('Size', 'M');
     fixture.detectChanges();
     expect(scrollIntoViewSpy).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
 
     scrollIntoViewSpy.mockClear();
     fixture.componentInstance.toggleOption('Color', 'Black');
     fixture.detectChanges();
     expect(scrollIntoViewSpy).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
   });
 
   it('should paginate', () => {
@@ -1022,20 +1078,21 @@ describe('ProductList', () => {
       locations: LOCATIONS,
     });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
 
     fixture.componentInstance.goToPage(2);
     fixture.detectChanges();
 
-    const req = expectProductsRequest(httpMock);
+    const req = expectProductListRequest(httpMock);
     expect(req.request.body).toEqual({
-      action: '*PRODUCTS',
+      action: '*PRODUCT_LIST',
       locationId: 18,
       categoryId: 5510,
       page: 2,
       pageSize: 24,
     });
-    req.flush({ ...SAMPLE, page: 2 });
+    req.flush({ ...SAMPLE_LIST, page: 2 });
+    expectNoProductFacetsRequest(httpMock);
 
     expect(fixture.componentInstance.page()).toBe(2);
   });
@@ -1049,7 +1106,7 @@ describe('ProductList', () => {
       locations: LOCATIONS,
     });
     fixture.detectChanges();
-    expectProductsRequest(httpMock).flush(SAMPLE);
+    flushBoth(httpMock);
 
     // jsdom (used here) doesn't implement scrollIntoView at all — stub it
     // the way a real browser's version would exist, so goToPage() can find
@@ -1073,11 +1130,29 @@ describe('ProductList', () => {
     });
     fixture.detectChanges();
 
-    expectProductsRequest(httpMock).flush('failure', { status: 500, statusText: 'Server Error' });
+    expectProductListRequest(httpMock).flush('failure', { status: 500, statusText: 'Server Error' });
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain(
       'We could not load products right now.',
     );
+  });
+
+  it('should not blank the grid when only the facets request fails', () => {
+    const fixture = TestBed.createComponent(ProductList);
+    const auth = TestBed.inject(AuthService);
+    fixture.componentRef.setInput('categoryId', '5510');
+    auth.session.set({
+      ...FAKE_SESSION,
+      locations: LOCATIONS,
+    });
+    fixture.detectChanges();
+
+    expectProductListRequest(httpMock).flush(SAMPLE_LIST);
+    expectProductFacetsRequest(httpMock).flush('failure', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Sworn duty shirt, long sleeve');
+    expect(fixture.nativeElement.textContent).not.toContain('We could not load products right now.');
   });
 });

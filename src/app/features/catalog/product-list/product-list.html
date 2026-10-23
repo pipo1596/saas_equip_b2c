@@ -21,7 +21,7 @@
     </div>
 
     <div class="row g-4">
-      @if (loading()) {
+      @if (facetsLoading()) {
         <aside class="col-lg-3" aria-hidden="true">
           <div class="card border-0 rounded-0 shadow-sm product-list__facets sticky-top">
             <div class="card-body">
@@ -125,7 +125,7 @@
         </aside>
       }
 
-      <div [class]="(loading() || hasFacets()) ? 'col-lg-9' : 'col-12'">
+      <div [class]="(facetsLoading() || hasFacets()) ? 'col-lg-9' : 'col-12'">
         <div #resultsTop class="results-top" aria-hidden="true"></div>
         @if (loading()) {
           <div class="row row-cols-2 row-cols-md-3 g-4" role="status">
