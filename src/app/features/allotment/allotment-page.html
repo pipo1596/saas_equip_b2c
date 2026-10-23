@@ -52,21 +52,26 @@
             No allotment is set up for your role.
           </div>
         } @else {
-          @if (allotmentBar(); as bar) {
-            <section
-              aria-label="Allotment summary"
-              class="allotment-page__panel allotment-page__hero mb-4"
-            >
-              <p class="allotment-page__hero-label">{{ bar.label }}</p>
-              <p class="allotment-page__hero-value">
-                {{ formatBalanceAmount(bar.available, 'DOLLARS') }} available
-              </p>
-              <div class="track"><i [style.width.%]="allotmentBarMeterPct()"></i></div>
-              @if (allotmentBarRenewsOn(); as renews) {
-                <p class="allotment-page__hero-meta">Renews {{ renews | date: 'MMM d, y' }}</p>
+          <section aria-label="Allotment summary" class="row row-cols-2 row-cols-lg-4 g-3 mb-4">
+            @for (rule of rules(); track rule.ruleId) {
+              @if (tileBalance(rule); as balance) {
+                <div class="col">
+                  <div class="allotment-page__panel allotment-page__hero-tile h-100">
+                    <p class="allotment-page__hero-label">{{ rule.ruleName }}</p>
+                    <p class="allotment-page__hero-value">
+                      {{ formatBalanceAmount(balance.available, rule.primaryUnit) }} available
+                    </p>
+                    <div class="track"><i [style.width.%]="meterPct(balance)"></i></div>
+                    @if (rule.cycle.renewsOn) {
+                      <p class="allotment-page__hero-meta">
+                        Renews {{ rule.cycle.renewsOn | date: 'MMM d, y' }}
+                      </p>
+                    }
+                  </div>
+                </div>
               }
-            </section>
-          }
+            }
+          </section>
 
           @if (summary()?.allotExclTaxFreight === 'Y') {
             <div class="alert alert-info mb-4">
@@ -112,21 +117,7 @@
           }
 
           <section aria-labelledby="h-history">
-            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-              <h2 id="h-history" class="allotment-page__section-title mb-0">Transaction History</h2>
-              <div class="allotment-page__scope-toggle" role="group" aria-label="History range">
-                <button
-                  type="button"
-                  [class.active]="scope() === 'CURRENT'"
-                  (click)="setScope('CURRENT')"
-                >
-                  This cycle
-                </button>
-                <button type="button" [class.active]="scope() === 'ALL'" (click)="setScope('ALL')">
-                  All history
-                </button>
-              </div>
-            </div>
+            <h2 id="h-history" class="allotment-page__section-title">Transaction History</h2>
 
             @if (txnError(); as message) {
               <div class="allotment-page__panel">
@@ -160,14 +151,7 @@
               </div>
             } @else if (history().length === 0) {
               <div class="allotment-page__panel text-center text-secondary py-4">
-                @if (scope() === 'CURRENT') {
-                  <p class="mb-2">No activity this cycle.</p>
-                  <button type="button" class="btn btn-link p-0" (click)="setScope('ALL')">
-                    View all history
-                  </button>
-                } @else {
-                  <p class="mb-0">No activity found.</p>
-                }
+                <p class="mb-0">No activity this cycle.</p>
               </div>
             } @else {
               @for (group of groupedHistory(); track group.ruleId) {

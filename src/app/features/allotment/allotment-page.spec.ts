@@ -176,7 +176,7 @@ describe('AllotmentPage', () => {
     fixture.detectChanges();
 
     const text: string = fixture.nativeElement.textContent;
-    expect(text).toContain('General Allotment');
+    expect(text).toContain('Annual uniform allowance');
     expect(text).toContain('$315.50 available');
     expect(fixture.nativeElement.querySelectorAll('app-allotment-rule-card').length).toBe(1);
   });
@@ -314,7 +314,7 @@ describe('AllotmentPage', () => {
     expect(groups[1].textContent).toContain('−1 Cap');
   });
 
-  it('shows "No activity this cycle" with a link that switches to all history', () => {
+  it('shows "No activity this cycle" when there is no history', () => {
     const fixture = TestBed.createComponent(AllotmentPage);
     fixture.detectChanges();
     flushInitialLoad(httpMock, {
@@ -329,28 +329,6 @@ describe('AllotmentPage', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('No activity this cycle.');
-
-    const link: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-link');
-    link.click();
-
-    const req = expectAllotmentRequest(httpMock);
-    expect(req.request.body).toEqual({ action: '*TXNS', ruleId: 0, scope: 'ALL', page: 1, pageSize: 200 });
-  });
-
-  it('posts *TXNS with the new scope when the "All history" toggle is clicked', () => {
-    const fixture = TestBed.createComponent(AllotmentPage);
-    fixture.detectChanges();
-    flushInitialLoad(httpMock);
-    fixture.detectChanges();
-
-    const buttons: HTMLButtonElement[] = fixture.nativeElement.querySelectorAll(
-      '.allotment-page__scope-toggle button',
-    );
-    const allHistoryButton = Array.from(buttons).find((btn) => btn.textContent?.includes('All history'))!;
-    allHistoryButton.click();
-
-    const req = expectAllotmentRequest(httpMock);
-    expect(req.request.body).toEqual({ action: '*TXNS', ruleId: 0, scope: 'ALL', page: 1, pageSize: 200 });
   });
 
   it('pages the history forward without reloading the summary', () => {
@@ -387,14 +365,21 @@ describe('AllotmentPage', () => {
   it('shows a transaction-level error with its own retry, without re-skeletoning the summary', () => {
     const fixture = TestBed.createComponent(AllotmentPage);
     fixture.detectChanges();
-    flushInitialLoad(httpMock);
+    flushInitialLoad(httpMock, {
+      transactions: {
+        scope: 'CURRENT',
+        ruleId: null,
+        pagination: { page: 1, pageSize: 25, totalRows: 30, totalPages: 2 },
+        data: [TRANSACTION],
+        pending: [],
+      },
+    });
     fixture.detectChanges();
 
-    const buttons: HTMLButtonElement[] = fixture.nativeElement.querySelectorAll(
-      '.allotment-page__scope-toggle button',
-    );
-    const allHistoryButton = Array.from(buttons).find((btn) => btn.textContent?.includes('All history'))!;
-    allHistoryButton.click();
+    const nextButton: HTMLButtonElement = Array.from(
+      fixture.nativeElement.querySelectorAll('.allotment-page__pager button'),
+    ).find((btn): btn is HTMLButtonElement => (btn as HTMLButtonElement).textContent?.trim() === 'Next')!;
+    nextButton.click();
     expectAllotmentRequest(httpMock).flush({ success: false, message: 'Could not load history.' });
     fixture.detectChanges();
 

@@ -10,12 +10,11 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-import { Allotment, AllotmentBar, formatBalanceAmount, meterPct } from '../../core/cart/allotment';
+import { Allotment, formatBalanceAmount, meterPct, tileBalance } from '../../core/cart/allotment';
 import {
   AllotmentPendingHold,
   AllotmentTransaction,
   AllotmentTransactionsPage,
-  AllotmentTxnScope,
   EmployeeAllotmentService,
   allotmentTxnLabel,
   formatAllotmentTimestamp,
@@ -40,9 +39,14 @@ interface HistoryGroup {
   rows: AllotmentTransaction[];
 }
 
-// Large enough that "This cycle"/"All history" shows everything without
-// paging in the common case — the doc's own documented ceiling (1-200).
+// Large enough that history shows everything without paging in the common
+// case — the doc's own documented ceiling (1-200).
 const HISTORY_PAGE_SIZE = 200;
+
+// This deployment's `*GET`/`*TXNS` only ever return the current cycle
+// regardless of what's requested, so there's no "This cycle"/"All history"
+// toggle to expose — always ask for the one scope that actually works.
+const HISTORY_SCOPE = 'CURRENT' as const;
 
 @Component({
   selector: 'app-allotment-page',
@@ -67,25 +71,16 @@ export class AllotmentPage implements OnInit {
   readonly txnLoading = signal(false);
   readonly txnError = signal<string | null>(null);
 
-  readonly scope = signal<AllotmentTxnScope>('CURRENT');
   readonly page = signal(1);
 
   readonly rules = computed(() => this.summary()?.rules ?? []);
   readonly hasNoAllotment = computed(() => this.summary() !== null && this.rules().length === 0);
-  readonly allotmentBar = computed<AllotmentBar | null>(() => this.summary()?.allotmentBar ?? null);
-  readonly allotmentBarMeterPct = computed(() => {
-    const bar = this.allotmentBar();
-    return bar ? meterPct(bar) : 0;
-  });
-  // The bar itself carries no renewal date — that lives on whichever rule is
-  // flagged as the bar rule, matched by `allotmentBar.ruleId`.
-  readonly allotmentBarRenewsOn = computed(() => {
-    const bar = this.allotmentBar();
-    if (!bar) {
-      return null;
-    }
-    return this.rules().find((rule) => rule.ruleId === bar.ruleId)?.cycle.renewsOn ?? null;
-  });
+  // One hero tile per rule, same as the home page's own summary row — shows
+  // whichever unit each rule actually pays in (dollars, units, or points),
+  // not just `summary.allotmentBar` (dollars-only, and only the single
+  // lowest-numbered dollar rule).
+  readonly tileBalance = tileBalance;
+  readonly meterPct = meterPct;
 
   readonly pending = computed(() => this.transactions()?.pending ?? []);
   readonly history = computed(() => this.transactions()?.data ?? []);
@@ -148,7 +143,6 @@ export class AllotmentPage implements OnInit {
         }
         this.summary.set(result.summary);
         this.transactions.set(result.transactions);
-        this.scope.set(result.transactions.scope);
         this.page.set(result.transactions.pagination.page);
       },
       error: () => {
@@ -156,15 +150,6 @@ export class AllotmentPage implements OnInit {
         this.error.set('We could not load your allotment right now.');
       },
     });
-  }
-
-  setScope(scope: AllotmentTxnScope): void {
-    if (scope === this.scope()) {
-      return;
-    }
-    this.scope.set(scope);
-    this.page.set(1);
-    this.loadTransactions();
   }
 
   goToPage(page: number): void {
@@ -190,7 +175,7 @@ export class AllotmentPage implements OnInit {
     this.employeeAllotmentService
       .loadTransactions({
         ruleId: 0,
-        scope: this.scope(),
+        scope: HISTORY_SCOPE,
         page: this.page(),
         pageSize: HISTORY_PAGE_SIZE,
       })

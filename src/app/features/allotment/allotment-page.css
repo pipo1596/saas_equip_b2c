@@ -26,7 +26,11 @@
   margin: 0 0 16px;
 }
 
-/* ---------- hero ---------- */
+/* ---------- hero (one tile per rule, same idea as the home page's own
+   summary row) ---------- */
+.allotment-page__hero-tile {
+  padding: 16px 18px;
+}
 .allotment-page__hero-label {
   font-size: 12px;
   font-weight: 600;
@@ -34,11 +38,14 @@
   text-transform: uppercase;
   color: var(--slate-500);
   margin: 0 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .allotment-page__hero-value {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 26px;
+  font-size: 20px;
   color: var(--navy);
   margin: 0 0 10px;
 }
@@ -98,31 +105,6 @@
   font-weight: 700;
   font-size: 14px;
   color: var(--amber);
-}
-
-/* ---------- history filters ---------- */
-.allotment-page__scope-toggle {
-  display: inline-flex;
-  border: 1px solid var(--slate-200);
-  border-radius: 8px;
-  overflow: hidden;
-}
-.allotment-page__scope-toggle button {
-  height: 36px;
-  padding: 0 14px;
-  border: none;
-  background: #fff;
-  color: var(--slate-600);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.allotment-page__scope-toggle button + button {
-  border-left: 1px solid var(--slate-200);
-}
-.allotment-page__scope-toggle button.active {
-  background: var(--navy);
-  color: #fff;
 }
 
 /* ---------- history groups (one allotment per box) ---------- */
