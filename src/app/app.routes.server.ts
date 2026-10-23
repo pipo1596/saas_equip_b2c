@@ -1,6 +1,20 @@
 import { RenderMode, ServerRoute } from '@angular/ssr';
 
 export const serverRoutes: ServerRoute[] = [
+  // The login route itself — easy to miss, but this one matters more than
+  // any of the ones below: Angular's prerendering convention makes `/`'s
+  // own prerendered output *become* `index.html`, which every
+  // `RenderMode.Client` route below serves as its shell. Left on the
+  // catch-all `**: RenderMode.Prerender` rule, the build bakes the real,
+  // fully-rendered login form into that shared `index.html` in place of the
+  // neutral loader markup actually written there (see index.html) — so an
+  // already-signed-in visitor hard-refreshing any client-rendered route
+  // (home, cart, ...) would see the login form flash before the client
+  // bundle loads and the router corrects it to their real page.
+  {
+    path: '',
+    renderMode: RenderMode.Client,
+  },
   // These three require a signed-in session, which only ever lives in the
   // browser's own localStorage — the server has no way to know whether a
   // given visitor is actually logged in, so it can't safely pick what to
@@ -36,6 +50,22 @@ export const serverRoutes: ServerRoute[] = [
   },
   {
     path: 'orders/:orderId',
+    renderMode: RenderMode.Client,
+  },
+  {
+    path: 'checkout',
+    renderMode: RenderMode.Client,
+  },
+  {
+    path: 'account',
+    renderMode: RenderMode.Client,
+  },
+  {
+    path: 'allotment',
+    renderMode: RenderMode.Client,
+  },
+  {
+    path: 'approvals',
     renderMode: RenderMode.Client,
   },
   {

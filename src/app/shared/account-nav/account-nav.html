@@ -60,9 +60,36 @@
       stroke-linejoin="round"
       aria-hidden="true"
     >
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v10M9 10h4.5a1.5 1.5 0 0 1 0 3H10a1.5 1.5 0 0 0 0 3H15" />
+      <path d="M12 1v22" />
+      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
     </svg>
     My Allotment
   </a>
+  @if (canApprove()) {
+    <a
+      routerLink="/approvals"
+      class="account-nav__link"
+      [class.account-nav__link--active]="active() === 'approvals'"
+      [attr.aria-current]="active() === 'approvals' ? 'page' : null"
+    >
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M9 11l3 3L22 4" />
+        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+      </svg>
+      Approvals
+      @if (pendingApprovalsCount() > 0) {
+        <span class="badge rounded-pill bg-primary ms-auto">{{ pendingApprovalsCount() }}</span>
+      }
+    </a>
+  }
 </nav>

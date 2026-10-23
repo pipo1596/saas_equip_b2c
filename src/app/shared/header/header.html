@@ -124,11 +124,21 @@
             (click)="userMenuOpen.set(false)"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" />
-              <circle cx="7" cy="18" r="1.6" />
-              <circle cx="17.5" cy="18" r="1.6" />
+              <path d="M4 7l8-4 8 4v10l-8 4-8-4z" />
+              <path d="M4 7l8 4 8-4M12 11v10" />
             </svg>
             My orders
+          </a>
+          <a
+            routerLink="/allotment"
+            class="dropdown-item d-flex align-items-center gap-2"
+            (click)="userMenuOpen.set(false)"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 1v22" />
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
+            My Allotment
           </a>
           <button type="button" class="dropdown-item d-flex align-items-center gap-2 text-danger" (click)="logOut()">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

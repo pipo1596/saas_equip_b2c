@@ -284,6 +284,9 @@ describe('Home', () => {
       expect(stats[1].querySelector('.stat__value')?.textContent?.trim()).toBe('2 units');
       // No renewsOn on this one — the renewal line is omitted entirely.
       expect(stats[1].querySelector('.stat__meta')).toBeNull();
+
+      expect(stats[0].getAttribute('href')).toBe('/allotment');
+      expect(stats[1].getAttribute('href')).toBe('/allotment');
     });
 
     it('clamps the meter at 0% rather than going negative when a credit pushes "used" below zero', () => {

@@ -1144,6 +1144,23 @@ describe('Header', () => {
     expect(header.userMenuOpen()).toBe(false);
   });
 
+  it('should link to the allotment page from the user menu, and close the menu when it is clicked', () => {
+    const fixture = TestBed.createComponent(Header);
+    const header = fixture.componentInstance;
+    fixture.detectChanges();
+
+    vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+
+    header.toggleUserMenu();
+    expect(header.userMenuOpen()).toBe(true);
+
+    const link: HTMLAnchorElement = fixture.nativeElement.querySelector('.user-menu a[href="/allotment"]');
+    expect(link.textContent).toContain('My Allotment');
+
+    link.click();
+    expect(header.userMenuOpen()).toBe(false);
+  });
+
   describe('Approvals menu item', () => {
     function cartWithApprovals(approvals: {
       canApprove: 'Y' | 'N';
