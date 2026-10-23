@@ -8,11 +8,41 @@ import { FAKE_SESSION } from '../../../core/auth/auth.testing';
 import { CartService } from '../../../core/cart/cart';
 import { POINTS_ONLY_ALLOTMENT } from '../../../core/cart/cart.testing';
 import { ProductFacetsResult, ProductListResult } from '../../../core/catalog/catalog-products';
+import { CatalogCategory, CatalogMenu, CatalogViewService } from '../../../core/catalog/catalog-view';
 import { ProductList } from './product-list';
 
 const LOCATIONS = [
   { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Edmonton Fire Dept Chief' },
 ];
+
+const LONG_SLEEVE: CatalogCategory = {
+  progCatId: 5510,
+  parentProgCatId: 5500,
+  categoryName: 'Long Sleeve',
+  sortOrder: 0,
+  status: 'ACTIVE',
+  productCount: 14,
+  children: [],
+};
+const SHORT_SLEEVE: CatalogCategory = {
+  progCatId: 5511,
+  parentProgCatId: 5500,
+  categoryName: 'Short Sleeve',
+  sortOrder: 1,
+  status: 'ACTIVE',
+  productCount: 14,
+  children: [],
+};
+const UNIFORM: CatalogCategory = {
+  progCatId: 5500,
+  parentProgCatId: null,
+  categoryName: 'Uniform',
+  sortOrder: 0,
+  status: 'ACTIVE',
+  productCount: 0,
+  children: [LONG_SLEEVE, SHORT_SLEEVE],
+};
+const MENU: CatalogMenu = { clothing: [UNIFORM], footwear: [], gear: [] };
 
 const SAMPLE_LIST: ProductListResult = {
   breadcrumb: null,
@@ -1065,5 +1095,149 @@ describe('ProductList', () => {
 
     expect(fixture.nativeElement.textContent).toContain('Sworn duty shirt, long sleeve');
     expect(fixture.nativeElement.textContent).not.toContain('We could not load products right now.');
+  });
+
+  describe('category tree sidebar', () => {
+    it("renders the full category tree from CatalogViewService.menu(), auto-expanded and highlighted to the active category", () => {
+      const fixture = TestBed.createComponent(ProductList);
+      const auth = TestBed.inject(AuthService);
+      TestBed.inject(CatalogViewService).menu.set(MENU);
+      fixture.componentRef.setInput('categoryId', '5510');
+      auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
+      fixture.detectChanges();
+      flushBoth(httpMock);
+      fixture.detectChanges();
+
+      const links: string[] = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('.category-tree__link'),
+      ).map((link) => link.querySelector('span')!.textContent!.trim());
+      expect(links).toEqual([
+        'Clothing',
+        'Uniform',
+        'Long Sleeve',
+        'Short Sleeve',
+        'Footwear',
+        'Gear',
+      ]);
+
+      const active = fixture.nativeElement.querySelector('.category-tree__link--active');
+      expect(active?.querySelector('span')?.textContent?.trim()).toBe('Long Sleeve');
+    });
+  });
+
+  describe('sibling pills', () => {
+    it("shows \"All {parent}\" plus the parent's children when browsing a leaf category", () => {
+      const fixture = TestBed.createComponent(ProductList);
+      const auth = TestBed.inject(AuthService);
+      TestBed.inject(CatalogViewService).menu.set(MENU);
+      fixture.componentRef.setInput('categoryId', '5510');
+      auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
+      fixture.detectChanges();
+      flushBoth(httpMock);
+      fixture.detectChanges();
+
+      const pills = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('[aria-label="Related categories"] a'),
+      ) as HTMLAnchorElement[];
+      expect(pills.map((pill) => pill.textContent?.trim())).toEqual([
+        'All Uniform',
+        'Long Sleeve',
+        'Short Sleeve',
+      ]);
+      expect(pills[1].className).toContain('btn-primary');
+      expect(pills[0].className).toContain('btn-outline-secondary');
+    });
+
+    it("shows \"All {category}\" plus its own children when browsing a category with children directly", () => {
+      const fixture = TestBed.createComponent(ProductList);
+      const auth = TestBed.inject(AuthService);
+      TestBed.inject(CatalogViewService).menu.set(MENU);
+      fixture.componentRef.setInput('categoryId', '5500');
+      auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
+      fixture.detectChanges();
+      flushBoth(httpMock);
+      fixture.detectChanges();
+
+      const pills = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('[aria-label="Related categories"] a'),
+      ) as HTMLAnchorElement[];
+      expect(pills.map((pill) => pill.textContent?.trim())).toEqual([
+        'All Uniform',
+        'Long Sleeve',
+        'Short Sleeve',
+      ]);
+      expect(pills[0].className).toContain('btn-primary');
+    });
+
+    it('shows no sibling pills for a bucket, search, or full-catalog scope', () => {
+      const fixture = TestBed.createComponent(ProductList);
+      const auth = TestBed.inject(AuthService);
+      TestBed.inject(CatalogViewService).menu.set(MENU);
+      fixture.componentRef.setInput('categoryId', 'full-catalog');
+      auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
+      fixture.detectChanges();
+      flushBoth(httpMock);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('[aria-label="Related categories"]')).toBeNull();
+    });
+  });
+
+  describe('applied filter chips and Refine "Clear all"', () => {
+    it('shows an applied chip per selected value, and removes just that one when clicked', () => {
+      const fixture = TestBed.createComponent(ProductList);
+      const auth = TestBed.inject(AuthService);
+      fixture.componentRef.setInput('categoryId', '5510');
+      auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
+      fixture.detectChanges();
+      flushBoth(httpMock);
+
+      fixture.componentInstance.toggleOption('Size', 'M');
+      fixture.detectChanges();
+      flushBoth(httpMock);
+      fixture.detectChanges();
+
+      const chip = (
+        Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')) as HTMLButtonElement[]
+      ).find((btn) => btn.textContent?.includes('Size: M'))!;
+      expect(chip).toBeTruthy();
+
+      chip.click();
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.selectedOptions()['Size']).toEqual([]);
+    });
+
+    it('shows a "Clear all" link in the Refine box only while a filter is active, and it clears every group', () => {
+      const fixture = TestBed.createComponent(ProductList);
+      const auth = TestBed.inject(AuthService);
+      fixture.componentRef.setInput('categoryId', '5510');
+      auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
+      fixture.detectChanges();
+      flushBoth(httpMock);
+      fixture.detectChanges();
+
+      const findClearAll = (): HTMLButtonElement | undefined =>
+        (
+          Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')) as HTMLButtonElement[]
+        ).find((btn) => btn.textContent?.trim() === 'Clear all');
+      expect(findClearAll()).toBeUndefined();
+
+      fixture.componentInstance.toggleOption('Size', 'M');
+      fixture.detectChanges();
+      flushBoth(httpMock);
+      fixture.componentInstance.toggleOption('Color', 'Black');
+      fixture.detectChanges();
+      flushBoth(httpMock);
+      fixture.detectChanges();
+
+      const clearAll = findClearAll();
+      expect(clearAll).toBeTruthy();
+      clearAll!.click();
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.selectedOptions()).toEqual({});
+      expect(fixture.componentInstance.page()).toBe(1);
+    });
   });
 });

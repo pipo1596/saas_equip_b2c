@@ -16,6 +16,7 @@ const CATEGORY = {
   sortOrder: 0,
   status: 'ACTIVE',
   children: [],
+  productCount: 0,
 };
 
 describe('Header', () => {

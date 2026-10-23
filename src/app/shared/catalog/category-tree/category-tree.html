@@ -1,0 +1,96 @@
+<div class="category-tree">
+  <div class="category-tree__header">
+    <h2 class="category-tree__title mb-0">Shop by category</h2>
+    <button
+      type="button"
+      class="btn btn-link btn-sm p-0 text-decoration-none"
+      (click)="toggleExpandAll()"
+    >
+      {{ isAllExpanded() ? 'Collapse all' : 'Expand all' }}
+    </button>
+  </div>
+  <div class="category-tree__search">
+    <svg
+      class="category-tree__search-icon"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4-4" />
+    </svg>
+    <input
+      type="search"
+      placeholder="Find a category"
+      [value]="query()"
+      (input)="onQueryInput($event)"
+      aria-label="Find a category"
+    />
+  </div>
+  @if (filteredBuckets().length === 0) {
+    <p class="category-tree__empty text-secondary small mb-0">No matching categories.</p>
+  } @else {
+    <ul class="category-tree__list list-unstyled mb-0">
+      @for (bucket of filteredBuckets(); track bucket.id) {
+        <li class="category-tree__item">
+          <div class="category-tree__row">
+            @if (bucket.categories.length > 0) {
+              <button
+                type="button"
+                class="category-tree__toggle"
+                [attr.aria-expanded]="expandedIds().has(bucket.id)"
+                [attr.aria-label]="(expandedIds().has(bucket.id) ? 'Collapse ' : 'Expand ') + bucket.label"
+                (click)="toggleNode(bucket.id)"
+              >
+                <svg
+                  class="category-tree__chevron"
+                  [class.category-tree__chevron--open]="expandedIds().has(bucket.id)"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </button>
+            } @else {
+              <span class="category-tree__toggle-spacer" aria-hidden="true"></span>
+            }
+            <a
+              [routerLink]="['/products', bucket.slug]"
+              class="category-tree__link"
+              [class.category-tree__link--active]="activeBucket() === bucket.slug"
+              [attr.aria-current]="activeBucket() === bucket.slug ? 'page' : null"
+            >
+              <span>{{ bucket.label }}</span>
+              <span class="badge rounded text-bg-light">{{ bucket.count }}</span>
+            </a>
+          </div>
+          @if (bucket.categories.length > 0 && expandedIds().has(bucket.id)) {
+            <ul class="category-tree__children list-unstyled mb-0">
+              @for (child of bucket.categories; track child.progCatId) {
+                <app-category-tree-node
+                  [category]="child"
+                  [activeCategoryId]="activeCategoryId()"
+                  [expandedIds]="expandedIds()"
+                  (toggle)="toggleNode($event)"
+                />
+              }
+            </ul>
+          }
+        </li>
+      }
+    </ul>
+  }
+</div>

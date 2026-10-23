@@ -11,6 +11,15 @@ export interface CatalogCategory {
   sortOrder: number;
   status: string;
   children: CatalogCategory[];
+  // Only ever populated by the API on a leaf (no `children`) — a parent
+  // node's own count is always 0 here; use `categoryProductCount` below to
+  // get its rollup total across every leaf descendant.
+  productCount: number;
+}
+
+interface RawCatalogCategory extends Omit<CatalogCategory, 'children' | 'productCount'> {
+  children: RawCatalogCategory[] | null;
+  productCount: number | null | undefined;
 }
 
 export interface CatalogMenu {
@@ -19,11 +28,105 @@ export interface CatalogMenu {
   gear: CatalogCategory[];
 }
 
+interface RawCatalogMenu {
+  clothing: RawCatalogCategory[] | null;
+  footwear: RawCatalogCategory[] | null;
+  gear: RawCatalogCategory[] | null;
+}
+
 export interface CatalogView {
   viewId: number;
   programId: number;
   menu: CatalogMenu;
   categoryCount: number;
+}
+
+interface RawCatalogView extends Omit<CatalogView, 'menu'> {
+  menu: RawCatalogMenu;
+}
+
+function normalizeCategory(category: RawCatalogCategory): CatalogCategory {
+  return {
+    ...category,
+    children: (category.children ?? []).map(normalizeCategory),
+    productCount: category.productCount ?? 0,
+  };
+}
+
+function normalizeMenu(menu: RawCatalogMenu): CatalogMenu {
+  return {
+    clothing: (menu.clothing ?? []).map(normalizeCategory),
+    footwear: (menu.footwear ?? []).map(normalizeCategory),
+    gear: (menu.gear ?? []).map(normalizeCategory),
+  };
+}
+
+// A parent's own `productCount` is never populated by the API — only a leaf
+// (no children) carries a real count — so a parent's total is always the sum
+// of every leaf underneath it, recursively.
+export function categoryProductCount(category: CatalogCategory): number {
+  if (category.children.length === 0) {
+    return category.productCount;
+  }
+  return category.children.reduce((sum, child) => sum + categoryProductCount(child), 0);
+}
+
+// Every root array in a `CatalogMenu` flattened into one list — the sidebar
+// category tree shows the whole catalog (every bucket) at once, regardless
+// of which bucket/category/search is currently being browsed.
+export function allCategoryRoots(menu: CatalogMenu): CatalogCategory[] {
+  return [...menu.clothing, ...menu.footwear, ...menu.gear];
+}
+
+// The path from a root down to `progCatId`, root first and the match last —
+// `null` if it isn't in this tree at all. Used both to know which ancestors
+// to auto-expand and to find a leaf's immediate parent for the sibling-pill
+// row.
+export function findCategoryPath(
+  roots: readonly CatalogCategory[],
+  progCatId: number,
+): CatalogCategory[] | null {
+  for (const category of roots) {
+    if (category.progCatId === progCatId) {
+      return [category];
+    }
+    const nested = findCategoryPath(category.children, progCatId);
+    if (nested) {
+      return [category, ...nested];
+    }
+  }
+  return null;
+}
+
+// A case-insensitive substring match against the category tree, for the
+// sidebar's "Find a category" box. A category whose own name matches keeps
+// its *entire* subtree (so searching "Shirt" still shows every shirt
+// sub-category); a category that only has a matching descendant keeps just
+// the branches leading to that match, not its unrelated siblings.
+export function filterCategoryTree(
+  categories: readonly CatalogCategory[],
+  query: string,
+): CatalogCategory[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) {
+    return [...categories];
+  }
+  return categories.flatMap((category): CatalogCategory[] => {
+    if (category.categoryName.toLowerCase().includes(needle)) {
+      return [category];
+    }
+    const matchingChildren = filterCategoryTree(category.children, needle);
+    return matchingChildren.length > 0 ? [{ ...category, children: matchingChildren }] : [];
+  });
+}
+
+// Every category id in the tree, for "Expand all" — collapsing is just
+// clearing the expanded-ids set back to empty.
+export function collectCategoryIds(categories: readonly CatalogCategory[]): number[] {
+  return categories.flatMap((category) => [
+    category.progCatId,
+    ...collectCategoryIds(category.children),
+  ]);
 }
 
 // A "leaf" category — one shoppable enough to feature on the Home page's
@@ -72,8 +175,9 @@ export class CatalogViewService {
 
     if (!this.request$) {
       this.request$ = this.http
-        .post<CatalogView>(this.dispatchUrl, { locationId, action: '*MENU' })
+        .post<RawCatalogView>(this.dispatchUrl, { locationId, action: '*MENU' })
         .pipe(
+          map((response) => ({ ...response, menu: normalizeMenu(response.menu) })),
           tap((response) => {
             this.cachedView = response;
             this.menu.set(response.menu);

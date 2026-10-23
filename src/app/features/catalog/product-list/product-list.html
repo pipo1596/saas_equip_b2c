@@ -13,37 +13,94 @@
       </nav>
     }
 
-    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
       <h1 class="product-list__title mb-0">{{ pageTitle() }}</h1>
       @if (!loading() && !error()) {
         <span class="text-secondary small">{{ totalCount() }} product{{ totalCount() === 1 ? '' : 's' }}</span>
       }
     </div>
 
+    @if (siblingPills(); as pills) {
+      <nav aria-label="Related categories" class="d-flex flex-wrap gap-2 mb-3">
+        <a
+          [routerLink]="['/products', pills.parentId]"
+          [queryParams]="{ name: pills.parentLabel }"
+          class="btn btn-sm rounded-pill"
+          [class.btn-primary]="pills.activeId === pills.parentId"
+          [class.btn-outline-secondary]="pills.activeId !== pills.parentId"
+        >
+          All {{ pills.parentLabel }}
+        </a>
+        @for (item of pills.items; track item.progCatId) {
+          <a
+            [routerLink]="['/products', item.progCatId]"
+            [queryParams]="{ name: item.categoryName }"
+            class="btn btn-sm rounded-pill"
+            [class.btn-primary]="pills.activeId === item.progCatId"
+            [class.btn-outline-secondary]="pills.activeId !== item.progCatId"
+          >
+            {{ item.categoryName }}
+          </a>
+        }
+      </nav>
+    }
+
+    @if (appliedFilterChips().length > 0) {
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <span class="text-secondary small fw-semibold">Applied:</span>
+        @for (chip of appliedFilterChips(); track chip.optionName + '|' + chip.value) {
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary rounded-pill d-inline-flex align-items-center gap-1"
+            (click)="toggleOption(chip.optionName, chip.value)"
+          >
+            {{ chip.optionName }}: {{ chip.value }}
+            <span aria-hidden="true">&times;</span>
+            <span class="visually-hidden">Remove {{ chip.optionName }} {{ chip.value }} filter</span>
+          </button>
+        }
+      </div>
+    }
+
     <div class="row g-4">
-      @if (facetsLoading()) {
-        <aside class="col-lg-3" aria-hidden="true">
-          <div class="card border-0 rounded-0 shadow-sm product-list__facets sticky-top">
+      <aside class="col-lg-3">
+        <div class="product-list__sidebar-sticky sticky-top">
+          <div class="card border-0 rounded-0 shadow-sm product-list__facets">
             <div class="card-body">
-              <div class="skeleton skeleton--text mb-3" style="width: 70px; height: 13px"></div>
-              <ul class="facet-list list-unstyled mb-0">
-                @for (n of [1, 2, 3, 4, 5]; track n) {
-                  <li class="mb-2"><div class="skeleton skeleton--text" style="width: 80%"></div></li>
-                }
-              </ul>
-              <div class="skeleton skeleton--text mt-4 mb-3" style="width: 60px; height: 13px"></div>
-              <div class="d-flex flex-wrap gap-2">
-                @for (n of [1, 2, 3, 4, 5, 6]; track n) {
-                  <div class="skeleton" style="width: 64px; height: 32px; border-radius: 4px"></div>
-                }
-              </div>
+              <app-category-tree
+                [menu]="menu()"
+                [activeCategoryId]="activeCategoryId()"
+                [activeBucket]="activeBucketSlug()"
+              />
             </div>
           </div>
-        </aside>
-      } @else if (hasFacets()) {
-        <aside class="col-lg-3">
-          <div class="card border-0 rounded-0 shadow-sm product-list__facets sticky-top">
+
+          @if (facetsLoading()) {
+            <div class="card border-0 rounded-0 shadow-sm product-list__facets mt-3" aria-hidden="true">
+              <div class="card-body">
+                <div class="skeleton skeleton--text mb-3" style="width: 70px; height: 13px"></div>
+                <div class="d-flex flex-wrap gap-2">
+                  @for (n of [1, 2, 3, 4, 5, 6]; track n) {
+                    <div class="skeleton" style="width: 64px; height: 32px; border-radius: 4px"></div>
+                  }
+                </div>
+              </div>
+            </div>
+          } @else if (hasFacets()) {
+            <div class="card border-0 rounded-0 shadow-sm product-list__facets mt-3">
             <div class="card-body">
+              <div class="d-flex align-items-center justify-content-between mb-3">
+                <h2 class="product-list__refine-title mb-0">Refine</h2>
+                @if (hasActiveFilters()) {
+                  <button
+                    type="button"
+                    class="btn btn-link btn-sm p-0 text-decoration-none"
+                    (click)="clearAllOptionFilters()"
+                  >
+                    Clear all
+                  </button>
+                }
+              </div>
               @for (group of optionFacets(); track group.optionName; let isFirstGroup = $first) {
                 <div class="facet-group" [class.mt-4]="!isFirstGroup">
                   <div class="d-flex align-items-center justify-content-between mb-2">
@@ -68,7 +125,7 @@
                       >
                         <path d="M6 9l6 6 6-6" />
                       </svg>
-                      <h2 class="mb-0">{{ group.optionName }}</h2>
+                      <h3 class="mb-0">{{ group.optionName }}</h3>
                     </button>
                     @if ((selectedOptions()[group.optionName] ?? []).length > 0) {
                       <button
@@ -102,10 +159,11 @@
               }
             </div>
           </div>
-        </aside>
-      }
+          }
+        </div>
+      </aside>
 
-      <div [class]="(facetsLoading() || hasFacets()) ? 'col-lg-9' : 'col-12'">
+      <div class="col-lg-9">
         <div #resultsTop class="results-top" aria-hidden="true"></div>
         @if (loading()) {
           <div class="row row-cols-2 row-cols-md-3 g-4" role="status">

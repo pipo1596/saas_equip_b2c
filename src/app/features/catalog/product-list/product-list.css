@@ -21,7 +21,11 @@
 }
 
 /* ---------- facets ---------- */
-.product-list__facets {
+/* The category tree and Refine cards stick together as one unit — only
+   `sticky-top` lived on the tree card itself, the Refine card (not sticky)
+   visually "ran away" down the page as you scrolled past the tree, opening
+   up a growing gap between the two. */
+.product-list__sidebar-sticky {
   top: 120px;
   /* Bootstrap's `.sticky-top` defaults to z-index:1020 — meant for things
      that should float above the whole page, but this sidebar is still
@@ -30,10 +34,18 @@
      (z-index 50 inside that), so it's brought back down below both. */
   z-index: 1;
 }
+.product-list__refine-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--slate-900);
+}
 .facet-group + .facet-group {
   margin-top: 28px;
 }
-.facet-group h2 {
+.facet-group h3 {
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 13px;

@@ -21,11 +21,28 @@ import {
   Product,
   ProductSearchParams,
 } from '../../../core/catalog/catalog-products';
+import {
+  CatalogCategory,
+  CatalogViewService,
+  allCategoryRoots,
+  findCategoryPath,
+} from '../../../core/catalog/catalog-view';
 import { LocationSelectionService } from '../../../core/location/location-selection';
 import { BreadcrumbNav } from '../../../shared/breadcrumb/breadcrumb-nav';
+import { CategoryTree } from '../../../shared/catalog/category-tree/category-tree';
 import { PayTagBadge } from '../../../shared/allotment/pay-tag';
 import { Footer } from '../../../shared/footer/footer';
 import { Header } from '../../../shared/header/header';
+
+// The pill row under the breadcrumb (e.g. "All Uniform | Long Sleeve |
+// Short Sleeve") — see `siblingPills` for how `source`/`activeId` are
+// chosen.
+export interface SiblingPills {
+  parentId: number;
+  parentLabel: string;
+  items: CatalogCategory[];
+  activeId: number;
+}
 
 const PAGE_SIZE = 24;
 const BUCKET_SLUGS = new Set(['clothing', 'footwear', 'gear']);
@@ -62,13 +79,14 @@ type CatalogScope =
 
 @Component({
   selector: 'app-product-list',
-  imports: [Header, Footer, RouterLink, CurrencyPipe, BreadcrumbNav, PayTagBadge],
+  imports: [Header, Footer, RouterLink, CurrencyPipe, BreadcrumbNav, PayTagBadge, CategoryTree],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './product-list.html',
   styleUrls: ['../../../shared/shared.css', './product-list.css'],
 })
 export class ProductList {
   private readonly catalogProductsService = inject(CatalogProductsService);
+  private readonly catalogViewService = inject(CatalogViewService);
   private readonly locationSelectionService = inject(LocationSelectionService);
   private readonly cartService = inject(CartService);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
@@ -99,6 +117,57 @@ export class ProductList {
   readonly activeCategoryId = computed(() => {
     const parsed = Number(this.categoryId());
     return Number.isFinite(parsed) && this.categoryId() ? parsed : null;
+  });
+
+  // The raw menu for the sidebar tree — shown on every page regardless of
+  // the current scope/search, independent of `*PRODUCT_LIST`/
+  // `*PRODUCT_FACETS`. `CategoryTree` builds its own three bucket-level
+  // roots from this, matching the header's own mega-menu tabs.
+  readonly menu = this.catalogViewService.menu;
+
+  // Every real category across every bucket, flattened — used for sibling-
+  // pill lookups below (buckets themselves don't participate in that).
+  readonly categoryRoots = computed(() => {
+    const menu = this.menu();
+    return menu ? allCategoryRoots(menu) : [];
+  });
+
+  // The route's own bucket slug (e.g. "footwear") when that bucket itself
+  // is the whole scope — `null` for a specific category, search, or the
+  // full catalog.
+  readonly activeBucketSlug = computed(() => {
+    const categoryId = this.categoryId();
+    return BUCKET_SLUGS.has(categoryId) ? categoryId : null;
+  });
+
+  // "All {parent}" plus its direct children, e.g. "All Uniform | Long
+  // Sleeve | Short Sleeve" — sourced from the active category's own
+  // children when it has any (browsing a parent directly), otherwise from
+  // its immediate parent's children (browsing one specific leaf). `null`
+  // when there's no category in scope at all (bucket/search/full-catalog),
+  // or the active category has neither children nor a parent to borrow
+  // siblings from.
+  readonly siblingPills = computed<SiblingPills | null>(() => {
+    const activeId = this.activeCategoryId();
+    if (activeId === null) {
+      return null;
+    }
+    const path = findCategoryPath(this.categoryRoots(), activeId);
+    if (!path) {
+      return null;
+    }
+    const node = path[path.length - 1];
+    const parent = path.length >= 2 ? path[path.length - 2] : null;
+    const source = node.children.length > 0 ? node : parent;
+    if (!source || source.children.length === 0) {
+      return null;
+    }
+    return {
+      parentId: source.progCatId,
+      parentLabel: source.categoryName,
+      items: source.children,
+      activeId: source === node ? source.progCatId : node.progCatId,
+    };
   });
 
   private readonly scope = computed<CatalogScope>(() => {
@@ -150,9 +219,24 @@ export class ProductList {
   readonly pageSize = PAGE_SIZE;
   readonly totalPages = computed(() => Math.max(1, Math.ceil(this.totalCount() / this.pageSize)));
 
-  // Lets the sidebar column disappear entirely (rather than sit empty)
-  // when this scope has no facets to narrow by at all.
+  // Lets the "Refine" box disappear entirely (rather than sit empty) when
+  // this scope has no option facets to narrow by at all — the category
+  // tree above it always shows regardless.
   readonly hasFacets = computed(() => this.optionFacets().length > 0);
+
+  // Every selected (optionName, value) pair, flattened for the "Applied:"
+  // chip row above the grid — each chip's own remove button just toggles
+  // that one value back off via `toggleOption`.
+  readonly appliedFilterChips = computed(() => {
+    const chips: { optionName: string; value: string }[] = [];
+    for (const [optionName, values] of Object.entries(this.selectedOptions())) {
+      for (const value of values ?? []) {
+        chips.push({ optionName, value });
+      }
+    }
+    return chips;
+  });
+  readonly hasActiveFilters = computed(() => this.appliedFilterChips().length > 0);
 
   // A new category/search/bucket always starts back at page 1 with no
   // filters selected — only reacts to the route-bound inputs, not the
@@ -163,6 +247,16 @@ export class ProductList {
     this.q();
     this.page.set(1);
     this.selectedOptions.set({});
+  });
+
+  // The sidebar category tree's own data — same `*MENU` the header's mega
+  // menu uses, cached per location by `CatalogViewService`, so this is a
+  // no-op whenever the header's already loaded it for this location.
+  private readonly loadMenuOnLocationChange = effect(() => {
+    const location = this.locationSelectionService.activeLocation();
+    if (location && this.isBrowser) {
+      this.catalogViewService.load(location.locationId).subscribe();
+    }
   });
 
   // Bumped on every new request of each kind — a response is only applied if
@@ -289,6 +383,12 @@ export class ProductList {
 
   clearOptionFilter(optionName: string): void {
     this.selectedOptions.update((current) => ({ ...current, [optionName]: [] }));
+    this.page.set(1);
+    this.scrollResultsIntoView();
+  }
+
+  clearAllOptionFilters(): void {
+    this.selectedOptions.set({});
     this.page.set(1);
     this.scrollResultsIntoView();
   }
