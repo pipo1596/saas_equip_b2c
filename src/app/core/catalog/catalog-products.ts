@@ -51,12 +51,6 @@ interface RawProduct extends Omit<Product, 'priceRange' | 'pointsRange' | 'color
   progCatIds: number[] | null;
 }
 
-export interface CategoryFacet {
-  progCatId: number;
-  categoryName: string;
-  count: number;
-}
-
 // `valueCode` is mainly for a "Color" group (hex-ish swatch codes) — an
 // empty string means this option has no swatch, e.g. Size/Material.
 export interface OptionFacetValue {
@@ -95,19 +89,19 @@ interface RawProductListResult extends Omit<ProductListResult, 'breadcrumb' | 'p
 
 // `*PRODUCT_FACETS` — the sidebar. Re-fetched only when scope/search/filters
 // change, never on a bare page change (its counts don't depend on `page`).
+// The backend no longer sends category facets here — only option groups
+// (Size, Color, ...).
 export interface ProductFacetsResult {
-  categoryFacets: CategoryFacet[];
   optionFacets: OptionFacetGroup[];
 }
 
 interface RawProductFacetsResult {
-  categoryFacets: CategoryFacet[] | null;
   optionFacets: (Omit<OptionFacetGroup, 'values'> & { values: OptionFacetValue[] | null })[] | null;
 }
 
 // A failure is always `{ success: false, message }`; a success response
 // never has a `success` key at all — discriminate on a field that's only
-// ever present on success (`products`/`categoryFacets` below), matching the
+// ever present on success (`products`/`optionFacets` below), matching the
 // pattern already used for `*GET`/`*AVAIL`/`*GET_SKU` in `product-detail.ts`.
 interface ApiFailure {
   success: false;
@@ -171,7 +165,6 @@ function normalizeProductListResult(result: RawProductListResult): ProductListRe
 
 function normalizeFacetsResult(result: RawProductFacetsResult): ProductFacetsResult {
   return {
-    categoryFacets: result.categoryFacets ?? [],
     optionFacets: (result.optionFacets ?? []).map((group) => ({
       ...group,
       values: group.values ?? [],
@@ -231,7 +224,7 @@ export class CatalogProductsService {
       )
       .pipe(
         map((response) => {
-          if (!('categoryFacets' in response)) {
+          if (!('optionFacets' in response)) {
             throw new Error(response.message ?? 'We could not load filters right now.');
           }
           return normalizeFacetsResult(response);

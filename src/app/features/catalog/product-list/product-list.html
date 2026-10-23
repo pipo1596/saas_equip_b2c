@@ -44,28 +44,8 @@
         <aside class="col-lg-3">
           <div class="card border-0 rounded-0 shadow-sm product-list__facets sticky-top">
             <div class="card-body">
-              @if (visibleCategoryFacets().length > 0) {
-                <div class="facet-group">
-                  <h2>Category</h2>
-                  <ul class="facet-list list-unstyled mb-0">
-                    @for (facet of visibleCategoryFacets(); track facet.progCatId) {
-                      <li>
-                        <a
-                          [routerLink]="['/products', facet.progCatId]"
-                          [queryParams]="{ name: facet.categoryName }"
-                          class="facet-link"
-                          [class.facet-link--active]="facet.progCatId === activeCategoryId()"
-                        >
-                          <span>{{ facet.categoryName }}</span>
-                          <span class="badge rounded text-bg-light">{{ facet.count }}</span>
-                        </a>
-                      </li>
-                    }
-                  </ul>
-                </div>
-              }
               @for (group of optionFacets(); track group.optionName; let isFirstGroup = $first) {
-                <div class="facet-group" [class.mt-4]="visibleCategoryFacets().length > 0 || !isFirstGroup">
+                <div class="facet-group" [class.mt-4]="!isFirstGroup">
                   <div class="d-flex align-items-center justify-content-between mb-2">
                     <button
                       type="button"

@@ -17,12 +17,10 @@ import { CartService, PayTag, ruleForCategories } from '../../../core/cart/cart'
 import { Breadcrumb, hasCrumbs } from '../../../core/catalog/breadcrumb';
 import {
   CatalogProductsService,
-  CategoryFacet,
   OptionFacetGroup,
   Product,
   ProductSearchParams,
 } from '../../../core/catalog/catalog-products';
-import { CatalogViewService } from '../../../core/catalog/catalog-view';
 import { LocationSelectionService } from '../../../core/location/location-selection';
 import { BreadcrumbNav } from '../../../shared/breadcrumb/breadcrumb-nav';
 import { PayTagBadge } from '../../../shared/allotment/pay-tag';
@@ -71,7 +69,6 @@ type CatalogScope =
 })
 export class ProductList {
   private readonly catalogProductsService = inject(CatalogProductsService);
-  private readonly catalogViewService = inject(CatalogViewService);
   private readonly locationSelectionService = inject(LocationSelectionService);
   private readonly cartService = inject(CartService);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
@@ -95,9 +92,10 @@ export class ProductList {
     this.q() ? `Search results for "${this.q()}"` : this.name() || 'Category',
   );
 
-  // Highlights the currently browsed category in the facet list — only
-  // meaningful when the route's categoryId is itself a real numeric
-  // category id (not a bucket slug or "full-catalog").
+  // Carried onto each product card's link back to the grid (via product
+  // detail's own "back" breadcrumb) — only meaningful when the route's
+  // categoryId is itself a real numeric category id (not a bucket slug or
+  // "full-catalog").
   readonly activeCategoryId = computed(() => {
     const parsed = Number(this.categoryId());
     return Number.isFinite(parsed) && this.categoryId() ? parsed : null;
@@ -132,23 +130,6 @@ export class ProductList {
   // one when `categoryId` was sent.
   readonly breadcrumb = signal<Breadcrumb | null>(null);
   readonly hasBreadcrumb = computed(() => hasCrumbs(this.breadcrumb()));
-  readonly categoryFacets = signal<CategoryFacet[]>([]);
-  // Categories with zero matches in the current scope aren't worth showing
-  // as a filter option at all, and this list should only ever offer the
-  // shoppable "leaf" categories — never a parent/group node — so it's
-  // cross-referenced against the same leaf-category set the Home page's
-  // "Shop by category" carousel uses. Falls back to showing every facet
-  // with a positive count while that leaf list is still loading, rather
-  // than flashing an empty sidebar.
-  readonly visibleCategoryFacets = computed(() => {
-    const withCount = this.categoryFacets().filter((facet) => facet.count > 0);
-    const leafCategories = this.catalogViewService.categories();
-    if (leafCategories.length === 0) {
-      return withCount;
-    }
-    const leafIds = new Set(leafCategories.map((category) => category.progCatId));
-    return withCount.filter((facet) => leafIds.has(facet.progCatId));
-  });
   // Sorted with "Size" first (see `sizeFirst`) whenever it's (re)populated.
   readonly optionFacets = signal<OptionFacetGroup[]>([]);
   // Which option groups are collapsed, by `optionName` — reset every time
@@ -171,9 +152,7 @@ export class ProductList {
 
   // Lets the sidebar column disappear entirely (rather than sit empty)
   // when this scope has no facets to narrow by at all.
-  readonly hasFacets = computed(
-    () => this.visibleCategoryFacets().length > 0 || this.optionFacets().length > 0,
-  );
+  readonly hasFacets = computed(() => this.optionFacets().length > 0);
 
   // A new category/search/bucket always starts back at page 1 with no
   // filters selected — only reacts to the route-bound inputs, not the
@@ -184,17 +163,6 @@ export class ProductList {
     this.q();
     this.page.set(1);
     this.selectedOptions.set({});
-  });
-
-  // Same leaf-category load the Home page uses — kept here too since a
-  // shopper can land directly on a product list without ever visiting Home.
-  // `CatalogViewService` caches per location, so this is a no-op if it's
-  // already loaded.
-  private readonly loadLeafCategoriesOnLocationChange = effect(() => {
-    const location = this.locationSelectionService.activeLocation();
-    if (location && this.isBrowser) {
-      this.catalogViewService.loadCategories(location.locationId).subscribe();
-    }
   });
 
   // Bumped on every new request of each kind — a response is only applied if
@@ -272,7 +240,6 @@ export class ProductList {
         if (requestId !== this.facetsRequestId) {
           return;
         }
-        this.categoryFacets.set(result.categoryFacets);
         // Only refresh the option facet groups themselves from an
         // unfiltered response — once a value is selected, the backend
         // narrows (and sometimes reorders/drops) facets to match, which
@@ -280,8 +247,6 @@ export class ProductList {
         // it. Freeze it at whatever it looked like before any filter was
         // applied; `resetOnRouteChange` clears selections (and so re-arms
         // this) whenever the category/search scope itself changes.
-        // `categoryFacets` doesn't need the same treatment — its counts
-        // are scope-only and unaffected by optionFilters.
         if (!hasActiveOptionFilters) {
           const sorted = sortOptionGroupsByPriority(result.optionFacets);
           this.optionFacets.set(sorted);

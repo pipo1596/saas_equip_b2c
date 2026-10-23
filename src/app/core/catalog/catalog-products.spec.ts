@@ -27,7 +27,6 @@ const SAMPLE_LIST: ProductListResult = {
 };
 
 const SAMPLE_FACETS: ProductFacetsResult = {
-  categoryFacets: [{ progCatId: 5510, categoryName: 'Long sleeve', count: 14 }],
   optionFacets: [
     { optionName: 'Size', values: [{ value: 'M', valueCode: '', count: 9 }] },
     { optionName: 'Color', values: [{ value: 'Black', valueCode: '#0B0B0B', count: 7 }] },
@@ -256,7 +255,7 @@ describe('CatalogProductsService', () => {
       req.flush(SAMPLE_FACETS);
     });
 
-    it('returns categoryFacets and optionFacets as-is', () => {
+    it('returns optionFacets as-is', () => {
       let result: ProductFacetsResult | undefined;
       service.searchFacets({ locationId: 18, categoryId: 5510 }).subscribe((r) => (result = r));
 
@@ -265,17 +264,24 @@ describe('CatalogProductsService', () => {
       expect(result).toEqual(SAMPLE_FACETS);
     });
 
-    it('normalizes a null categoryFacets/optionFacets and a null values array within a group', () => {
+    it('normalizes a null optionFacets and a null values array within a group', () => {
       let result: ProductFacetsResult | undefined;
       service.searchFacets({ locationId: 18, categoryId: 5510 }).subscribe((r) => (result = r));
 
       httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPCVEW').flush({
-        categoryFacets: null,
         optionFacets: [{ optionName: 'Size', values: null }],
       } as never);
 
-      expect(result?.categoryFacets).toEqual([]);
       expect(result?.optionFacets).toEqual([{ optionName: 'Size', values: [] }]);
+    });
+
+    it('normalizes a fully missing optionFacets field to an empty array', () => {
+      let result: ProductFacetsResult | undefined;
+      service.searchFacets({ locationId: 18, categoryId: 5510 }).subscribe((r) => (result = r));
+
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPCVEW').flush({ optionFacets: null } as never);
+
+      expect(result?.optionFacets).toEqual([]);
     });
 
     it('surfaces a business-level failure as an error, using the response message', () => {

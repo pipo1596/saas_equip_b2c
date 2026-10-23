@@ -42,27 +42,6 @@
   color: var(--slate-900);
   margin-bottom: 12px;
 }
-.facet-link {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 8px;
-  margin: 0 -8px;
-  border-radius: 8px;
-  font-size: 13.5px;
-  color: var(--slate-700);
-  text-decoration: none;
-}
-.facet-link:hover {
-  background: var(--slate-100);
-  color: var(--action);
-}
-.facet-link--active {
-  background: var(--slate-100);
-  color: var(--navy);
-  font-weight: 600;
-}
 .swatch {
   width: 14px;
   height: 14px;
