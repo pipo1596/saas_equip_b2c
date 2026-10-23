@@ -71,6 +71,24 @@ export function categoryProductCount(category: CatalogCategory): number {
   return category.children.reduce((sum, child) => sum + categoryProductCount(child), 0);
 }
 
+// A category whose one and only child shares its exact name (case/whitespace
+// insensitive) is a redundant wrapper — display-wise, that child's row adds
+// nothing, so it's skipped and its own children are promoted to show
+// directly under the parent instead. Runs through however many such layers
+// chain together, and recurses into every remaining branch. The parent's own
+// identity (`progCatId`/name) is kept — only the redundant child's row
+// disappears, never the parent's.
+export function collapseSameNameChild(category: CatalogCategory): CatalogCategory {
+  let current = category;
+  while (
+    current.children.length === 1 &&
+    current.children[0].categoryName.trim().toLowerCase() === current.categoryName.trim().toLowerCase()
+  ) {
+    current = { ...current, children: current.children[0].children };
+  }
+  return { ...current, children: current.children.map(collapseSameNameChild) };
+}
+
 // Every root array in a `CatalogMenu` flattened into one list — the sidebar
 // category tree shows the whole catalog (every bucket) at once, regardless
 // of which bucket/category/search is currently being browsed.

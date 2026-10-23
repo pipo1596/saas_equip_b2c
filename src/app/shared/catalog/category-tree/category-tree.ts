@@ -5,6 +5,7 @@ import {
   CatalogCategory,
   CatalogMenu,
   categoryProductCount,
+  collapseSameNameChild,
   collectCategoryIds,
   filterCategoryTree,
   findCategoryPath,
@@ -61,11 +62,25 @@ export class CategoryTree {
       return [];
     }
     return BUCKET_DEFS.map((def) => {
-      const categories = menu[def.slug];
+      // A bucket whose own single top-level category duplicates the
+      // bucket's own label (e.g. a "Clothing" bucket holding just one
+      // category also named "Clothing") is exactly the same redundant-
+      // wrapper situation `collapseSameNameChild` already handles deeper in
+      // the tree — reuse it by treating the bucket itself as a throwaway
+      // pseudo-category just long enough to borrow that logic.
+      const collapsed = collapseSameNameChild({
+        progCatId: def.id,
+        parentProgCatId: null,
+        categoryName: def.label,
+        sortOrder: 0,
+        status: 'ACTIVE',
+        productCount: 0,
+        children: menu[def.slug],
+      });
       return {
         ...def,
-        categories,
-        count: categories.reduce((sum, category) => sum + categoryProductCount(category), 0),
+        categories: collapsed.children,
+        count: collapsed.children.reduce((sum, category) => sum + categoryProductCount(category), 0),
       };
     });
   });

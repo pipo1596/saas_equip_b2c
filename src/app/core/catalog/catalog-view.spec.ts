@@ -9,6 +9,7 @@ import {
   LeafCategoriesResponse,
   allCategoryRoots,
   categoryProductCount,
+  collapseSameNameChild,
   collectCategoryIds,
   filterCategoryTree,
   findCategoryPath,
@@ -268,6 +269,157 @@ describe('category tree helpers', () => {
   describe('collectCategoryIds', () => {
     it('collects every id in the tree, including nested descendants', () => {
       expect(collectCategoryIds(MENU.clothing)).toEqual([0, 1, 2, 3]);
+    });
+  });
+
+  describe('collapseSameNameChild', () => {
+    it("skips a lone child that duplicates the parent's own name, promoting its children up", () => {
+      const wrapped: CatalogCategory = {
+        progCatId: 99,
+        parentProgCatId: null,
+        categoryName: 'Clothing',
+        sortOrder: 0,
+        status: 'ACTIVE',
+        productCount: 0,
+        children: [
+          {
+            progCatId: 100,
+            parentProgCatId: 99,
+            categoryName: 'Clothing',
+            sortOrder: 0,
+            status: 'ACTIVE',
+            productCount: 0,
+            children: [UNIFORM],
+          },
+        ],
+      };
+
+      const result = collapseSameNameChild(wrapped);
+
+      expect(result.progCatId).toBe(99);
+      expect(result.categoryName).toBe('Clothing');
+      expect(result.children).toEqual([UNIFORM]);
+    });
+
+    it('matches case- and whitespace-insensitively', () => {
+      const wrapped: CatalogCategory = {
+        progCatId: 99,
+        parentProgCatId: null,
+        categoryName: 'Clothing',
+        sortOrder: 0,
+        status: 'ACTIVE',
+        productCount: 0,
+        children: [
+          {
+            progCatId: 100,
+            parentProgCatId: 99,
+            categoryName: ' CLOTHING ',
+            sortOrder: 0,
+            status: 'ACTIVE',
+            productCount: 0,
+            children: [UNIFORM],
+          },
+        ],
+      };
+
+      expect(collapseSameNameChild(wrapped).children).toEqual([UNIFORM]);
+    });
+
+    it('collapses through a chain of several same-named single-child layers', () => {
+      const chain: CatalogCategory = {
+        progCatId: 1,
+        parentProgCatId: null,
+        categoryName: 'Clothing',
+        sortOrder: 0,
+        status: 'ACTIVE',
+        productCount: 0,
+        children: [
+          {
+            progCatId: 2,
+            parentProgCatId: 1,
+            categoryName: 'Clothing',
+            sortOrder: 0,
+            status: 'ACTIVE',
+            productCount: 0,
+            children: [
+              {
+                progCatId: 3,
+                parentProgCatId: 2,
+                categoryName: 'Clothing',
+                sortOrder: 0,
+                status: 'ACTIVE',
+                productCount: 0,
+                children: [UNIFORM],
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = collapseSameNameChild(chain);
+      expect(result.progCatId).toBe(1);
+      expect(result.children).toEqual([UNIFORM]);
+    });
+
+    it('leaves a node alone when its single child has a different name', () => {
+      expect(collapseSameNameChild(UNIFORM)).toEqual(UNIFORM);
+    });
+
+    it('leaves a node alone when it has more than one child, even if one shares its name', () => {
+      const multiChild: CatalogCategory = {
+        progCatId: 1,
+        parentProgCatId: null,
+        categoryName: 'Clothing',
+        sortOrder: 0,
+        status: 'ACTIVE',
+        productCount: 0,
+        children: [
+          { ...LEAF_A, categoryName: 'Clothing' },
+          LEAF_B,
+        ],
+      };
+
+      expect(collapseSameNameChild(multiChild).children).toEqual([
+        { ...LEAF_A, categoryName: 'Clothing' },
+        LEAF_B,
+      ]);
+    });
+
+    it('recurses into every remaining branch, not just the top level', () => {
+      const tree: CatalogCategory = {
+        progCatId: 0,
+        parentProgCatId: null,
+        categoryName: 'Clothing',
+        sortOrder: 0,
+        status: 'ACTIVE',
+        productCount: 0,
+        children: [
+          {
+            progCatId: 1,
+            parentProgCatId: 0,
+            categoryName: 'Uniform',
+            sortOrder: 0,
+            status: 'ACTIVE',
+            productCount: 0,
+            children: [
+              {
+                progCatId: 2,
+                parentProgCatId: 1,
+                categoryName: 'Uniform',
+                sortOrder: 0,
+                status: 'ACTIVE',
+                productCount: 0,
+                children: [LEAF_A, LEAF_B],
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = collapseSameNameChild(tree);
+      expect(result.children).toEqual([
+        { progCatId: 1, parentProgCatId: 0, categoryName: 'Uniform', sortOrder: 0, status: 'ACTIVE', productCount: 0, children: [LEAF_A, LEAF_B] },
+      ]);
     });
   });
 });

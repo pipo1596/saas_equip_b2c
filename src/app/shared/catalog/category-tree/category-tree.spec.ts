@@ -205,4 +205,29 @@ describe('CategoryTree', () => {
     fixture.detectChanges();
     expect(linkNames(fixture)).toEqual(['Clothing', 'Uniform', 'Footwear', 'Gear']);
   });
+
+  it('skips a bucket\'s own category when it duplicates the bucket\'s own name, showing its children directly', () => {
+    const duplicateWrapper: CatalogCategory = {
+      progCatId: 50,
+      parentProgCatId: null,
+      categoryName: 'Clothing',
+      sortOrder: 0,
+      status: 'ACTIVE',
+      productCount: 0,
+      children: [UNIFORM],
+    };
+    const fixture = TestBed.createComponent(CategoryTree);
+    fixture.componentRef.setInput('menu', { clothing: [duplicateWrapper], footwear: [], gear: [] });
+    fixture.detectChanges();
+
+    const toggle: HTMLButtonElement = fixture.nativeElement.querySelector('.category-tree__toggle');
+    toggle.click();
+    fixture.detectChanges();
+
+    // "Clothing" (the bucket) expands straight to "Uniform" — the
+    // duplicate-named wrapper category in between never shows.
+    expect(linkNames(fixture)).toEqual(['Clothing', 'Uniform', 'Footwear', 'Gear']);
+    const badge = fixture.nativeElement.querySelector('.category-tree__link .badge');
+    expect(badge?.textContent?.trim()).toBe('28');
+  });
 });
