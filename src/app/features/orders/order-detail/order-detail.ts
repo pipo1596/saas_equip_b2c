@@ -314,6 +314,8 @@ export class OrderDetailPage implements OnInit {
   // immediately instead of waiting for some unrelated cart refresh.
   private refreshApprovalBadge(): void {
     const locationId = this.locationSelectionService.activeLocation()?.locationId ?? null;
-    this.cartService.load(locationId).subscribe({ error: () => {} });
+    // Forced — this exists specifically to get the real current count right
+    // now, not whatever was cached from moments ago.
+    this.cartService.load(locationId, { force: true }).subscribe({ error: () => {} });
   }
 }

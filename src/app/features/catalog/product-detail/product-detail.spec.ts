@@ -450,6 +450,33 @@ describe('ProductDetail', () => {
     expect(httpMock.match((req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCPRDDTL')).toHaveLength(0);
   });
 
+  it('fires the empty-selection *AVAIL check in parallel with the product *GET, not after it resolves', () => {
+    const fixture = TestBed.createComponent(ProductDetail);
+    fixture.componentRef.setInput('productPk', '12345');
+    fixture.detectChanges();
+
+    // Both already pending at once — *AVAIL doesn't wait on the product
+    // *GET to resolve first (each `expectRequest` call fails if its own
+    // request isn't there yet, regardless of the other).
+    const getReq = expectRequest(httpMock, '*GET');
+    const availReq = expectRequest(httpMock, '*AVAIL');
+    expect(availReq.request.body).toEqual({
+      action: '*AVAIL',
+      productPk: 12345,
+      selections: [],
+      locationId: null,
+    });
+
+    // Resolving *AVAIL first (before the product data even arrives) doesn't
+    // blow up or fire a second *AVAIL call once the product does land.
+    availReq.flush(AVAIL_EVERYTHING);
+    getReq.flush(RESPONSE);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.product()?.title).toBe("Men's Trail Jacket");
+    expect(countRequests(httpMock, '*AVAIL')).toBe(0);
+  });
+
   it('should check availability with an empty selection on first load, and prompt for a pick before showing price', () => {
     const fixture = TestBed.createComponent(ProductDetail);
     const detail = fixture.componentInstance;

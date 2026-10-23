@@ -71,8 +71,8 @@
       <div class="row g-4">
         <div class="col-lg-6">
           <div class="ratio ratio-1x1 bg-white product-detail__hero">
-            @if (activeImageUrl()) {
-              <img [src]="activeImageUrl()" [alt]="pageTitle()" class="object-fit-contain p-4" />
+            @if (activeImageUrl(); as imageUrl) {
+              <img [ngSrc]="imageUrl" [alt]="pageTitle()" class="object-fit-contain p-4" fill priority />
             } @else {
               <div class="d-flex align-items-center justify-content-center text-secondary">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -100,7 +100,13 @@
                     [class.product-detail__thumb--active]="image.imageUrl === activeImageUrl()"
                     (click)="selectImage(image)"
                   >
-                    <img [src]="image.imageUrl" [alt]="image.imageDesc || pageTitle()" class="product-detail__thumb-img" />
+                    <img
+                      [ngSrc]="image.imageUrl"
+                      [alt]="image.imageDesc || pageTitle()"
+                      class="product-detail__thumb-img"
+                      width="64"
+                      height="64"
+                    />
                   </button>
                 }
               </div>

@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { Observable, finalize, map, shareReplay, tap } from 'rxjs';
+import { Observable, finalize, map, of, shareReplay, tap } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import { Allotment, RawAllotment, normalizeAllotment } from './allotment';
@@ -105,6 +105,16 @@ const EMPTY_CART: Cart = {
   roleRequiresApproval: 'N',
 };
 
+// How long a plain `load()` (no `productPk`) stays fresh enough to reuse
+// without firing a new `*GET` — the header re-calls this on every single
+// navigation (it's destroyed and recreated per route, see
+// `NoRouteReuseStrategy`), so without this, clicking through a few pages in
+// a row refetches the full cart+allotment every single click for no reason.
+// Long enough to absorb that; short enough that the cart still catches up
+// quickly to anything that actually changed it elsewhere (another tab, a
+// placed order, etc.).
+export const FRESHNESS_WINDOW_MS = 10_000;
+
 interface RawCartItem extends Omit<CartItem, 'options' | 'progCatIds'> {
   options: CartItemOption[] | null;
   progCatIds: number[] | null;
@@ -149,9 +159,13 @@ export class CartService {
 
   // Drops back to an empty cart without a network call — used when signing
   // out (including ending a shop-as session), so a stale cart never
-  // momentarily shows through before the next real `load()`.
+  // momentarily shows through before the next real `load()`. Also clears
+  // the freshness window: without this, a `load()` call for the next
+  // session (different employee/location) could reuse this now-stale
+  // `EMPTY_CART` instead of actually fetching.
   reset(): void {
     this.cart.set(EMPTY_CART);
+    this.freshUntil = 0;
   }
 
   // True once the employee actually has a points rule, and no dollar rule
@@ -219,10 +233,27 @@ export class CartService {
   // one that lands after the in-flight one has already resolved.
   private readonly pendingLoads = new Map<string, Observable<Cart>>();
 
+  // Epoch ms until which a plain reload can reuse the current `cart` signal
+  // instead of hitting the network, and which `locationId` that freshness
+  // actually applies to — see `FRESHNESS_WINDOW_MS`. Both are updated by
+  // `request()` on every successful response (load *or* mutation), since
+  // either one leaves `cart` holding a known-current value for whatever
+  // `locationId` it was sent with. Keying on `locationId` too matters once
+  // the shopper switches locations: without it, a reload right after
+  // switching could still serve back the *previous* location's cached
+  // allotment breakdown instead of actually fetching the new one.
+  private freshUntil = 0;
+  private freshLocationId: number | null = null;
+
   // `locationId` scopes the allotment breakdown to the shopper's active
   // location (the same value passed to `APCTPCVEW`) — `null` only in the
   // narrow window before one's known yet. `productPk`, product detail page
   // only, also returns `allotment.productTag` for that specific product.
+  // `force` skips the freshness window below — for a caller that knows the
+  // cart just changed server-side through some other action (placing an
+  // order, a `PCH` cart-changed response, approving/rejecting an order that
+  // affects the approvals badge) and needs the real current state right
+  // now, not whatever was cached a moment ago.
   //
   // The header's own effect calls this on every navigation (it's
   // re-instantiated per route) with the same `locationId` a page like cart
@@ -230,7 +261,21 @@ export class CartService {
   // de-duping, both fire their own full `*GET` within the same tick. This
   // shares one in-flight request across every caller with matching params
   // instead.
-  load(locationId: number | null, productPk?: number): Observable<Cart> {
+  load(locationId: number | null, options: { productPk?: number; force?: boolean } = {}): Observable<Cart> {
+    const { productPk, force = false } = options;
+
+    // Only the plain reload shape (no `productPk`) is eligible — a product
+    // detail call needs that specific product's `productTag`, which a
+    // cached plain reload's response never carried in the first place.
+    if (
+      !force &&
+      productPk === undefined &&
+      locationId === this.freshLocationId &&
+      Date.now() < this.freshUntil
+    ) {
+      return of(this.cart());
+    }
+
     const key = `${locationId}:${productPk ?? ''}`;
     const pending = this.pendingLoads.get(key);
     if (pending) {
@@ -305,7 +350,11 @@ export class CartService {
         }
         return normalizeCart(response);
       }),
-      tap((cart) => this.cart.set(cart)),
+      tap((cart) => {
+        this.cart.set(cart);
+        this.freshUntil = Date.now() + FRESHNESS_WINDOW_MS;
+        this.freshLocationId = body['locationId'] as number | null;
+      }),
     );
   }
 }

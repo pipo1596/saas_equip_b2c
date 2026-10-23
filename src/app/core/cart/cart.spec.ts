@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 
-import { Cart, CartService } from './cart';
+import { Cart, CartService, FRESHNESS_WINDOW_MS } from './cart';
 
 const LOCATION_ID = 18;
 
@@ -134,6 +134,39 @@ describe('CartService', () => {
     });
   });
 
+  describe('reset', () => {
+    it('empties the cart without a network call', () => {
+      service.load(LOCATION_ID).subscribe();
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush(CART);
+
+      service.reset();
+
+      httpMock.expectNone('/cgi/APPSCDSPCH?SEPGM=APCCART');
+      expect(service.cart()).toEqual({
+        cartId: null,
+        itemCount: 0,
+        subtotalPrice: 0,
+        subtotalPoints: null,
+        items: [],
+        allotment: null,
+        roleRequiresApproval: 'N',
+      });
+    });
+
+    it('clears the freshness window, so the next load() for a new session always refetches', () => {
+      service.load(LOCATION_ID).subscribe();
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush(CART);
+
+      service.reset();
+
+      // Without clearing the freshness window, this would wrongly reuse the
+      // now-stale `EMPTY_CART` from `reset()` instead of actually fetching
+      // the new session's real cart.
+      service.load(LOCATION_ID).subscribe();
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush(CART);
+    });
+  });
+
   describe('load', () => {
     it('posts *GET with the locationId and updates the cart signal', () => {
       let result: Cart | undefined;
@@ -158,7 +191,7 @@ describe('CartService', () => {
     });
 
     it('includes productPk only when given (product detail page)', () => {
-      service.load(LOCATION_ID, 12345).subscribe();
+      service.load(LOCATION_ID, { productPk: 12345 }).subscribe();
 
       const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART');
       expect(req.request.body).toEqual({
@@ -183,18 +216,54 @@ describe('CartService', () => {
 
     it('does not share across calls with different params (e.g. a productPk lookup vs. the plain reload)', () => {
       service.load(LOCATION_ID).subscribe();
-      service.load(LOCATION_ID, 12345).subscribe();
+      service.load(LOCATION_ID, { productPk: 12345 }).subscribe();
 
       const requests = httpMock.match('/cgi/APPSCDSPCH?SEPGM=APCCART');
       expect(requests.length).toBe(2);
       requests.forEach((req) => req.flush(CART));
     });
 
-    it('fires a fresh *GET for a later call once the in-flight one has already settled', () => {
+    it('reuses the cart signal for a later plain reload within the freshness window, instead of firing a second *GET', () => {
       service.load(LOCATION_ID).subscribe();
       httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush(CART);
 
+      let result: Cart | undefined;
+      service.load(LOCATION_ID).subscribe((cart) => (result = cart));
+
+      httpMock.expectNone('/cgi/APPSCDSPCH?SEPGM=APCCART');
+      expect(result).toEqual(CART);
+    });
+
+    it('fires a fresh *GET for a plain reload once the freshness window has elapsed', () => {
+      vi.useFakeTimers();
+      try {
+        service.load(LOCATION_ID).subscribe();
+        httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush(CART);
+
+        vi.advanceTimersByTime(FRESHNESS_WINDOW_MS + 1);
+
+        service.load(LOCATION_ID).subscribe();
+        httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush(CART);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('does not reuse the cache for a different locationId, even within the freshness window', () => {
       service.load(LOCATION_ID).subscribe();
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush(CART);
+
+      service.load(LOCATION_ID + 1).subscribe();
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART');
+      expect(req.request.body).toEqual({ action: '*GET', locationId: LOCATION_ID + 1 });
+      req.flush(CART);
+    });
+
+    it('bypasses the freshness window when force is set', () => {
+      service.load(LOCATION_ID).subscribe();
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush(CART);
+
+      service.load(LOCATION_ID, { force: true }).subscribe();
       httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush(CART);
     });
 
@@ -294,7 +363,7 @@ describe('CartService', () => {
 
       it('passes through lineTags and productTag as-is', () => {
         let result: Cart | undefined;
-        service.load(LOCATION_ID, 123).subscribe((cart) => (result = cart));
+        service.load(LOCATION_ID, { productPk: 123 }).subscribe((cart) => (result = cart));
 
         httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush({
           ...CART,

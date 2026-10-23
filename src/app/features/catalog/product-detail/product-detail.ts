@@ -1,4 +1,4 @@
-import { CurrencyPipe, isPlatformBrowser } from '@angular/common';
+import { CurrencyPipe, NgOptimizedImage, isPlatformBrowser } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -46,7 +46,16 @@ import { Header } from '../../../shared/header/header';
 
 @Component({
   selector: 'app-product-detail',
-  imports: [Header, Footer, RouterLink, CurrencyPipe, BreadcrumbNav, PayTagBadge, AllotmentCoverageCard],
+  imports: [
+    Header,
+    Footer,
+    RouterLink,
+    CurrencyPipe,
+    NgOptimizedImage,
+    BreadcrumbNav,
+    PayTagBadge,
+    AllotmentCoverageCard,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './product-detail.html',
   styleUrls: ['../../../shared/shared.css', './product-detail.css'],
@@ -298,11 +307,29 @@ export class ProductDetail implements OnInit {
   // options at all (`axes` empty): a zero-axis "selection" is trivially
   // complete, so this is exactly how a single-SKU product resolves its one
   // SKU without a shopper ever having anything to pick.
+  //
+  // Deliberately does *not* wait on `product()` — the very first call (empty
+  // `selections`) only needs `productPk`/`locationId`, both known from the
+  // route before the product's own `*GET` has resolved at all. Gating on
+  // `product()` would serialize "load the product, *then* check
+  // availability" for no reason; this way the two fire in parallel, so
+  // pricing/"Add to Cart" can resolve about as fast as the product data
+  // itself instead of a full round trip later. `product()` was also dropped
+  // as a tracked dependency — the first (and typically only) run already
+  // happens at construction, off `productPk`/`selections` alone, both
+  // already at their real values by then; `applyProductDetailData`
+  // deliberately never re-assigns `selections` once the product arrives
+  // (see its own comment) specifically so this doesn't fire a redundant
+  // second time for the same still-empty selection.
   private readonly checkAvailabilityOnSelectionChange = effect(() => {
     const productPk = Number(this.productPk());
-    const product = this.product();
     const selections = this.selections();
-    if (!this.isBrowser || !product || !Number.isFinite(productPk)) {
+    // `!this.productPk()` matters on its own: `Number('')` is `0`, a
+    // perfectly finite number, so `Number.isFinite` alone doesn't catch a
+    // route with no `productPk` bound at all — this used to be masked by
+    // also gating on `product()` (always null with nothing to load), which
+    // this effect no longer waits on.
+    if (!this.isBrowser || !this.productPk() || !Number.isFinite(productPk)) {
       return;
     }
 
@@ -447,7 +474,7 @@ export class ProductDetail implements OnInit {
     // specific product — fire-and-forget, same as the header's own cart
     // load, since there's nowhere on this page to surface a failure beyond
     // just not showing a tag.
-    this.cartService.load(locationId, productPk).subscribe({
+    this.cartService.load(locationId, { productPk }).subscribe({
       next: (cart) => this.productTag.set(cart.allotment?.productTag ?? null),
       error: () => {},
     });
@@ -602,8 +629,14 @@ export class ProductDetail implements OnInit {
     this.axes.set(data.axes);
     this.attributes.set(data.attributes);
     this.breadcrumb.set(data.breadcrumb);
-    // Nothing pre-picked — the shopper chooses every axis themselves.
-    this.selections.set({});
+    // Deliberately *not* `this.selections.set({})` here — nothing pre-picks
+    // an axis, but `selections` already starts as `{}` from construction
+    // and nothing can write to it before this first response arrives, so
+    // it's already the right value. Setting it again would hand
+    // `checkAvailabilityOnSelectionChange` a new (if equivalent) `{}`
+    // object, re-triggering its already-in-flight first `*AVAIL` call a
+    // second time for no reason — signals compare objects by reference, not
+    // by value.
     this.availableOptionIds.set({});
     this.resolvedSkuId.set(null);
     this.manualImageUrl.set(null);

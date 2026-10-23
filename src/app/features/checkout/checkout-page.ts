@@ -411,13 +411,16 @@ export class CheckoutPage implements OnInit {
           this.submitting.set(false);
           if (result.success) {
             // The server already emptied the cart — refresh the shared
-            // signal so the header's badge/drawer reflect that too.
-            this.cartService.load(locationId).subscribe({ error: () => {} });
+            // signal so the header's badge/drawer reflect that too. Forced:
+            // the cart genuinely changed server-side just now, regardless
+            // of whether the last reload was only moments ago.
+            this.cartService.load(locationId, { force: true }).subscribe({ error: () => {} });
             this.router.navigate(['/orders', result.orderId], { state: { justPlaced: true } });
             return;
           }
           if (result.code === 'PCH') {
-            this.cartService.load(locationId).subscribe({ error: () => {} });
+            // Forced — `PCH` means the cart changed server-side just now.
+            this.cartService.load(locationId, { force: true }).subscribe({ error: () => {} });
             // A new attempt — prices/cart just changed, so this is no
             // longer a retry of the one that failed.
             this.checkoutKey = generateCheckoutKey();
