@@ -65,6 +65,15 @@ describe('CategoryTree', () => {
     expect(fixture.nativeElement.querySelectorAll('.category-tree__toggle').length).toBe(1);
   });
 
+  it('includes the bucket label as a `name` query param on the bucket link, same as every other category link', () => {
+    const fixture = TestBed.createComponent(CategoryTree);
+    fixture.componentRef.setInput('menu', MENU);
+    fixture.detectChanges();
+
+    const link: HTMLAnchorElement = fixture.nativeElement.querySelector('.category-tree__link');
+    expect(link.getAttribute('href')).toBe('/products/clothing?name=Clothing');
+  });
+
   it("highlights the Clothing bucket link itself when that bucket is the whole scope", () => {
     const fixture = TestBed.createComponent(CategoryTree);
     fixture.componentRef.setInput('menu', MENU);
@@ -229,5 +238,26 @@ describe('CategoryTree', () => {
     expect(linkNames(fixture)).toEqual(['Clothing', 'Uniform', 'Footwear', 'Gear']);
     const badge = fixture.nativeElement.querySelector('.category-tree__link .badge');
     expect(badge?.textContent?.trim()).toBe('28');
+  });
+
+  it('also skips a bucket\'s own category named "Apparel", treating it as equivalent to "Clothing"', () => {
+    const apparelWrapper: CatalogCategory = {
+      progCatId: 50,
+      parentProgCatId: null,
+      categoryName: 'Apparel',
+      sortOrder: 0,
+      status: 'ACTIVE',
+      productCount: 0,
+      children: [UNIFORM],
+    };
+    const fixture = TestBed.createComponent(CategoryTree);
+    fixture.componentRef.setInput('menu', { clothing: [apparelWrapper], footwear: [], gear: [] });
+    fixture.detectChanges();
+
+    const toggle: HTMLButtonElement = fixture.nativeElement.querySelector('.category-tree__toggle');
+    toggle.click();
+    fixture.detectChanges();
+
+    expect(linkNames(fixture)).toEqual(['Clothing', 'Uniform', 'Footwear', 'Gear']);
   });
 });

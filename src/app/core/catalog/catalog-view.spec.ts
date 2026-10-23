@@ -325,6 +325,57 @@ describe('category tree helpers', () => {
       expect(collapseSameNameChild(wrapped).children).toEqual([UNIFORM]);
     });
 
+    it('treats "Clothing" and "Apparel" as a match, suppressing the "Apparel" child', () => {
+      const wrapped: CatalogCategory = {
+        progCatId: 99,
+        parentProgCatId: null,
+        categoryName: 'Clothing',
+        sortOrder: 0,
+        status: 'ACTIVE',
+        productCount: 0,
+        children: [
+          {
+            progCatId: 100,
+            parentProgCatId: 99,
+            categoryName: 'Apparel',
+            sortOrder: 0,
+            status: 'ACTIVE',
+            productCount: 0,
+            children: [UNIFORM],
+          },
+        ],
+      };
+
+      const result = collapseSameNameChild(wrapped);
+      expect(result.progCatId).toBe(99);
+      expect(result.categoryName).toBe('Clothing');
+      expect(result.children).toEqual([UNIFORM]);
+    });
+
+    it('matches "Clothing"/"Apparel" in either direction', () => {
+      const wrapped: CatalogCategory = {
+        progCatId: 99,
+        parentProgCatId: null,
+        categoryName: 'Apparel',
+        sortOrder: 0,
+        status: 'ACTIVE',
+        productCount: 0,
+        children: [
+          {
+            progCatId: 100,
+            parentProgCatId: 99,
+            categoryName: 'Clothing',
+            sortOrder: 0,
+            status: 'ACTIVE',
+            productCount: 0,
+            children: [UNIFORM],
+          },
+        ],
+      };
+
+      expect(collapseSameNameChild(wrapped).children).toEqual([UNIFORM]);
+    });
+
     it('collapses through a chain of several same-named single-child layers', () => {
       const chain: CatalogCategory = {
         progCatId: 1,

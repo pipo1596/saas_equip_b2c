@@ -69,6 +69,7 @@
             }
             <a
               [routerLink]="['/products', bucket.slug]"
+              [queryParams]="{ name: bucket.label }"
               class="category-tree__link"
               [class.category-tree__link--active]="activeBucket() === bucket.slug"
               [attr.aria-current]="activeBucket() === bucket.slug ? 'page' : null"

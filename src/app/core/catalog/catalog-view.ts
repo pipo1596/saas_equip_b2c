@@ -71,18 +71,38 @@ export function categoryProductCount(category: CatalogCategory): number {
   return category.children.reduce((sum, child) => sum + categoryProductCount(child), 0);
 }
 
-// A category whose one and only child shares its exact name (case/whitespace
-// insensitive) is a redundant wrapper — display-wise, that child's row adds
-// nothing, so it's skipped and its own children are promoted to show
-// directly under the parent instead. Runs through however many such layers
-// chain together, and recurses into every remaining branch. The parent's own
-// identity (`progCatId`/name) is kept — only the redundant child's row
-// disappears, never the parent's.
+// Pairs of names treated as "the same" for the redundant-wrapper collapse
+// below, even though they're not literally identical strings — e.g. a bucket
+// labeled "Clothing" whose own single top-level category is conventionally
+// named "Apparel" instead of repeating "Clothing" exactly. Each pair matches
+// in either direction (parent/child order doesn't matter). Add more pairs
+// here as other known synonyms turn up.
+const CATEGORY_NAME_SYNONYMS: ReadonlyArray<readonly [string, string]> = [['clothing', 'apparel']];
+
+function namesAreEquivalent(a: string, b: string): boolean {
+  const left = a.trim().toLowerCase();
+  const right = b.trim().toLowerCase();
+  if (left === right) {
+    return true;
+  }
+  return CATEGORY_NAME_SYNONYMS.some(
+    ([x, y]) => (left === x && right === y) || (left === y && right === x),
+  );
+}
+
+// A category whose one and only child has an equivalent name (exact match,
+// case/whitespace insensitive, or a known synonym like "Clothing"/"Apparel"
+// — see `namesAreEquivalent`) is a redundant wrapper — display-wise, that
+// child's row adds nothing, so it's skipped and its own children are
+// promoted to show directly under the parent instead. Runs through however
+// many such layers chain together, and recurses into every remaining
+// branch. The parent's own identity (`progCatId`/name) is kept — only the
+// redundant child's row disappears, never the parent's.
 export function collapseSameNameChild(category: CatalogCategory): CatalogCategory {
   let current = category;
   while (
     current.children.length === 1 &&
-    current.children[0].categoryName.trim().toLowerCase() === current.categoryName.trim().toLowerCase()
+    namesAreEquivalent(current.categoryName, current.children[0].categoryName)
   ) {
     current = { ...current, children: current.children[0].children };
   }
