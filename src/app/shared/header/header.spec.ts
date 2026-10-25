@@ -1246,6 +1246,129 @@ describe('Header', () => {
     });
   });
 
+  describe('notification bell', () => {
+    function cartWithApprovals(approvals: {
+      canApprove: 'Y' | 'N';
+      pendingApprovals: number | null;
+      awaitingApproval: number | null;
+    }) {
+      return {
+        cartId: null,
+        itemCount: 0,
+        subtotalPrice: 0,
+        subtotalPoints: null,
+        items: [],
+        roleRequiresApproval: 'N' as const,
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 0,
+          allotExclTaxFreight: 'N' as const,
+          rules: [],
+          approvals,
+          openOrders: null,
+          lineTags: [],
+          productTag: null,
+        },
+      };
+    }
+
+    it('shows no red badge, and an "all caught up" flyout, when there is nothing pending either way', () => {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+      header.cart.set(cartWithApprovals({ canApprove: 'N', pendingApprovals: null, awaitingApproval: 0 }));
+      fixture.detectChanges();
+
+      const bell: HTMLButtonElement = fixture.nativeElement.querySelector('button[aria-label="Notifications"]');
+      expect(bell).not.toBeNull();
+      expect(bell.querySelector('.badge-count')).toBeNull();
+
+      bell.click();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.notif-menu').textContent).toContain("You're all caught up.");
+    });
+
+    it('uses the red accent color for the badge, not the cart\'s blue', () => {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+      header.cart.set(cartWithApprovals({ canApprove: 'Y', pendingApprovals: 2, awaitingApproval: 0 }));
+      fixture.detectChanges();
+
+      const badge = fixture.nativeElement.querySelector('button[aria-label="Notifications, 2 pending"] .badge-count');
+      expect(badge.classList).toContain('badge--accent');
+      expect(badge.classList).not.toContain('bg-primary');
+    });
+
+    it('opens a flyout on click showing orders waiting on the employee\'s own review, linking to /approvals', () => {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+      header.cart.set(cartWithApprovals({ canApprove: 'Y', pendingApprovals: 2, awaitingApproval: 5 }));
+      fixture.detectChanges();
+
+      const bell: HTMLButtonElement = fixture.nativeElement.querySelector(
+        'button[aria-label="Notifications, 2 pending"]',
+      );
+      bell.click();
+      fixture.detectChanges();
+      expect(header.notificationsMenuOpen()).toBe(true);
+
+      const link: HTMLAnchorElement = fixture.nativeElement.querySelector('.notif-menu a[href="/approvals"]');
+      expect(link.textContent).toContain('Needs your review');
+      expect(link.querySelector('.badge')?.textContent?.trim()).toBe('2');
+
+      // No `/approvals` route is registered in this spec's bare
+      // `provideRouter([])` — mocked so the click below doesn't reject with
+      // "Cannot match any routes" as an unhandled rejection.
+      vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+      link.click();
+      expect(header.notificationsMenuOpen()).toBe(false);
+    });
+
+    it('opens a flyout showing the employee\'s own orders waiting on someone else, linking to /orders, when they can\'t approve', () => {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+      header.cart.set(cartWithApprovals({ canApprove: 'N', pendingApprovals: null, awaitingApproval: 1 }));
+      fixture.detectChanges();
+
+      const bell: HTMLButtonElement = fixture.nativeElement.querySelector(
+        'button[aria-label="Notifications, 1 pending"]',
+      );
+      bell.click();
+      fixture.detectChanges();
+
+      const link: HTMLAnchorElement = fixture.nativeElement.querySelector(
+        '.notif-menu a[href="/orders?status=PENDING_APPROVAL"]',
+      );
+      expect(link.textContent).toContain('Awaiting approval');
+      expect(link.querySelector('.badge')?.textContent?.trim()).toBe('1');
+
+      // No `/orders` route is registered in this spec's bare
+      // `provideRouter([])` — mocked so the click below doesn't reject with
+      // "Cannot match any routes" as an unhandled rejection.
+      vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+      link.click();
+      expect(header.notificationsMenuOpen()).toBe(false);
+    });
+
+    it('closes the other dropdowns when opened, and closes itself when another dropdown opens', () => {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+      header.cart.set(cartWithApprovals({ canApprove: 'Y', pendingApprovals: 1, awaitingApproval: 0 }));
+      fixture.detectChanges();
+
+      header.toggleUserMenu();
+      expect(header.userMenuOpen()).toBe(true);
+
+      header.toggleNotificationsMenu();
+      expect(header.notificationsMenuOpen()).toBe(true);
+      expect(header.userMenuOpen()).toBe(false);
+
+      header.toggleUserMenu();
+      expect(header.userMenuOpen()).toBe(true);
+      expect(header.notificationsMenuOpen()).toBe(false);
+    });
+  });
+
   describe('click outside closes the open menu', () => {
     it('closes the location menu on an outside click, but not a click inside it', () => {
       const fixture = TestBed.createComponent(Header);

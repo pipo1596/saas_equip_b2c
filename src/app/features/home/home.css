@@ -28,6 +28,22 @@
   margin-left: auto;
   white-space: nowrap;
 }
+.announce__in.notice--important {
+  background: #fff4e0;
+  border-color: #f3dfb0;
+  color: #8a4b00;
+}
+.announce__in.notice--important svg {
+  color: #b4791f;
+}
+.announce__in.notice--urgent {
+  background: #fdecec;
+  border-color: #f5c6c6;
+  color: #9b1c1c;
+}
+.announce__in.notice--urgent svg {
+  color: #c23d3d;
+}
 
 /* ---------- hero dashboard ---------- */
 .hero {

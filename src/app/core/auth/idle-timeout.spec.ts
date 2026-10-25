@@ -13,6 +13,7 @@ const SESSION = FAKE_SESSION;
 const TENANT_SETTINGS: TenantSettings = {
   tp_id: 2,
   cont_name: 'Test Contact',
+  cust_name: 'Test Customer',
   pric_eml: 'contact@example.com',
   pric_phn: '555-0100',
   adm_ct_eml: 'admin@example.com',

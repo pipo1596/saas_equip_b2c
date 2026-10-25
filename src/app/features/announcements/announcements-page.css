@@ -1,0 +1,218 @@
+:host {
+  display: block;
+  background: #e9f0f7;
+  min-height: 60vh;
+}
+
+.announcements__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.announcements__title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(24px, 3vw, 32px);
+  color: var(--navy);
+  margin: 0;
+}
+.announcements__sub {
+  color: var(--slate-600);
+  margin: 4px 0 0;
+}
+.announcements__pager {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--slate-600);
+}
+.announcements__pager span {
+  margin-right: 6px;
+}
+.announcements__pager button {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--slate-200);
+  background: #fff;
+  color: var(--slate-700);
+  cursor: pointer;
+}
+.announcements__pager button:disabled {
+  color: var(--slate-300);
+  cursor: default;
+}
+
+.announcements__empty {
+  background: #fff;
+  border-radius: 10px;
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--slate-600);
+}
+.announcements__empty-inline {
+  color: var(--slate-600);
+  margin: 0;
+}
+
+/* ---------- current notice ---------- */
+.announcements__current {
+  background: #eaf1fb;
+  border: 1px solid #d5e3f6;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.announcements__current-head {
+  font: inherit;
+  text-align: left;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: inherit;
+}
+.announcements__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--slate-700);
+}
+.announcements__pill {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--action);
+  color: #fff;
+  font-weight: 600;
+}
+.announcements__category {
+  font-weight: 600;
+}
+.announcements__headline {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--navy);
+}
+.announcements__excerpt {
+  font-size: 14px;
+  color: var(--slate-700);
+}
+.announcements__body {
+  padding: 0 24px 22px;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--slate-700);
+}
+.announcements__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 10px;
+}
+.announcements__posted {
+  font-size: 13px;
+  color: var(--slate-600);
+}
+
+/* ---------- previous notices ---------- */
+.announcements__section-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--slate-600);
+  margin: 0 0 8px;
+}
+.announcements__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: #fff;
+  border: 1px solid var(--slate-200);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.announcements__row + .announcements__row {
+  border-top: 1px solid var(--slate-100);
+}
+.announcements__row--open {
+  background: #fafbfc;
+}
+.announcements__row-head {
+  font: inherit;
+  text-align: left;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 14px 20px;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: inherit;
+}
+.announcements__row-date {
+  flex: none;
+  width: 96px;
+  font-size: 13px;
+  color: var(--slate-600);
+}
+.announcements__row-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.announcements__row-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--slate-700);
+}
+.announcements__row--open .announcements__row-title {
+  font-weight: 600;
+  color: var(--navy);
+}
+.announcements__row-category {
+  font-size: 12px;
+  color: var(--slate-600);
+}
+.announcements__chevron {
+  flex: none;
+  color: var(--slate-600);
+  transition: transform 0.15s;
+}
+.announcements__row--open .announcements__chevron {
+  transform: rotate(180deg);
+}
+.announcements__row-expanded {
+  padding: 0 20px 18px 132px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--slate-700);
+}
+
+@media (max-width: 640px) {
+  .announcements__row-expanded {
+    padding-left: 20px;
+  }
+}

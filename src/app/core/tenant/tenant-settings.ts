@@ -8,6 +8,7 @@ import { environment } from '../../../environments/environment';
 export interface TenantSettings {
   tp_id: number;
   cont_name: string;
+  cust_name: string;
   pric_eml: string;
   pric_phn: string;
   adm_ct_eml: string;

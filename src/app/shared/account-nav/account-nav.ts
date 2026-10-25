@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 
 import { CartService } from '../../core/cart/cart';
 
-export type AccountNavKey = 'account' | 'orders' | 'allotment' | 'approvals';
+export type AccountNavKey = 'account' | 'orders' | 'allotment' | 'approvals' | 'announcements';
 
 // The left-hand "Account" nav shared by every account-related page (My
 // account, My orders, …) — `active` picks which entry renders as the

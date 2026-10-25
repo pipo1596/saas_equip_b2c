@@ -167,6 +167,7 @@ export class Header implements OnInit {
   @ViewChild('deptWrap') private readonly deptWrapRef?: ElementRef<HTMLElement>;
   @ViewChild('rulesWrap') private readonly rulesWrapRef?: ElementRef<HTMLElement>;
   @ViewChild('userWrap') private readonly userWrapRef?: ElementRef<HTMLElement>;
+  @ViewChild('notifWrap') private readonly notifWrapRef?: ElementRef<HTMLElement>;
 
   // Backstop for the drawer's own explicit close-on-navigate links below —
   // those only cover links *inside* the drawer; this catches everything
@@ -341,6 +342,7 @@ export class Header implements OnInit {
   // reaching into the header component itself.
   readonly rulesMenuOpen = this.cartService.rulesMenuOpen;
   readonly userMenuOpen = signal(false);
+  readonly notificationsMenuOpen = signal(false);
 
   // `(ngSubmit)` is an output of `FormGroupDirective` (via `[formGroup]`) —
   // without wrapping the control in a group, a bare `<form>` has no
@@ -356,6 +358,18 @@ export class Header implements OnInit {
   readonly approvals = computed(() => this.cart().allotment?.approvals ?? null);
   readonly canApprove = computed(() => this.approvals()?.canApprove === 'Y');
   readonly pendingApprovalsCount = computed(() => this.approvals()?.pendingApprovals ?? 0);
+  readonly awaitingApprovalCount = computed(() => this.approvals()?.awaitingApproval ?? 0);
+  // The bell badge — an approver sees how many orders are waiting on *their*
+  // review; everyone else sees how many of their *own* orders are still
+  // waiting on someone else's. Same split home.html's own two approval stat
+  // tiles already use.
+  readonly notificationCount = computed(() => {
+    const approvals = this.approvals();
+    if (!approvals) {
+      return 0;
+    }
+    return approvals.canApprove === 'Y' ? (approvals.pendingApprovals ?? 0) : (approvals.awaitingApproval ?? 0);
+  });
   // Switching locations re-scopes the allotment breakdown (and the catalog
   // itself) to a different program — with items already in the cart, that'd
   // leave them covered (or not) by rules that were never actually checked
@@ -423,6 +437,7 @@ export class Header implements OnInit {
     this.deptMenuOpen.set(false);
     this.rulesMenuOpen.set(false);
     this.userMenuOpen.set(false);
+    this.notificationsMenuOpen.set(false);
     this.openCatalogNavKey.update((open) => (open === key ? null : key));
   }
 
@@ -436,6 +451,7 @@ export class Header implements OnInit {
       this.deptMenuOpen.set(false);
       this.rulesMenuOpen.set(false);
       this.userMenuOpen.set(false);
+      this.notificationsMenuOpen.set(false);
       this.openCatalogNavKey.set(key);
     }, Header.CATALOG_NAV_OPEN_DELAY_MS);
   }
@@ -470,6 +486,7 @@ export class Header implements OnInit {
     this.openCatalogNavKey.set(null);
     this.rulesMenuOpen.set(false);
     this.userMenuOpen.set(false);
+    this.notificationsMenuOpen.set(false);
     this.deptMenuOpen.update((open) => !open);
   }
 
@@ -485,6 +502,7 @@ export class Header implements OnInit {
     this.openCatalogNavKey.set(null);
     this.deptMenuOpen.set(false);
     this.userMenuOpen.set(false);
+    this.notificationsMenuOpen.set(false);
     this.rulesMenuOpen.update((open) => !open);
   }
 
@@ -492,13 +510,22 @@ export class Header implements OnInit {
     this.openCatalogNavKey.set(null);
     this.deptMenuOpen.set(false);
     this.rulesMenuOpen.set(false);
+    this.notificationsMenuOpen.set(false);
     this.userMenuOpen.update((open) => !open);
   }
 
-  // Closes whichever of the three dropdowns is open on any click outside
-  // its own trigger+panel wrapper — a click on the trigger itself is
-  // "inside" (it's part of the same wrapper), and is left to that button's
-  // own (click) handler instead of being double-toggled here.
+  toggleNotificationsMenu(): void {
+    this.openCatalogNavKey.set(null);
+    this.deptMenuOpen.set(false);
+    this.rulesMenuOpen.set(false);
+    this.userMenuOpen.set(false);
+    this.notificationsMenuOpen.update((open) => !open);
+  }
+
+  // Closes whichever of the four dropdowns is open on any click outside its
+  // own trigger+panel wrapper — a click on the trigger itself is "inside"
+  // (it's part of the same wrapper), and is left to that button's own
+  // (click) handler instead of being double-toggled here.
   onDocumentClick(event: MouseEvent): void {
     const target = event.target as Node;
     if (this.deptMenuOpen() && !this.deptWrapRef?.nativeElement.contains(target)) {
@@ -509,6 +536,9 @@ export class Header implements OnInit {
     }
     if (this.userMenuOpen() && !this.userWrapRef?.nativeElement.contains(target)) {
       this.userMenuOpen.set(false);
+    }
+    if (this.notificationsMenuOpen() && !this.notifWrapRef?.nativeElement.contains(target)) {
+      this.notificationsMenuOpen.set(false);
     }
   }
 

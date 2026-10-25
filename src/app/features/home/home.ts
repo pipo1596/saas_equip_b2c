@@ -9,9 +9,17 @@ import {
   computed,
   effect,
   inject,
+  signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
+import {
+  AnnouncementsService,
+  NoticeBanner,
+  NoticeLink,
+  noticeLink,
+  noticeStyleClass,
+} from '../../core/announcements/announcements';
 import { AuthService } from '../../core/auth/auth';
 import { formatBalanceAmount, meterPct, tileBalance } from '../../core/cart/allotment';
 import { CartService } from '../../core/cart/cart';
@@ -32,6 +40,7 @@ export class Home implements OnInit {
   @ViewChild('categoryTrack') private readonly categoryTrack?: ElementRef<HTMLElement>;
 
   private readonly tenantSettingsService = inject(TenantSettingsService);
+  private readonly announcementsService = inject(AnnouncementsService);
   private readonly authService = inject(AuthService);
   private readonly catalogViewService = inject(CatalogViewService);
   private readonly locationSelectionService = inject(LocationSelectionService);
@@ -40,6 +49,18 @@ export class Home implements OnInit {
 
   readonly tenantSettings = this.tenantSettingsService.settings;
   readonly firstName = this.authService.firstName;
+
+  // The home page banner — `null` hides the strip entirely (no notice
+  // qualifies, or the call failed; see `AnnouncementsService.banner`).
+  readonly banner = signal<NoticeBanner | null>(null);
+  readonly bannerStyleClass = computed(() => {
+    const notice = this.banner();
+    return notice ? noticeStyleClass(notice.style) : '';
+  });
+  readonly bannerLink = computed<NoticeLink | null>(() => {
+    const notice = this.banner();
+    return notice ? noticeLink(notice) : null;
+  });
   readonly categories = this.catalogViewService.categories;
   readonly activeLocation = this.locationSelectionService.activeLocation;
 
@@ -66,6 +87,7 @@ export class Home implements OnInit {
   ngOnInit(): void {
     if (this.isBrowser) {
       this.tenantSettingsService.load().subscribe();
+      this.announcementsService.banner().subscribe((notice) => this.banner.set(notice));
     }
   }
 

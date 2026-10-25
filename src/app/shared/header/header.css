@@ -140,6 +140,33 @@
   border-bottom: 1px solid var(--slate-100);
   margin-bottom: 4px;
 }
+.notif-menu {
+  width: 240px;
+}
+.notif-menu__empty {
+  padding: 8px 16px 4px;
+}
+/* Keeps the count badge pinned at its own size and inside the panel no
+   matter how long the label ends up being — without this, the label (the
+   flex item ahead of the badge) doesn't yield any width on its own, so the
+   badge gets pushed past the dropdown's right edge instead of wrapping. */
+.notif-menu .dropdown-item > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.notif-menu .badge {
+  flex: none;
+}
+/* The bell's own badge, and each flyout row's count, stay the original
+   accent red rather than Bootstrap's `bg-primary` blue (used by the cart's
+   own badge) — a notification reads as "needs attention", not as a neutral
+   count. */
+.badge--accent {
+  background: var(--accent);
+  color: #fff;
+}
 
 /* ---------- main app bar ---------- */
 .appbar {
@@ -442,16 +469,6 @@
 .iconbtn:hover {
   background: var(--slate-100);
   color: var(--navy);
-}
-.dot {
-  position: absolute;
-  top: 7px;
-  right: 8px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  border: 2px solid #fff;
 }
 .badge-count {
   /* Anchored inside the button's own top-right corner instead of Bootstrap's

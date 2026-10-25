@@ -45,6 +45,9 @@ describe('Home', () => {
           menu: { clothing: [], footwear: [], gear: [] },
         }),
       );
+    httpMock
+      .match((req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCTPCNTC')
+      .forEach((req) => req.flush({ banner: null }));
     httpMock.verify();
     localStorage.clear();
     sessionStorage.clear();
@@ -91,7 +94,7 @@ describe('Home', () => {
     home.ngOnInit();
     TestBed.inject(HttpTestingController)
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS')
-      .flush({ comp_name: 'Metro EMS' } as never);
+      .flush({ comp_name: 'Metro EMS', cust_name: 'Metro EMS' } as never);
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('.hero__eyebrow')?.textContent?.trim()).toBe(
@@ -105,7 +108,7 @@ describe('Home', () => {
     home.ngOnInit();
     TestBed.inject(HttpTestingController)
       .expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS')
-      .flush({ comp_name: 'Metro EMS' } as never);
+      .flush({ comp_name: 'Metro EMS', cust_name: 'Metro EMS' } as never);
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('.hero__eyebrow')?.textContent?.trim()).toBe(
@@ -382,6 +385,76 @@ describe('Home', () => {
       const stats: HTMLElement[] = fixture.nativeElement.querySelectorAll('.stat');
       const awaitingStat = Array.from(stats).find((el) => el.textContent?.includes('Awaiting approval'));
       expect(awaitingStat?.getAttribute('href')).toBe('/orders?status=PENDING_APPROVAL');
+    });
+  });
+
+  describe('home page banner', () => {
+    function flushTenantSettings() {
+      TestBed.inject(HttpTestingController)
+        .match((req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS')
+        .forEach((req) => req.flush({}));
+    }
+
+    it('renders the banner message and its link', () => {
+      const fixture = TestBed.createComponent(Home);
+      fixture.detectChanges();
+      flushTenantSettings();
+      TestBed.inject(HttpTestingController)
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPCNTC')
+        .flush({
+          banner: {
+            noticeId: 42,
+            message: 'Latest news from Metro EMS: the 2026 station-boot policy is now in effect.',
+            style: 'INFO',
+            linkType: 'ANNOUNCE',
+            linkText: 'Read the update',
+            linkProgCatId: null,
+            linkProductPk: null,
+            linkUrl: null,
+          },
+        });
+      fixture.detectChanges();
+
+      const strip: HTMLElement = fixture.nativeElement.querySelector('.announce__in');
+      expect(strip.textContent).toContain('Latest news from Metro EMS');
+      const link: HTMLAnchorElement = strip.querySelector('a')!;
+      expect(link.textContent?.trim()).toBe('Read the update');
+      expect(link.getAttribute('href')).toBe('/announcements?noticeId=42');
+    });
+
+    it('hides the banner strip entirely when there is no qualifying notice', () => {
+      const fixture = TestBed.createComponent(Home);
+      fixture.detectChanges();
+      flushTenantSettings();
+      TestBed.inject(HttpTestingController).expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPCNTC').flush({ banner: null });
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.announce')).toBeNull();
+    });
+
+    it('applies the urgent style class and omits the link when linkType is NONE', () => {
+      const fixture = TestBed.createComponent(Home);
+      fixture.detectChanges();
+      flushTenantSettings();
+      TestBed.inject(HttpTestingController)
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPCNTC')
+        .flush({
+          banner: {
+            noticeId: 7,
+            message: 'Urgent notice',
+            style: 'URGENT',
+            linkType: 'NONE',
+            linkText: null,
+            linkProgCatId: null,
+            linkProductPk: null,
+            linkUrl: null,
+          },
+        });
+      fixture.detectChanges();
+
+      const strip: HTMLElement = fixture.nativeElement.querySelector('.announce__in');
+      expect(strip.classList).toContain('notice--urgent');
+      expect(strip.querySelector('a')).toBeNull();
     });
   });
 

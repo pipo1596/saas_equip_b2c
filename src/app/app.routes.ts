@@ -86,4 +86,10 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/approvals/approval-queue/approval-queue').then((m) => m.ApprovalQueue),
   },
+  {
+    path: 'announcements',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/announcements/announcements-page').then((m) => m.AnnouncementsPage),
+  },
 ];

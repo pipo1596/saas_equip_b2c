@@ -1,23 +1,28 @@
 <app-header />
 
-<div class="announce">
-  <div class="announce__in container d-flex align-items-center gap-2">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M3 11l18-5v12L3 14v-3z" />
-      <path d="M11.6 16.8A3 3 0 0 1 6 15" />
-    </svg>
-    {{
-      tenantSettings()?.alert_copy ??
-        'Latest news from Metro EMS: the 2026 station-boot policy is now in effect.'
-    }}
-    <a href="#">Read the update</a>
+@if (banner(); as notice) {
+  <div class="announce">
+    <div [class]="'announce__in ' + bannerStyleClass() + ' container d-flex align-items-center gap-2'">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 11l18-5v12L3 14v-3z" />
+        <path d="M11.6 16.8A3 3 0 0 1 6 15" />
+      </svg>
+      {{ notice.message }}
+      @if (bannerLink(); as link) {
+        @if (link.kind === 'route') {
+          <a [routerLink]="link.routerLink" [queryParams]="link.queryParams">{{ link.label }}</a>
+        } @else {
+          <a [href]="link.href" target="_blank" rel="noopener">{{ link.label }}</a>
+        }
+      }
+    </div>
   </div>
-</div>
+}
 
 <section class="hero container p-0">
   <div class="hero__card">
     <div class="hero__content">
-      <p class="hero__eyebrow">{{ activeLocation()?.locationName ?? 'Select location' }} · {{ tenantSettings()?.comp_name }}</p>
+      <p class="hero__eyebrow">{{ activeLocation()?.locationName ?? 'Select location' }} · {{ tenantSettings()?.cust_name }}</p>
       <h1>Welcome back, {{ firstName() ?? 'there' }}.</h1>
       <p class="hero__sub">
         Here's where your account stands today. Shop your allotment, track orders, and stay

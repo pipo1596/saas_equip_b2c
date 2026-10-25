@@ -57,13 +57,71 @@
       </div>
 
       <span class="tb-sep"></span>
-      <button class="iconbtn" type="button" aria-label="Notifications">
-        <span class="dot" aria-hidden="true"></span>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-          <path d="M13.7 21a2 2 0 0 1-3.4 0" />
-        </svg>
-      </button>
+      <div class="notif-wrap dropdown" #notifWrap>
+        <button
+          class="iconbtn position-relative"
+          type="button"
+          aria-haspopup="menu"
+          [attr.aria-expanded]="notificationsMenuOpen()"
+          [attr.aria-label]="
+            notificationCount() > 0
+              ? 'Notifications, ' + notificationCount() + ' pending'
+              : 'Notifications'
+          "
+          (click)="toggleNotificationsMenu()"
+        >
+          @if (notificationCount() > 0) {
+            <span class="badge-count badge--accent badge rounded-pill position-absolute">{{ notificationCount() }}</span>
+          }
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+          </svg>
+        </button>
+        <div class="notif-menu dropdown-menu dropdown-menu-end shadow-lg" data-bs-popper [class.show]="notificationsMenuOpen()">
+          <div class="dropdown-header">Notifications</div>
+          @if (canApprove()) {
+            @if (pendingApprovalsCount() > 0) {
+              <a
+                routerLink="/approvals"
+                class="dropdown-item d-flex align-items-center justify-content-between gap-2"
+                (click)="notificationsMenuOpen.set(false)"
+              >
+                <span class="d-flex align-items-center gap-2">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M9 11l3 3L22 4" />
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                  </svg>
+                  Needs your review
+                </span>
+                <span class="badge rounded-pill badge--accent">{{ pendingApprovalsCount() }}</span>
+              </a>
+            } @else {
+              <div class="notif-menu__empty text-secondary small">You're all caught up.</div>
+            }
+          } @else {
+            @if (awaitingApprovalCount() > 0) {
+              <a
+                [routerLink]="['/orders']"
+                [queryParams]="{ status: 'PENDING_APPROVAL' }"
+                class="dropdown-item d-flex align-items-center justify-content-between gap-2"
+                (click)="notificationsMenuOpen.set(false)"
+              >
+                <span class="d-flex align-items-center gap-2">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M4 7l8-4 8 4v10l-8 4-8-4z" />
+                    <path d="M4 7l8 4 8-4M12 11v10" />
+                  </svg>
+                  Awaiting approval
+                </span>
+                <span class="badge rounded-pill badge--accent">{{ awaitingApprovalCount() }}</span>
+              </a>
+            } @else {
+              <div class="notif-menu__empty text-secondary small">You're all caught up.</div>
+            }
+          }
+        </div>
+      </div>
       <button class="iconbtn position-relative" type="button" aria-label="Open cart" (click)="openCart()">
         @if (cartCount() > 0) {
           <span class="badge-count badge rounded-pill bg-primary position-absolute">{{ cartCount() }}</span>
@@ -99,6 +157,17 @@
               <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
             </svg>
             My account
+          </a>
+          <a
+            routerLink="/announcements"
+            class="dropdown-item d-flex align-items-center gap-2"
+            (click)="userMenuOpen.set(false)"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 11l18-5v12L3 14v-3z" />
+              <path d="M11.6 16.8A3 3 0 0 1 6 15" />
+            </svg>
+            Announcements
           </a>
           @if (canApprove()) {
             <a
