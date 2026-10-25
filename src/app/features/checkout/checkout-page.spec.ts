@@ -113,6 +113,7 @@ const FULLY_COVERED_CART: Cart = {
     allotmentBar: null,
     ruleCount: 1,
     allotExclTaxFreight: 'Y',
+    allowCcOverage: 'N',
     rules: [
       {
         ruleId: 99,
@@ -135,9 +136,7 @@ const FULLY_COVERED_CART: Cart = {
         covers: { allAssortments: 'Y', categories: [], unitGrants: [] },
         carryover: { type: 'FORFEIT', pct: null, capAmount: null, carriedIn: null },
         quotas: [],
-        requireApproval: 'N',
-        allowCcFallback: 'N',
-        fallbackRuleIds: [],
+        fallbacks: [],
       },
     ],
     approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
@@ -164,6 +163,33 @@ const CART_WITH_SHIPPING_AND_TAX_COVERED: Cart = {
   allotment: { ...FULLY_COVERED_CART.allotment!, allotExclTaxFreight: 'N' },
 };
 
+// CART, only partially covered (100 of the 179.98 line total), on a role
+// whose `allowCcOverage` is 'Y' — used to check that a remaining balance no
+// longer blocks placing the order once the role allows card overage.
+const CART_WITH_CC_OVERAGE: Cart = {
+  ...FULLY_COVERED_CART,
+  allotment: {
+    ...FULLY_COVERED_CART.allotment!,
+    allowCcOverage: 'Y',
+    rules: [
+      {
+        ...FULLY_COVERED_CART.allotment!.rules[0],
+        dollars: { total: 100, used: 0, inCart: 100, available: 0 },
+      },
+    ],
+    lineTags: [
+      {
+        cartItemId: 9001,
+        skuId: 9001,
+        ruleId: 99,
+        payUnit: 'DOLLARS',
+        tagLabel: '$ allotment',
+        allocations: [{ ruleId: 99, payUnit: 'DOLLARS', amount: 100 }],
+      },
+    ],
+  },
+};
+
 // CART, fully covered by a points-only allotment that excludes shipping/tax
 // from that coverage (`allotExclTaxFreight: 'Y'`, same as FULLY_COVERED_CART)
 // — used to check that the leftover dollar shipping/tax figure, which a
@@ -177,6 +203,7 @@ const POINTS_FULLY_COVERED_CART: Cart = {
     allotmentBar: null,
     ruleCount: 1,
     allotExclTaxFreight: 'Y',
+    allowCcOverage: 'N',
     rules: [
       {
         ruleId: 90,
@@ -199,9 +226,7 @@ const POINTS_FULLY_COVERED_CART: Cart = {
         covers: { allAssortments: 'Y', categories: [], unitGrants: [] },
         carryover: { type: 'FORFEIT', pct: null, capAmount: null, carriedIn: null },
         quotas: [],
-        requireApproval: 'N',
-        allowCcFallback: 'N',
-        fallbackRuleIds: [],
+        fallbacks: [],
       },
     ],
     approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
@@ -729,8 +754,8 @@ describe('CheckoutPage', () => {
     fixture.detectChanges();
 
     // Full order total (subtotal due 179.98 + shipping 12.50, no tax
-    // configured here) — credit card payment isn't collected at all yet,
-    // so any balance at all blocks the order outright.
+    // configured here) — this cart has no allotment at all (so no card
+    // overage either), so any balance at all blocks the order outright.
     expect(page.orderTotal()).toBeCloseTo(192.48, 5);
 
     const warning: HTMLElement = fixture.nativeElement.querySelector('.alert-warning');
@@ -740,6 +765,72 @@ describe('CheckoutPage', () => {
     expect(placeOrder.hasAttribute('disabled')).toBe(true);
     expect(placeOrder.querySelector('.checkout-page__place-order-sub')?.textContent).toContain(
       'Balance must be $0.00',
+    );
+  });
+
+  it("should allow placing the order with a balance, as an info note, when the role's allowCcOverage is 'Y'", () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    const page = fixture.componentInstance;
+    fixture.detectChanges();
+    flushInitialCartLoads(httpMock, CART_WITH_CC_OVERAGE);
+    flushCheckoutData(httpMock, {
+      cust_addrs: [PRIMARY_ADDRESS],
+      ship_addrs: [PRIMARY_ADDRESS],
+      ship_mthds: [DEFAULT_SHIP_METHOD],
+      tax_rates: [],
+    });
+    fixture.detectChanges();
+
+    expect(page.orderTotal()).toBeGreaterThan(0);
+    expect(fixture.nativeElement.querySelector('.alert-warning')).toBeNull();
+
+    const note: HTMLElement = fixture.nativeElement.querySelector('.alert-info');
+    expect(note?.textContent).toContain('charged to your personal card');
+
+    page.contactForm.setValue({
+      email: 'pat.doe@example.com',
+      firstName: 'Pat',
+      lastName: 'Doe',
+      phone: '555-0100',
+      extension: '',
+    });
+    fixture.detectChanges();
+
+    expect(page.canPlaceOrder()).toBe(true);
+    const placeOrder: HTMLElement = fixture.nativeElement.querySelector('.checkout-page__place-order');
+    expect(placeOrder.hasAttribute('disabled')).toBe(false);
+  });
+
+  it("should still block a points-only balance even when the role's allowCcOverage is 'Y' (points never go to the card)", () => {
+    const fixture = TestBed.createComponent(CheckoutPage);
+    const page = fixture.componentInstance;
+    fixture.detectChanges();
+    flushInitialCartLoads(httpMock, {
+      ...POINTS_FULLY_COVERED_CART,
+      allotment: {
+        ...POINTS_FULLY_COVERED_CART.allotment!,
+        allowCcOverage: 'Y',
+        rules: [
+          {
+            ...POINTS_FULLY_COVERED_CART.allotment!.rules[0],
+            // Over-drawn, so there's a genuine points shortfall to block on.
+            points: { total: 10, used: 10, inCart: 8, available: -8 },
+          },
+        ],
+      },
+    });
+    flushCheckoutData(httpMock, {
+      cust_addrs: [PRIMARY_ADDRESS],
+      ship_addrs: [PRIMARY_ADDRESS],
+      ship_mthds: [DEFAULT_SHIP_METHOD],
+      tax_rates: [],
+    });
+    fixture.detectChanges();
+
+    expect(page.pointsShortfall()).toBeGreaterThan(0);
+    expect(page.canPlaceOrder()).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain(
+      "isn't fully covered by your points allotment",
     );
   });
 
@@ -1038,9 +1129,7 @@ describe('CheckoutPage', () => {
       },
       carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
       quotas: [],
-      requireApproval: 'N' as const,
-      allowCcFallback: 'N' as const,
-      fallbackRuleIds: [],
+      fallbacks: [],
     };
     flushInitialCartLoads(httpMock, {
       ...CART,

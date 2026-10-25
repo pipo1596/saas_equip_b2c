@@ -12,6 +12,7 @@ export type {
   AllotmentCategoryRef,
   AllotmentCovers,
   AllotmentCycle,
+  AllotmentFallback,
   AllotmentQuota,
   AllotmentRule,
   AllotmentUnitGrant,
@@ -24,7 +25,6 @@ export type {
 } from './allotment';
 export {
   coverageLabel,
-  fallbackChain,
   formatBalanceAmount,
   meterPct,
   ruleForCategories,

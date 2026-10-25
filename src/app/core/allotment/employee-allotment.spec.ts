@@ -16,6 +16,7 @@ const SUMMARY = {
   allotmentBar: { ruleId: 5, label: 'General Allotment', total: 500, used: 184.5, inCart: 0, available: 315.5 },
   ruleCount: 1,
   allotExclTaxFreight: 'N' as const,
+  allowCcOverage: 'N' as const,
   rules: [
     {
       ruleId: 5,
@@ -38,9 +39,7 @@ const SUMMARY = {
       covers: { allAssortments: 'Y' as const, categories: [], unitGrants: [] },
       carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
       quotas: [],
-      requireApproval: 'N' as const,
-      allowCcFallback: 'N' as const,
-      fallbackRuleIds: [],
+      fallbacks: [],
     },
   ],
   approvals: { canApprove: 'N' as const, pendingApprovals: null, awaitingApproval: null },

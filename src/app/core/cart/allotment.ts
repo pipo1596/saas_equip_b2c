@@ -82,6 +82,21 @@ export interface AllotmentQuota {
   limitValue: number;
 }
 
+// One rule this one falls back to once its own balance runs out, in
+// priority order (`seq`) — up to two (2nd and 3rd priority). Carries its own
+// name/unit/`available` straight from the API, so nothing needs to re-look
+// it up against the full rule list to show it. `available` is that
+// fallback rule's *own* balance, same figure its own tile shows — never add
+// it to this rule's own numbers. Always `[]` for a units rule; the fallback
+// mechanism only applies to dollars/points.
+export interface AllotmentFallback {
+  seq: number;
+  ruleId: number;
+  ruleName: string;
+  unit: PayUnit;
+  available: number;
+}
+
 export interface AllotmentRule {
   ruleId: number;
   ruleName: string;
@@ -95,12 +110,7 @@ export interface AllotmentRule {
   covers: AllotmentCovers;
   carryover: AllotmentCarryover;
   quotas: AllotmentQuota[];
-  requireApproval: 'Y' | 'N';
-  allowCcFallback: 'Y' | 'N';
-  // Ordered ruleIds this rule falls back to once its own balance runs out
-  // on a given order (e.g. Uniform -> Footwear) — empty when nothing else
-  // picks up the rest.
-  fallbackRuleIds: number[];
+  fallbacks: AllotmentFallback[];
 }
 
 export interface PayTag {
@@ -146,6 +156,12 @@ export interface Allotment {
   programId: number | null;
   allotmentBar: AllotmentBar | null;
   ruleCount: number;
+  // The role's own flag — not a per-rule setting. When "Y", whatever an
+  // item's rule (plus its fallbacks) can't cover is charged to the
+  // employee's personal card instead of blocking the order; when "N", an
+  // uncovered balance still refuses the order (`INS`). Points shortfalls
+  // never go to the card either way.
+  allowCcOverage: 'Y' | 'N';
   // 'Y' means shipping and tax are excluded from allotment coverage — they
   // become a credit-card balance at checkout regardless of how much of the
   // goods themselves the allotment covers. 'N' means the allotment covers
@@ -163,14 +179,14 @@ export interface Allotment {
   productTag: ProductTag | null;
 }
 
-interface RawAllotmentRule extends Omit<AllotmentRule, 'covers' | 'quotas' | 'fallbackRuleIds'> {
+interface RawAllotmentRule extends Omit<AllotmentRule, 'covers' | 'quotas' | 'fallbacks'> {
   covers: {
     allAssortments: 'Y' | 'N';
     categories: AllotmentCategoryRef[] | null;
     unitGrants: AllotmentUnitGrant[] | null;
   };
   quotas: AllotmentQuota[] | null;
-  fallbackRuleIds: number[] | null;
+  fallbacks: AllotmentFallback[] | null;
 }
 
 interface RawLineTag extends Omit<LineTag, 'allocations'> {
@@ -201,7 +217,7 @@ export function normalizeAllotment(raw: RawAllotment | null | undefined): Allotm
         unitGrants: rule.covers.unitGrants ?? [],
       },
       quotas: rule.quotas ?? [],
-      fallbackRuleIds: rule.fallbackRuleIds ?? [],
+      fallbacks: rule.fallbacks ?? [],
     })),
     lineTags: (raw.lineTags ?? []).map((tag) => ({ ...tag, allocations: tag.allocations ?? [] })),
   };
@@ -218,16 +234,6 @@ export function tileBalance(rule: AllotmentRule): Balance | null {
     return rule.points;
   }
   return rule.dollars;
-}
-
-// The ordered rules this one falls back to once exhausted, resolved from
-// `fallbackRuleIds` against the full rule list — e.g. Uniform's own chain
-// resolves to `[Footwear]`. Skips any id that doesn't resolve to an actual
-// rule rather than throwing; that shouldn't happen; only defensive.
-export function fallbackChain(rule: AllotmentRule, rules: AllotmentRule[]): AllotmentRule[] {
-  return rule.fallbackRuleIds
-    .map((id) => rules.find((candidate) => candidate.ruleId === id))
-    .filter((candidate): candidate is AllotmentRule => !!candidate);
 }
 
 // A meter can exceed 100% once the cart pushes a balance over its

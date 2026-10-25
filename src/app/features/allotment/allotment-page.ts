@@ -10,7 +10,13 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-import { Allotment, formatBalanceAmount, meterPct, tileBalance } from '../../core/cart/allotment';
+import {
+  Allotment,
+  AllotmentFallback,
+  formatBalanceAmount,
+  meterPct,
+  tileBalance,
+} from '../../core/cart/allotment';
 import {
   AllotmentPendingHold,
   AllotmentTransaction,
@@ -81,6 +87,7 @@ export class AllotmentPage implements OnInit {
   // lowest-numbered dollar rule).
   readonly tileBalance = tileBalance;
   readonly meterPct = meterPct;
+  readonly allowCcOverage = computed(() => this.summary()?.allowCcOverage === 'Y');
 
   readonly pending = computed(() => this.transactions()?.pending ?? []);
   readonly history = computed(() => this.transactions()?.data ?? []);
@@ -163,6 +170,14 @@ export class AllotmentPage implements OnInit {
 
   pendingKey(hold: AllotmentPendingHold): string {
     return `${hold.orderId}-${hold.ruleId}-${hold.progCatId ?? ''}`;
+  }
+
+  // "+ $176.27 from Officer Pants $250" / "+ 58 pts from …" — shown under a
+  // hero tile's own available figure, one per fallback. Never added to the
+  // tile's own number: it's what's available *elsewhere*, not more of this
+  // rule's own balance.
+  fallbackTileNote(fallback: AllotmentFallback): string {
+    return `+ ${formatBalanceAmount(fallback.available, fallback.unit)} from ${fallback.ruleName}`;
   }
 
   retryTransactions(): void {

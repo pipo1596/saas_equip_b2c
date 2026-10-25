@@ -237,8 +237,7 @@ describe('Home', () => {
       covers: { allAssortments: 'Y' as const, categories: [], unitGrants: [] },
       carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
       quotas: [],
-      requireApproval: 'N' as const,
-      allowCcFallback: 'N' as const,
+      fallbacks: [],
     };
 
     function flushCartWithAllotment(allotment: object) {

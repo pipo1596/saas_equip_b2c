@@ -78,15 +78,36 @@ export interface OrderLine {
   unitsUsed: number;
   dollarsUsed: number;
   pointsUsed: number;
+  // This line's own share of the order's shipping/tax — only meaningful
+  // when the allotment pays shipping/tax at all (`allotExclTaxFreight`
+  // 'N'); otherwise these just read 0.
+  lineShipAmt: number;
+  lineTaxAmt: number;
+  // This line's own share of `totals.ccOverageAmt` — its card part,
+  // including its own tax/freight share. 0 when nothing on this line went
+  // to the card.
+  ccOverageAmt: number;
   lineStatus: LineStatus;
 }
 
 export interface PaidFrom {
-  ruleId: number;
+  // `null` for the "Personal card" entry (`state === 'CARD'`) — there's no
+  // allotment rule behind a card charge.
+  ruleId: number | null;
   ruleName: string;
   amountType: 'DOLLARS' | 'UNITS' | 'POINTS';
   amount: number;
-  state: 'RESERVED' | 'CHARGED';
+  state: 'RESERVED' | 'CHARGED' | 'CARD';
+  // 'Y' when this draw came from a fallback rule rather than the line's own
+  // covering rule — `fallbackForRuleId`/`fallbackForRuleName` then name the
+  // rule it stood in for, and `orderLineId`/`itemTitle` name the specific
+  // line that spilled into it. All four are `null` on an ordinary
+  // (non-fallback) entry, including the card.
+  isFallback: 'Y' | 'N';
+  fallbackForRuleId: number | null;
+  fallbackForRuleName: string | null;
+  orderLineId: number | null;
+  itemTitle: string | null;
 }
 
 export interface Shipment {
@@ -173,6 +194,10 @@ export interface OrderDetail {
     allotPointsUsed: number;
     allotUnitsUsed: number;
     customerBilled: number;
+    // Amount due on the employee's personal card — 0 when nothing is.
+    // Never known before placing the order (not in the `*PLACE` response);
+    // only ever read from this `*GET`.
+    ccOverageAmt: number;
   };
   fulfilment: { ref: string | null; sentTs: string | null; lastError: string | null };
   lines: OrderLine[];

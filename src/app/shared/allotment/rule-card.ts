@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
 import {
+  AllotmentFallback,
   AllotmentRule,
   Balance,
   PayUnit,
@@ -70,12 +71,20 @@ interface UnitGrantLine {
         }
 
         <ul class="rule-card__facts">
+          @for (fallback of fallbackLines(); track fallback.ruleId) {
+            <li class="rule-card__fallback">
+              <span class="rule-card__fallback-label">Fallback:</span> {{ fallback.ruleName }}
+              <div class="rule-card__fallback-note">
+                {{ fallback.ruleName }} will be used when this allotment runs out.
+              </div>
+            </li>
+          }
           <li>Carryover: {{ carryoverSummary() }}</li>
           @if (rule.quotas.length > 0) {
             <li>Quota limits: {{ quotasSummary() }}</li>
           }
-          @if (approvalSummary(); as approval) {
-            <li>Approval: {{ approval }}</li>
+          @if (cardNote(); as note) {
+            <li>{{ note }}</li>
           }
         </ul>
       </article>
@@ -177,10 +186,27 @@ interface UnitGrantLine {
       border-radius: 50%;
       background: var(--action);
     }
+    .rule-card__fallback::before {
+      background: #d08a1e;
+    }
+    .rule-card__fallback-label {
+      color: #8a4b00;
+      font-weight: 700;
+    }
+    .rule-card__fallback-note {
+      color: var(--slate-500);
+      font-size: 11.5px;
+      margin-top: 2px;
+    }
   `,
 })
 export class AllotmentRuleCard {
   readonly rule = input.required<AllotmentRule>();
+  // The role's own card-overage flag (`Allotment.allowCcOverage`) — not a
+  // per-rule setting, so every rule card for the same employee shows the
+  // same note. Defaults to `false` so a caller that hasn't wired it up yet
+  // just gets the old "no card note" behavior rather than a wrong claim.
+  readonly allowCcOverage = input(false);
 
   readonly balanceLines = computed<BalanceLine[]>(() => {
     const rule = this.rule();
@@ -258,21 +284,14 @@ export class AllotmentRuleCard {
       .join('; '),
   );
 
-  // Consolidated into one "Approval:" line rather than two separate
-  // bullets — `null` (and the whole line hidden) when neither applies.
-  readonly approvalSummary = computed(() => {
-    const rule = this.rule();
-    const needsApproval = rule.requireApproval === 'Y';
-    const ccFallback = rule.allowCcFallback === 'Y';
-    if (needsApproval && ccFallback) {
-      return 'Orders need approval; personal card can cover the rest';
-    }
-    if (needsApproval) {
-      return 'Orders need approval';
-    }
-    if (ccFallback) {
-      return 'Personal card can cover the rest';
-    }
-    return null;
-  });
+  // One bullet per fallback (2nd/3rd priority), in priority order — already
+  // in that order from the API (`seq` ascending), so this just passes it
+  // through for the template's `@for`.
+  readonly fallbackLines = computed<AllotmentFallback[]>(() => this.rule().fallbacks);
+
+  // The role's own card wording — never rule-specific, so this shows
+  // identically on every rule card for an employee whose role allows it.
+  readonly cardNote = computed(() =>
+    this.allowCcOverage() ? "Anything your allotments don't cover can be paid by personal card." : null,
+  );
 }

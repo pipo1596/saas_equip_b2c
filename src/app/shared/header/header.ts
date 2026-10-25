@@ -387,6 +387,7 @@ export class Header implements OnInit {
   readonly allotmentBar = computed(() => this.allotment()?.allotmentBar ?? null);
   readonly ruleCount = computed(() => this.allotment()?.ruleCount ?? 0);
   readonly allotmentRules = computed(() => this.allotment()?.rules ?? []);
+  readonly allowCcOverage = computed(() => this.allotment()?.allowCcOverage === 'Y');
   // The bar itself carries no renewal date — that lives on whichever rule
   // is flagged as the bar rule, matched by `allotmentBar.ruleId`.
   readonly allotmentBarRenewsOn = computed(() => {

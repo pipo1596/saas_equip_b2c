@@ -11,7 +11,6 @@ import {
   LineTag,
   PayTag,
   coverageLabel,
-  fallbackChain,
   formatBalanceAmount,
   formatCartItemOptions,
   tileBalance,
@@ -186,7 +185,7 @@ export class CartPage implements OnInit {
     if (!exceeded) {
       return null;
     }
-    const [fallback] = fallbackChain(exceeded.rule, this.cart().allotment?.rules ?? []);
+    const [fallback] = exceeded.rule.fallbacks;
     return fallback
       ? `Your ${exceeded.grant.categoryName} allotment is maxed out — this would really be billed to your ${fallback.ruleName} instead.`
       : `Your ${exceeded.grant.categoryName} allotment is maxed out — this would really need another allotment or your personal card.`;
@@ -259,9 +258,9 @@ export class CartPage implements OnInit {
     if (rule.cycle.renewsOn) {
       parts.push(`Renews ${DATE_PIPE.transform(rule.cycle.renewsOn, 'MMM d, y')}`);
     }
-    const chain = fallbackChain(rule, this.cart().allotment?.rules ?? []);
-    if (chain.length > 0) {
-      parts.push(`Then uses: ${chain.map((next) => this.shortRuleName(next.ruleName)).join(', ')}`);
+    const fallbacks = rule.fallbacks;
+    if (fallbacks.length > 0) {
+      parts.push(`Then uses: ${fallbacks.map((next) => this.shortRuleName(next.ruleName)).join(', ')}`);
     }
     return parts.join(' · ');
   }
@@ -313,7 +312,7 @@ export class CartPage implements OnInit {
   // by card, so that case stays silent (the balance box still flags it in
   // its own warning color either way).
   private shortfallNoteFor(rule: AllotmentRule): string | null {
-    if (rule.primaryUnit !== 'DOLLARS' || rule.fallbackRuleIds.length > 0) {
+    if (rule.primaryUnit !== 'DOLLARS' || rule.fallbacks.length > 0) {
       return null;
     }
     const balance = tileBalance(rule);

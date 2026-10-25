@@ -275,6 +275,27 @@
   font-weight: 400;
   color: var(--slate-500);
 }
+.order-detail__fallback-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  background: #fff4dd;
+  color: #8a4b00;
+  border: 1px solid #f0c27a;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.order-detail__card-note {
+  font-size: 12.5px;
+  color: #0c447c;
+  background: #eaf1fb;
+  border: 1px solid #d5e3f6;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
 @media (max-width: 991.98px) {
   .order-detail__item {
     flex-wrap: wrap;

@@ -82,8 +82,7 @@ const DOLLAR_RULE = {
       limitValue: 6,
     },
   ],
-  requireApproval: 'N' as const,
-  allowCcFallback: 'Y' as const,
+  fallbacks: [],
 };
 
 const POINTS_RULE = {
@@ -400,7 +399,7 @@ describe('CartService', () => {
         });
       });
 
-      it('normalizes a missing fallbackRuleIds on a rule to []', () => {
+      it('normalizes a missing fallbacks list on a rule to []', () => {
         let result: Cart | undefined;
         service.load(LOCATION_ID).subscribe((cart) => (result = cart));
 
@@ -411,7 +410,8 @@ describe('CartService', () => {
             allotmentBar: ALLOTMENT_BAR,
             ruleCount: 1,
             allotExclTaxFreight: 'N',
-            rules: [DOLLAR_RULE],
+            allowCcOverage: 'N',
+            rules: [{ ...DOLLAR_RULE, fallbacks: null }],
             approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
             openOrders: null,
             lineTags: null,
@@ -419,12 +419,14 @@ describe('CartService', () => {
           },
         });
 
-        expect(result?.allotment?.rules[0].fallbackRuleIds).toEqual([]);
+        expect(result?.allotment?.rules[0].fallbacks).toEqual([]);
       });
 
-      it('passes through a fallback chain and a split line allocation as-is', () => {
+      it('passes through a fallback list and a split line allocation as-is', () => {
         let result: Cart | undefined;
         service.load(LOCATION_ID).subscribe((cart) => (result = cart));
+
+        const fallback = { seq: 2, ruleId: 22, ruleName: 'Footwear allotment', unit: 'DOLLARS', available: 50 };
 
         httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush({
           ...CART,
@@ -433,9 +435,10 @@ describe('CartService', () => {
             allotmentBar: ALLOTMENT_BAR,
             ruleCount: 2,
             allotExclTaxFreight: 'N',
+            allowCcOverage: 'N',
             rules: [
-              { ...DOLLAR_RULE, ruleId: 21, ruleName: 'Uniform allotment', fallbackRuleIds: [22] },
-              { ...DOLLAR_RULE, ruleId: 22, ruleName: 'Footwear allotment', fallbackRuleIds: [] },
+              { ...DOLLAR_RULE, ruleId: 21, ruleName: 'Uniform allotment', fallbacks: [fallback] },
+              { ...DOLLAR_RULE, ruleId: 22, ruleName: 'Footwear allotment', fallbacks: [] },
             ],
             approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
             openOrders: null,
@@ -456,7 +459,7 @@ describe('CartService', () => {
           },
         });
 
-        expect(result?.allotment?.rules[0].fallbackRuleIds).toEqual([22]);
+        expect(result?.allotment?.rules[0].fallbacks).toEqual([fallback]);
         expect(result?.allotment?.lineTags[0].allocations).toEqual([
           { ruleId: 21, payUnit: 'DOLLARS', amount: 100 },
           { ruleId: 22, payUnit: 'DOLLARS', amount: 40 },
@@ -607,6 +610,7 @@ describe('CartService', () => {
           allotmentBar: null,
           ruleCount: rules.length,
           allotExclTaxFreight: 'N',
+          allowCcOverage: 'N',
           rules,
           approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
           openOrders: null,

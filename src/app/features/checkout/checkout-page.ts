@@ -172,6 +172,13 @@ export class CheckoutPage implements OnInit {
   // Informational only — driven by the shopper's role, not anything about
   // the cart itself, so it never factors into `canPlaceOrder`.
   readonly requiresApproval = computed(() => this.cart().roleRequiresApproval === 'Y');
+  // The role's own card-overage flag — when "Y", a remaining balance no
+  // longer blocks placing the order (see `canPlaceOrder`); the backend
+  // charges whatever's left to the employee's personal card instead of
+  // refusing the order with `INS`. There's no way to preview that split
+  // before placing (no `*PREVIEW` action exists yet) — the exact card
+  // amount only comes back from `*GET` once the order exists.
+  readonly allowCcOverage = computed(() => this.cart().allotment?.allowCcOverage === 'Y');
 
   // `FLAT` is the only rate type the API gives a cost for today — anything
   // else has nothing to show yet, so it's treated as "not costed" rather
@@ -248,7 +255,7 @@ export class CheckoutPage implements OnInit {
 
   readonly canPlaceOrder = computed(
     () =>
-      this.orderTotal() === 0 &&
+      (this.orderTotal() === 0 || this.allowCcOverage()) &&
       this.exceededQuotas().length === 0 &&
       this.exceededUnitRules().length === 0 &&
       this.exceededUnitGrants().length === 0 &&
@@ -259,7 +266,10 @@ export class CheckoutPage implements OnInit {
   );
 
   readonly placeOrderSubtitle = computed(() => {
-    if (this.orderTotal() > 0) {
+    // Points never go to the card, so a points-only balance always blocks.
+    // A dollar balance only blocks when the role has no card overage — with
+    // it, the order can place with the rest due on the employee's card.
+    if (this.orderTotal() > 0 && (this.pointsOnly() || !this.allowCcOverage())) {
       // No dollar figure for a points-only employee — they never pay in
       // dollars at all, so naming a balance here wouldn't mean anything.
       return this.pointsOnly()

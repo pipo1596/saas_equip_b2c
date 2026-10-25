@@ -338,15 +338,30 @@
 
             @if (order.paidFrom.length > 0) {
               <div class="order-detail__label mt-3 mb-2">Paid from</div>
-              @for (paid of order.paidFrom; track paid.ruleId) {
-                <div class="d-flex justify-content-between align-items-baseline mb-2">
-                  <span>
-                    {{ paid.ruleName }}
-                    @if (paid.state === 'RESERVED') {
-                      <span class="order-detail__summary-note">(reserved)</span>
-                    }
-                  </span>
-                  <b>{{ formatAmount(paid.amount, paid.amountType) }}</b>
+              @for (paid of order.paidFrom; track $index) {
+                <div class="order-detail__paid-from-row mb-2">
+                  <div class="d-flex justify-content-between align-items-baseline gap-2">
+                    <span class="d-flex align-items-center gap-2">
+                      {{ paid.ruleName }}
+                      @if (paid.state === 'RESERVED') {
+                        <span class="order-detail__summary-note">(reserved)</span>
+                      }
+                      @if (paid.isFallback === 'Y') {
+                        <span class="order-detail__fallback-tag">Fallback</span>
+                      }
+                    </span>
+                    <b>{{ formatAmount(paid.amount, paid.amountType) }}</b>
+                  </div>
+                  @if (paid.isFallback === 'Y' && paid.fallbackForRuleName) {
+                    <div class="order-detail__summary-note">
+                      for {{ paid.fallbackForRuleName }}{{ paid.itemTitle ? ' (' + paid.itemTitle + ')' : '' }}
+                    </div>
+                  }
+                </div>
+              }
+              @if (order.totals.ccOverageAmt > 0) {
+                <div class="order-detail__card-note mb-2" role="status">
+                  {{ order.totals.ccOverageAmt | currency }} of this order is charged to your personal card.
                 </div>
               }
             }

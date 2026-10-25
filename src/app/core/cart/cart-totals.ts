@@ -149,13 +149,19 @@ export function unitRuleExceededMessage(rule: AllotmentRule): string {
 }
 
 // How much of a specific assortment grant this cart is actually drawing —
-// counting only items this specific rule's own `lineTag` tagged as
-// UNITS-covered. The same product's own `progCatIds` could just as easily
-// be paid by another rule (or not at all), and this is meant to measure
-// this rule's own draw on this one grant, not every cart item that merely
+// counting only items *effectively* tagged as UNITS-covered by this rule
+// (see `effectiveLineTags`), not just the raw server tag. Once a grant is
+// genuinely exhausted, a line against it that a dollar allotment can really
+// cover gets reattributed there instead — it was never going to charge
+// against this grant at checkout, so it shouldn't count as drawing on it
+// here either (that's exactly what left `exceededUnitGrants` wrongly
+// blocking checkout on a line that would actually succeed by falling back
+// to dollars). The same product's own `progCatIds` could just as easily be
+// paid by another rule (or not at all), and this is meant to measure this
+// rule's own draw on this one grant, not every cart item that merely
 // happens to share a category.
 function unitsDrawnFromGrant(rule: AllotmentRule, grant: AllotmentUnitGrant, cart: Cart): number {
-  const byItemId = lineTagByItemId(cart);
+  const byItemId = effectiveLineTags(cart);
   return cart.items
     .filter(
       (item) => byItemId.get(item.cartItemId)?.ruleId === rule.ruleId && item.progCatIds.includes(grant.progCatId),

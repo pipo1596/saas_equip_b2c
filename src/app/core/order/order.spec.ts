@@ -63,6 +63,7 @@ const RAW_ORDER = {
     allotPointsUsed: 0,
     allotUnitsUsed: 0,
     customerBilled: 0,
+    ccOverageAmt: 0,
   },
   fulfilment: { ref: null, sentTs: null, lastError: null },
   lines: [
@@ -85,10 +86,26 @@ const RAW_ORDER = {
       unitsUsed: 0,
       dollarsUsed: 179.98,
       pointsUsed: 0,
+      lineShipAmt: 0,
+      lineTaxAmt: 0,
+      ccOverageAmt: 0,
       lineStatus: 'OPEN' as const,
     },
   ],
-  paidFrom: [{ ruleId: 99, ruleName: 'General Allotment', amountType: 'DOLLARS' as const, amount: 179.98, state: 'CHARGED' as const }],
+  paidFrom: [
+    {
+      ruleId: 99,
+      ruleName: 'General Allotment',
+      amountType: 'DOLLARS' as const,
+      amount: 179.98,
+      state: 'CHARGED' as const,
+      isFallback: 'N' as const,
+      fallbackForRuleId: null,
+      fallbackForRuleName: null,
+      orderLineId: null,
+      itemTitle: null,
+    },
+  ],
   shipments: [] as never[],
   history: [
     { fromStatus: null, toStatus: 'PROCESSING', source: 'PORTAL' as const, note: null, orderLineId: null, ts: '2026-09-30 10:00:00', by: null },
@@ -192,6 +209,59 @@ describe('OrderService', () => {
       req.flush(RAW_ORDER);
 
       expect(result).toEqual(RAW_ORDER);
+    });
+
+    it('passes through a fallback draw and a personal-card entry in paidFrom untouched', () => {
+      let result: OrderDetail | ApiError | undefined;
+      service.get(42).subscribe((res) => (result = res));
+
+      const paidFrom = [
+        {
+          ruleId: 40,
+          ruleName: 'Officer 700 Uniform',
+          amountType: 'DOLLARS' as const,
+          amount: 226.27,
+          state: 'CHARGED' as const,
+          isFallback: 'N' as const,
+          fallbackForRuleId: null,
+          fallbackForRuleName: null,
+          orderLineId: null,
+          itemTitle: null,
+        },
+        {
+          ruleId: 41,
+          ruleName: 'Officer Pants $250',
+          amountType: 'DOLLARS' as const,
+          amount: 129.45,
+          state: 'CHARGED' as const,
+          isFallback: 'Y' as const,
+          fallbackForRuleId: 40,
+          fallbackForRuleName: 'Officer 700 Uniform',
+          orderLineId: 8811,
+          itemTitle: 'Jacket',
+        },
+        {
+          ruleId: null,
+          ruleName: 'Personal card',
+          amountType: 'DOLLARS' as const,
+          amount: 22.8,
+          state: 'CARD' as const,
+          isFallback: 'N' as const,
+          fallbackForRuleId: null,
+          fallbackForRuleName: null,
+          orderLineId: null,
+          itemTitle: null,
+        },
+      ];
+
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER').flush({
+        ...RAW_ORDER,
+        totals: { ...RAW_ORDER.totals, ccOverageAmt: 22.8 },
+        paidFrom,
+      });
+
+      expect((result as OrderDetail).paidFrom).toEqual(paidFrom);
+      expect((result as OrderDetail).totals.ccOverageAmt).toBe(22.8);
     });
 
     it('normalizes null lines/paidFrom/shipments/history/approvals to []', () => {

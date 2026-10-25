@@ -28,9 +28,7 @@ const BASE_RULE: AllotmentRule = {
   },
   carryover: { type: 'FORFEIT', pct: null, capAmount: null, carriedIn: null },
   quotas: [],
-  requireApproval: 'N',
-  allowCcFallback: 'N',
-  fallbackRuleIds: [],
+  fallbacks: [],
 };
 
 describe('AllotmentCoverageCard', () => {

@@ -24,9 +24,7 @@ const BASE_RULE: AllotmentRule = {
   covers: { allAssortments: 'Y', categories: [], unitGrants: [] },
   carryover: { type: 'FORFEIT', pct: null, capAmount: null, carriedIn: null },
   quotas: [],
-  requireApproval: 'N',
-  allowCcFallback: 'N',
-  fallbackRuleIds: [],
+  fallbacks: [],
 };
 
 function facts(fixture: { nativeElement: HTMLElement }): string[] {
@@ -341,26 +339,51 @@ describe('AllotmentRuleCard', () => {
     );
   });
 
-  it('consolidates approval and card-fallback into a single "Approval:" line', () => {
+  it('shows no Fallback bullet for a rule with no fallbacks', () => {
     const fixture = TestBed.createComponent(AllotmentRuleCard);
     fixture.componentRef.setInput('rule', BASE_RULE);
     fixture.detectChanges();
-    expect(facts(fixture).some((f) => f.startsWith('Approval:'))).toBe(false);
 
-    fixture.componentRef.setInput('rule', { ...BASE_RULE, requireApproval: 'Y' });
-    fixture.detectChanges();
-    expect(facts(fixture)).toContain('Approval: Orders need approval');
+    expect(fixture.nativeElement.querySelector('.rule-card__fallback')).toBeNull();
+  });
 
-    fixture.componentRef.setInput('rule', { ...BASE_RULE, allowCcFallback: 'Y' });
-    fixture.detectChanges();
-    expect(facts(fixture)).toContain('Approval: Personal card can cover the rest');
-
+  it('shows a Fallback bullet (name + grey "will be used" note, no amount) per fallback, in order', () => {
+    const fixture = TestBed.createComponent(AllotmentRuleCard);
     fixture.componentRef.setInput('rule', {
       ...BASE_RULE,
-      requireApproval: 'Y',
-      allowCcFallback: 'Y',
+      fallbacks: [
+        { seq: 2, ruleId: 41, ruleName: 'Officer Pants $250', unit: 'DOLLARS', available: 176.27 },
+        { seq: 3, ruleId: 42, ruleName: 'Gear Allowance', unit: 'DOLLARS', available: 40 },
+      ],
     });
     fixture.detectChanges();
-    expect(facts(fixture)).toContain('Approval: Orders need approval; personal card can cover the rest');
+
+    const bullets: HTMLElement[] = fixture.nativeElement.querySelectorAll('.rule-card__fallback');
+    expect(bullets.length).toBe(2);
+    expect(bullets[0].querySelector('.rule-card__fallback-label')?.textContent).toBe('Fallback:');
+    expect(bullets[0].textContent).toContain('Officer Pants $250');
+    expect(bullets[0].querySelector('.rule-card__fallback-note')?.textContent?.trim()).toBe(
+      'Officer Pants $250 will be used when this allotment runs out.',
+    );
+    // No dollar amount shown anywhere in the bullet.
+    expect(bullets[0].textContent).not.toContain('176.27');
+    expect(bullets[1].textContent).toContain('Gear Allowance');
+  });
+
+  it('shows no card note by default (allowCcOverage not set)', () => {
+    const fixture = TestBed.createComponent(AllotmentRuleCard);
+    fixture.componentRef.setInput('rule', BASE_RULE);
+    fixture.detectChanges();
+
+    expect(facts(fixture).some((f) => f.includes('personal card'))).toBe(false);
+  });
+
+  it("shows the role's card wording when allowCcOverage is true", () => {
+    const fixture = TestBed.createComponent(AllotmentRuleCard);
+    fixture.componentRef.setInput('rule', BASE_RULE);
+    fixture.componentRef.setInput('allowCcOverage', true);
+    fixture.detectChanges();
+
+    expect(facts(fixture)).toContain("Anything your allotments don't cover can be paid by personal card.");
   });
 });

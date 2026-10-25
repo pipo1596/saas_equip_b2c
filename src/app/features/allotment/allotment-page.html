@@ -61,6 +61,9 @@
                     <p class="allotment-page__hero-value">
                       {{ formatBalanceAmount(balance.available, rule.primaryUnit) }} available
                     </p>
+                    @for (fallback of rule.fallbacks; track fallback.ruleId) {
+                      <p class="allotment-page__hero-fallback">{{ fallbackTileNote(fallback) }}</p>
+                    }
                     <div class="track"><i [style.width.%]="meterPct(balance)"></i></div>
                     @if (rule.cycle.renewsOn) {
                       <p class="allotment-page__hero-meta">
@@ -82,7 +85,7 @@
           <section aria-label="Allotment rules">
             @for (rule of rules(); track rule.ruleId) {
               <div class="allotment-page__panel mb-4">
-                <app-allotment-rule-card [rule]="rule" />
+                <app-allotment-rule-card [rule]="rule" [allowCcOverage]="allowCcOverage()" />
               </div>
             }
           </section>

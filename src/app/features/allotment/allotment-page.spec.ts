@@ -10,6 +10,7 @@ const SUMMARY = {
   allotmentBar: { ruleId: 5, label: 'General Allotment', total: 500, used: 184.5, inCart: 0, available: 315.5 },
   ruleCount: 1,
   allotExclTaxFreight: 'N',
+  allowCcOverage: 'N',
   rules: [
     {
       ruleId: 5,
@@ -32,9 +33,7 @@ const SUMMARY = {
       covers: { allAssortments: 'Y', categories: [], unitGrants: [] },
       carryover: { type: 'FORFEIT', pct: null, capAmount: null, carriedIn: null },
       quotas: [],
-      requireApproval: 'N',
-      allowCcFallback: 'N',
-      fallbackRuleIds: [],
+      fallbacks: [],
     },
   ],
   approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
@@ -179,6 +178,48 @@ describe('AllotmentPage', () => {
     expect(text).toContain('Annual uniform allowance');
     expect(text).toContain('$315.50 available');
     expect(fixture.nativeElement.querySelectorAll('app-allotment-rule-card').length).toBe(1);
+  });
+
+  it('shows "+ $X from <rule>" under a hero tile\'s own available figure, per fallback', () => {
+    const fixture = TestBed.createComponent(AllotmentPage);
+    fixture.detectChanges();
+    flushInitialLoad(httpMock, {
+      summary: {
+        ...SUMMARY,
+        rules: [
+          {
+            ...SUMMARY.rules[0],
+            fallbacks: [{ seq: 2, ruleId: 41, ruleName: 'Officer Pants $250', unit: 'DOLLARS', available: 176.27 }],
+          },
+        ],
+      },
+    });
+    fixture.detectChanges();
+
+    const tile = fixture.nativeElement.querySelector('.allotment-page__hero-tile');
+    expect(tile.querySelector('.allotment-page__hero-fallback')?.textContent?.trim()).toBe(
+      '+ $176.27 from Officer Pants $250',
+    );
+  });
+
+  it('shows no fallback line on a hero tile when the rule has no fallbacks', () => {
+    const fixture = TestBed.createComponent(AllotmentPage);
+    fixture.detectChanges();
+    flushInitialLoad(httpMock);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.allotment-page__hero-fallback')).toBeNull();
+  });
+
+  it("passes the role's allowCcOverage flag down to each rule card", () => {
+    const fixture = TestBed.createComponent(AllotmentPage);
+    fixture.detectChanges();
+    flushInitialLoad(httpMock, { summary: { ...SUMMARY, allowCcOverage: 'Y' } });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain(
+      "Anything your allotments don't cover can be paid by personal card.",
+    );
   });
 
   it('shows "No allotment is set up for your role." when there are no rules', () => {

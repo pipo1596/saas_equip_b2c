@@ -1180,6 +1180,7 @@ describe('Header', () => {
           allotmentBar: null,
           ruleCount: 0,
           allotExclTaxFreight: 'N' as const,
+          allowCcOverage: 'N' as const,
           rules: [],
           approvals,
           openOrders: null,
@@ -1264,6 +1265,7 @@ describe('Header', () => {
           allotmentBar: null,
           ruleCount: 0,
           allotExclTaxFreight: 'N' as const,
+          allowCcOverage: 'N' as const,
           rules: [],
           approvals,
           openOrders: null,
@@ -1402,6 +1404,7 @@ describe('Header', () => {
           allotmentBar: null,
           ruleCount: 1,
           allotExclTaxFreight: 'N',
+          allowCcOverage: 'N',
           rules: [
             {
               ruleId: 11,
@@ -1424,9 +1427,7 @@ describe('Header', () => {
               covers: { allAssortments: 'Y', categories: [], unitGrants: [] },
               carryover: { type: 'FORFEIT', pct: null, capAmount: null, carriedIn: null },
               quotas: [],
-              requireApproval: 'N',
-              allowCcFallback: 'N',
-              fallbackRuleIds: [],
+              fallbacks: [],
             },
           ],
           approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
@@ -1527,9 +1528,7 @@ describe('Header', () => {
       covers: { allAssortments: 'Y' as const, categories: [], unitGrants: [] },
       carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
       quotas: [],
-      requireApproval: 'N' as const,
-      allowCcFallback: 'N' as const,
-      fallbackRuleIds: [],
+      fallbacks: [],
     };
 
     it("shows the bar's figures, Renews date (from the bar rule's own cycle), and Rules(N)", () => {
@@ -1550,6 +1549,7 @@ describe('Header', () => {
           },
           ruleCount: 1,
           allotExclTaxFreight: 'N',
+          allowCcOverage: 'N',
           rules: [DOLLAR_RULE],
           approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
           openOrders: null,
@@ -1586,6 +1586,7 @@ describe('Header', () => {
           },
           ruleCount: 1,
           allotExclTaxFreight: 'N',
+          allowCcOverage: 'N',
           rules: [DOLLAR_RULE],
           approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
           openOrders: null,
@@ -1610,6 +1611,7 @@ describe('Header', () => {
           allotmentBar: null,
           ruleCount: 1,
           allotExclTaxFreight: 'N',
+          allowCcOverage: 'N',
           rules: [
             {
               ...DOLLAR_RULE,
@@ -1668,6 +1670,7 @@ describe('Header', () => {
           allotmentBar: null,
           ruleCount: 2,
           allotExclTaxFreight: 'N',
+          allowCcOverage: 'N',
           rules: [unitsRule, pointsRule],
           approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
           openOrders: null,
@@ -1704,6 +1707,7 @@ describe('Header', () => {
           allotmentBar: null,
           ruleCount: 1,
           allotExclTaxFreight: 'N',
+          allowCcOverage: 'N',
           rules: [pointsRule],
           approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
           openOrders: null,
@@ -1733,6 +1737,7 @@ describe('Header', () => {
           allotmentBar: null,
           ruleCount: 0,
           allotExclTaxFreight: 'N',
+          allowCcOverage: 'N',
           rules: [],
           approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
           openOrders: null,
@@ -1763,6 +1768,7 @@ describe('Header', () => {
           },
           ruleCount: 2,
           allotExclTaxFreight: 'N',
+          allowCcOverage: 'N',
           rules: [
             DOLLAR_RULE,
             {
@@ -1789,6 +1795,33 @@ describe('Header', () => {
       const nameEls: HTMLElement[] = fixture.nativeElement.querySelectorAll('.rule-card__name');
       const names = Array.from(nameEls).map((el) => el.textContent?.trim());
       expect(names).toEqual(['ANB Employee Allowance', 'Tactical Gear']);
+    });
+
+    it("passes the role's allowCcOverage flag down to the Rules panel's cards", () => {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+      header.cart.set({
+        ...EMPTY_ALLOTMENT_CART,
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 1,
+          allotExclTaxFreight: 'N',
+          allowCcOverage: 'Y',
+          rules: [DOLLAR_RULE],
+          approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [],
+          productTag: null,
+        },
+      });
+      fixture.detectChanges();
+      header.toggleRulesMenu();
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.textContent).toContain(
+        "Anything your allotments don't cover can be paid by personal card.",
+      );
     });
   });
 });

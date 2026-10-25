@@ -209,9 +209,7 @@ describe('CartPage', () => {
       },
       carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
       quotas: [],
-      requireApproval: 'N' as const,
-      allowCcFallback: 'N' as const,
-      fallbackRuleIds: [],
+      fallbacks: [],
     };
     flushInitialCartLoads(httpMock, {
       ...CART,
@@ -551,9 +549,7 @@ describe('CartPage', () => {
       covers: { allAssortments: 'N' as const, categories: [], unitGrants: [{ progCatId: 3, categoryName: 'Tactical', unitQty: 5 }] },
       carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
       quotas: [],
-      requireApproval: 'N' as const,
-      allowCcFallback: 'N' as const,
-      fallbackRuleIds: [],
+      fallbacks: [],
     };
 
     function cartWithUnitsLine(units: { total: number; used: number; inCart: number; available: number }) {
@@ -707,9 +703,7 @@ describe('CartPage', () => {
       },
       carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
       quotas: [],
-      requireApproval: 'N' as const,
-      allowCcFallback: 'N' as const,
-      fallbackRuleIds: [] as number[],
+      fallbacks: [],
     };
 
     it("shows the matching assortment next to the pay-tag badge for a multi-category units rule", () => {
@@ -811,9 +805,7 @@ describe('CartPage', () => {
               covers: { allAssortments: 'Y' as const, categories: [], unitGrants: [] },
               carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
               quotas: [],
-              requireApproval: 'N' as const,
-              allowCcFallback: 'N' as const,
-              fallbackRuleIds: [],
+              fallbacks: [],
             },
           ],
           approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
@@ -829,13 +821,13 @@ describe('CartPage', () => {
       expect(row.querySelector('.pay-tag')?.textContent?.trim()).toBe('$ allotment');
       const groupHeadings: HTMLElement[] = fixture.nativeElement.querySelectorAll('.allotment-group__name');
       expect(Array.from(groupHeadings).map((h) => h.textContent?.trim())).toContain('General Allotment');
-      // Still blocks checkout and still shows the top-of-page warning — the
-      // real backend charge is unaffected by where this line is shown.
+      // Genuinely covered by the dollar allotment now — no "exceeded"
+      // warning, and Checkout isn't blocked over a line that will really
+      // succeed at checkout.
       expect(fixture.nativeElement.textContent).not.toContain('maxed out');
-      expect(fixture.nativeElement.textContent).toContain(
-        'Your Unit Allotment for Cap is exceeded. Please adjust qty before checking out.',
-      );
-      expect(fixture.nativeElement.querySelector('a.cart-page__checkout')).toBeNull();
+      expect(fixture.nativeElement.textContent).not.toContain('is exceeded');
+      expect(fixture.nativeElement.querySelector('a.cart-page__checkout')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('button.cart-page__checkout')).toBeNull();
     });
 
     it("keeps an over-drawn line under its real units group as long as the category still has real room left, however far the quantity is raised", () => {
@@ -868,9 +860,7 @@ describe('CartPage', () => {
               covers: { allAssortments: 'Y' as const, categories: [], unitGrants: [] },
               carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
               quotas: [],
-              requireApproval: 'N' as const,
-              allowCcFallback: 'N' as const,
-              fallbackRuleIds: [],
+              fallbacks: [],
             },
           ],
           approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
@@ -1039,9 +1029,7 @@ describe('CartPage', () => {
           limitValue: 2,
         },
       ],
-      requireApproval: 'N' as const,
-      allowCcFallback: 'N' as const,
-      fallbackRuleIds: [],
+      fallbacks: [],
     };
 
     function cartWithQuotaItem(quantity: number) {
@@ -1110,9 +1098,7 @@ describe('CartPage', () => {
       covers: { allAssortments: 'N' as const, categories: [{ progCatId: 1, categoryName: 'Uniform' }], unitGrants: [] },
       carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
       quotas: [],
-      requireApproval: 'N' as const,
-      allowCcFallback: 'N' as const,
-      fallbackRuleIds: [22],
+      fallbacks: [{ seq: 2, ruleId: 22, ruleName: 'Footwear allotment', unit: 'DOLLARS' as const, available: 40 }],
     };
 
     const FOOTWEAR_RULE = {
@@ -1121,7 +1107,7 @@ describe('CartPage', () => {
       ruleName: 'Footwear allotment',
       dollars: { total: 200, used: 0, inCart: 160, available: 40 },
       covers: { allAssortments: 'N' as const, categories: [{ progCatId: 2, categoryName: 'Footwear' }], unitGrants: [] },
-      fallbackRuleIds: [],
+      fallbacks: [],
     };
 
     const UNIT_RULE = {
@@ -1137,7 +1123,7 @@ describe('CartPage', () => {
         categories: [],
         unitGrants: [{ progCatId: 3, categoryName: 'Tactical', unitQty: 5 }],
       },
-      fallbackRuleIds: [],
+      fallbacks: [],
     };
 
     const SHIRT = {
@@ -1250,6 +1236,22 @@ describe('CartPage', () => {
       expect(groups[2].textContent).toContain('Tactical Pants');
     });
 
+    it("shows a group's own fallback rule in its subtitle (\"Then uses: …\"), from the API's fallbacks list", () => {
+      const fixture = TestBed.createComponent(CartPage);
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, GROUPED_CART);
+      fixture.detectChanges();
+
+      const uniformGroup = fixture.nativeElement.querySelectorAll('.allotment-group')[0];
+      expect(uniformGroup.querySelector('.allotment-group__subtitle')?.textContent).toContain(
+        'Then uses: Footwear',
+      );
+
+      // Footwear itself has no configured fallback — nothing to show.
+      const footwearGroup = fixture.nativeElement.querySelectorAll('.allotment-group')[1];
+      expect(footwearGroup.querySelector('.allotment-group__subtitle')?.textContent).not.toContain('Then uses:');
+    });
+
     it("shows a split line's per-allotment breakdown and a fallback note explaining it", () => {
       const fixture = TestBed.createComponent(CartPage);
       fixture.detectChanges();
@@ -1334,7 +1336,7 @@ describe('CartPage', () => {
         ruleId: 41,
         ruleName: 'General Allotment',
         dollars: { total: 1200, used: 0, inCart: 1071.9, available: 128.1 },
-        fallbackRuleIds: [],
+        fallbacks: [],
       };
       const SIMPLE_UNIT_RULE = { ...UNIT_RULE, ruleId: 42, units: { total: 20, used: 0, inCart: 17, available: 3 } };
 
@@ -1389,7 +1391,7 @@ describe('CartPage', () => {
         ruleId: 51,
         ruleName: 'General Allotment',
         dollars: { total: 500, used: -42, inCart: 1071.9, available: -529.9 },
-        fallbackRuleIds: [],
+        fallbacks: [],
       };
       const OVERDRAWN_UNIT_RULE = {
         ...UNIT_RULE,

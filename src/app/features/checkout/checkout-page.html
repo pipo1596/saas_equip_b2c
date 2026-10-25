@@ -369,16 +369,23 @@
               }
 
               @if (orderTotal() > 0) {
-                <div class="alert alert-warning mb-3" role="alert">
-                  @if (pointsOnly()) {
+                @if (pointsOnly()) {
+                  <div class="alert alert-warning mb-3" role="alert">
                     This order isn't fully covered by your points allotment, so it can't be placed yet — adjust
                     items or shipping method to bring it down.
-                  } @else {
-                    Credit card payment isn't available yet. This order has a
-                    {{ orderTotal() | currency }} balance that isn't covered by an allotment, so it can't be
-                    placed until that balance is $0.00 — adjust items or shipping method to bring it down.
-                  }
-                </div>
+                  </div>
+                } @else if (!allowCcOverage()) {
+                  <div class="alert alert-warning mb-3" role="alert">
+                    This order has a {{ orderTotal() | currency }} balance that isn't covered by an allotment, so
+                    it can't be placed until that balance is $0.00 — adjust items or shipping method to bring it
+                    down.
+                  </div>
+                } @else {
+                  <div class="alert alert-info mb-3" role="status">
+                    Up to {{ orderTotal() | currency }} of this order isn't covered by your allotment and will be
+                    charged to your personal card.
+                  </div>
+                }
               }
               @for (status of exceededQuotas(); track status.quota.quotaId) {
                 <div class="alert alert-warning mb-3" role="alert">{{ quotaExceededMessage(status) }}</div>

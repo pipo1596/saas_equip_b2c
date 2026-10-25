@@ -11,6 +11,7 @@ export const POINTS_ONLY_ALLOTMENT: Allotment = {
   allotmentBar: null,
   ruleCount: 1,
   allotExclTaxFreight: 'N',
+  allowCcOverage: 'N',
   rules: [
     {
       ruleId: 90,
@@ -33,9 +34,7 @@ export const POINTS_ONLY_ALLOTMENT: Allotment = {
       covers: { allAssortments: 'Y', categories: [], unitGrants: [] },
       carryover: { type: 'FORFEIT', pct: null, capAmount: null, carriedIn: null },
       quotas: [],
-      requireApproval: 'N',
-      allowCcFallback: 'N',
-      fallbackRuleIds: [],
+      fallbacks: [],
     },
   ],
   approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },

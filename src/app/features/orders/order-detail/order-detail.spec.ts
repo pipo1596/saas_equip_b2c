@@ -49,6 +49,7 @@ const BASE_ORDER = {
     allotPointsUsed: 0,
     allotUnitsUsed: 0,
     customerBilled: 0,
+    ccOverageAmt: 0,
   },
   fulfilment: { ref: null, sentTs: null, lastError: null },
   lines: [
@@ -72,11 +73,25 @@ const BASE_ORDER = {
       unitsUsed: 0,
       dollarsUsed: 179.98,
       pointsUsed: 0,
+      lineShipAmt: 0,
+      lineTaxAmt: 0,
+      ccOverageAmt: 0,
       lineStatus: 'PARTIALLY_SHIPPED' as const,
     },
   ],
   paidFrom: [
-    { ruleId: 99, ruleName: 'General Allotment', amountType: 'DOLLARS' as const, amount: 179.98, state: 'CHARGED' as const },
+    {
+      ruleId: 99,
+      ruleName: 'General Allotment',
+      amountType: 'DOLLARS' as const,
+      amount: 179.98,
+      state: 'CHARGED' as const,
+      isFallback: 'N' as const,
+      fallbackForRuleId: null,
+      fallbackForRuleName: null,
+      orderLineId: null,
+      itemTitle: null,
+    },
   ],
   shipments: [] as never[],
   history: [
@@ -352,6 +367,94 @@ describe('OrderDetailPage', () => {
     expect(fixture.nativeElement.textContent).toContain('(billed to company)');
     expect(fixture.nativeElement.textContent).toContain('Billed to company');
     expect(fixture.nativeElement.textContent).toContain('$41.30');
+  });
+
+  describe('Paid from', () => {
+    const FALLBACK_PAID_FROM = [
+      {
+        ruleId: 40,
+        ruleName: 'Officer 700 Uniform',
+        amountType: 'DOLLARS' as const,
+        amount: 226.27,
+        state: 'CHARGED' as const,
+        isFallback: 'N' as const,
+        fallbackForRuleId: null,
+        fallbackForRuleName: null,
+        orderLineId: null,
+        itemTitle: null,
+      },
+      {
+        ruleId: 41,
+        ruleName: 'Officer Pants $250',
+        amountType: 'DOLLARS' as const,
+        amount: 129.45,
+        state: 'CHARGED' as const,
+        isFallback: 'Y' as const,
+        fallbackForRuleId: 40,
+        fallbackForRuleName: 'Officer 700 Uniform',
+        orderLineId: 8811,
+        itemTitle: 'Jacket',
+      },
+      {
+        ruleId: null,
+        ruleName: 'Personal card',
+        amountType: 'DOLLARS' as const,
+        amount: 22.8,
+        state: 'CARD' as const,
+        isFallback: 'N' as const,
+        fallbackForRuleId: null,
+        fallbackForRuleName: null,
+        orderLineId: null,
+        itemTitle: null,
+      },
+    ];
+
+    it('shows a FALLBACK tag and "for <rule> (<item>)" note on a fallback draw, but not on an ordinary entry', () => {
+      const { fixture } = createPage();
+      fixture.detectChanges();
+      flushOrderGet(httpMock, { ...BASE_ORDER, paidFrom: FALLBACK_PAID_FROM });
+      fixture.detectChanges();
+
+      const rows: HTMLElement[] = fixture.nativeElement.querySelectorAll('.order-detail__paid-from-row');
+      const uniformRow = Array.from(rows).find((row) => row.textContent?.includes('Officer 700 Uniform'))!;
+      expect(uniformRow.querySelector('.order-detail__fallback-tag')).toBeNull();
+
+      const pantsRow = Array.from(rows).find((row) => row.textContent?.includes('Officer Pants $250'))!;
+      expect(pantsRow.querySelector('.order-detail__fallback-tag')?.textContent?.trim()).toBe('Fallback');
+      expect(pantsRow.textContent).toContain('for Officer 700 Uniform (Jacket)');
+    });
+
+    it('shows "Personal card" as its own paid-from line, last', () => {
+      const { fixture } = createPage();
+      fixture.detectChanges();
+      flushOrderGet(httpMock, { ...BASE_ORDER, paidFrom: FALLBACK_PAID_FROM });
+      fixture.detectChanges();
+
+      const rows: HTMLElement[] = fixture.nativeElement.querySelectorAll('.order-detail__paid-from-row');
+      expect(rows[rows.length - 1].textContent).toContain('Personal card');
+    });
+
+    it('shows a callout with the card amount when totals.ccOverageAmt is above 0', () => {
+      const { fixture } = createPage();
+      fixture.detectChanges();
+      flushOrderGet(httpMock, {
+        ...BASE_ORDER,
+        totals: { ...BASE_ORDER.totals, ccOverageAmt: 22.8 },
+        paidFrom: FALLBACK_PAID_FROM,
+      });
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.order-detail__card-note')?.textContent).toContain('$22.80');
+    });
+
+    it('shows no card callout when totals.ccOverageAmt is 0', () => {
+      const { fixture } = createPage();
+      fixture.detectChanges();
+      flushOrderGet(httpMock, BASE_ORDER);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.order-detail__card-note')).toBeNull();
+    });
   });
 
   it('does not show an amount due', () => {
