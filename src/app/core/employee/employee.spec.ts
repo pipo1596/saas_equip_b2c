@@ -102,6 +102,34 @@ describe('EmployeeService', () => {
     expect(second?.profile).toEqual(PROFILE);
   });
 
+  it('fetches fresh for a different empId/sessionId instead of reusing the cached employee — e.g. shopping as someone else', () => {
+    service.load(EMP_ID, SESSION_ID).subscribe();
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE').flush({
+      empId: EMP_ID,
+      firstName: 'pierre',
+      lastName: 'achkar',
+      locations: [],
+      profile: PROFILE,
+    });
+
+    let second: EmployeeDetails | undefined;
+    service.load('E2', 'S2').subscribe((employee) => (second = employee));
+
+    const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE');
+    expect(req.request.body).toEqual({ empId: 'E2', sessionId: 'S2', action: '*GET' });
+    req.flush({
+      empId: 'E2',
+      firstName: 'pat',
+      lastName: 'doe',
+      locations: [],
+      impersonation: { active: true, actorName: 'Pat Admin', actorLevel: 'L1' },
+    });
+
+    expect(second?.firstName).toBe('pat');
+    expect(second?.impersonation).toEqual({ active: true, actorName: 'Pat Admin', actorLevel: 'L1' });
+    expect(service.employee()?.empId).toBe('E2');
+  });
+
   it('shares one in-flight request across concurrent calls', () => {
     let first: EmployeeDetails | undefined;
     let second: EmployeeDetails | undefined;

@@ -1,6 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { Router } from '@angular/router';
 
 import { AuthService, LoginResponse } from './auth';
 import { FAKE_EMAIL, FAKE_EMP_ID, FAKE_FIRST_NAME, FAKE_LAST_NAME, FAKE_PHONE, FAKE_SESSION_ID } from './auth.testing';
@@ -462,6 +463,31 @@ describe('AuthService', () => {
       expect(service.impersonation()).toEqual({ active: true, actorName: 'Pat Admin', actorLevel: 'L1' });
     });
 
+    it("keeps the impersonation flag set at redemption when *GET doesn't echo it back", () => {
+      service.redeemShopAs('9f3c...token').subscribe();
+
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN').flush({
+        success: true,
+        empId: FAKE_EMP_ID,
+        sessionId: FAKE_SESSION_ID,
+        firstName: FAKE_FIRST_NAME,
+        lastName: FAKE_LAST_NAME,
+        email: FAKE_EMAIL,
+        actorName: 'Pat Admin',
+        actorLevel: 'L1',
+        message: null,
+      });
+      expect(service.impersonation()).toEqual({ active: true, actorName: 'Pat Admin', actorLevel: 'L1' });
+
+      // The real-world bug: *GET comes back with no `impersonation` field at
+      // all, right after the SHOPAS1 response already set it.
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
+        .flush({ empId: FAKE_EMP_ID, firstName: FAKE_FIRST_NAME, lastName: FAKE_LAST_NAME });
+
+      expect(service.impersonation()).toEqual({ active: true, actorName: 'Pat Admin', actorLevel: 'L1' });
+    });
+
     it('does nothing to the session on a failed redeem', () => {
       service.redeemShopAs('bad-token').subscribe();
 
@@ -523,6 +549,123 @@ describe('AuthService', () => {
 
       expect(service.isAuthenticated()).toBe(false);
       expect(service.sessionEnded()).toBe(false);
+    });
+  });
+
+  describe('cross-tab session sync', () => {
+    function storedSession(empId: string) {
+      return JSON.stringify({ ...FAKE_SESSION_SHAPE, empId });
+    }
+    const FAKE_SESSION_SHAPE = {
+      sessionId: FAKE_SESSION_ID,
+      firstName: FAKE_FIRST_NAME,
+      lastName: FAKE_LAST_NAME,
+      email: FAKE_EMAIL,
+      phone: FAKE_PHONE,
+      locations: [],
+      impersonation: null,
+    };
+
+    it("signs this tab out (without touching localStorage) when another tab's write is a different employee", () => {
+      localStorage.setItem('auth.session', storedSession(FAKE_EMP_ID));
+      service.login('jane.doe@example.com', 'TestPass123!').subscribe();
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN').flush({
+        success: true,
+        mfaRequired: false,
+        empId: FAKE_EMP_ID,
+        sessionId: FAKE_SESSION_ID,
+        message: null,
+      } satisfies LoginResponse);
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
+        .flush({ empId: FAKE_EMP_ID, firstName: FAKE_FIRST_NAME, lastName: FAKE_LAST_NAME });
+      expect(service.isAuthenticated()).toBe(true);
+
+      const router = TestBed.inject(Router);
+      const navigateSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+
+      // A different tab just shopped-as (or logged in as) a different
+      // employee — writes the new session under the same key.
+      const otherEmployeeSession = storedSession('E2');
+      localStorage.setItem('auth.session', otherEmployeeSession);
+      window.dispatchEvent(new StorageEvent('storage', { key: 'auth.session', newValue: otherEmployeeSession }));
+
+      expect(service.isAuthenticated()).toBe(false);
+      expect(navigateSpy).toHaveBeenCalledWith('/');
+      // Must NOT have removed the other tab's freshly-written session.
+      expect(localStorage.getItem('auth.session')).toBe(otherEmployeeSession);
+    });
+
+    it('signs this tab out when another tab logs out entirely (newValue null)', () => {
+      service.login('jane.doe@example.com', 'TestPass123!').subscribe();
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN').flush({
+        success: true,
+        mfaRequired: false,
+        empId: FAKE_EMP_ID,
+        sessionId: FAKE_SESSION_ID,
+        message: null,
+      } satisfies LoginResponse);
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
+        .flush({ empId: FAKE_EMP_ID, firstName: FAKE_FIRST_NAME, lastName: FAKE_LAST_NAME });
+
+      const router = TestBed.inject(Router);
+      const navigateSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+
+      window.dispatchEvent(new StorageEvent('storage', { key: 'auth.session', newValue: null }));
+
+      expect(service.isAuthenticated()).toBe(false);
+      expect(navigateSpy).toHaveBeenCalledWith('/');
+    });
+
+    it('does nothing when the write is for the same employee already active here', () => {
+      service.login('jane.doe@example.com', 'TestPass123!').subscribe();
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN').flush({
+        success: true,
+        mfaRequired: false,
+        empId: FAKE_EMP_ID,
+        sessionId: FAKE_SESSION_ID,
+        message: null,
+      } satisfies LoginResponse);
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
+        .flush({ empId: FAKE_EMP_ID, firstName: FAKE_FIRST_NAME, lastName: FAKE_LAST_NAME });
+
+      const router = TestBed.inject(Router);
+      const navigateSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+
+      // Same tab re-persisting an update for the same identity (e.g. a
+      // refreshed employee record) — not a real identity change.
+      window.dispatchEvent(
+        new StorageEvent('storage', { key: 'auth.session', newValue: storedSession(FAKE_EMP_ID) }),
+      );
+
+      expect(service.isAuthenticated()).toBe(true);
+      expect(navigateSpy).not.toHaveBeenCalled();
+    });
+
+    it('ignores a storage event for an unrelated key', () => {
+      service.login('jane.doe@example.com', 'TestPass123!').subscribe();
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCLOGIN').flush({
+        success: true,
+        mfaRequired: false,
+        empId: FAKE_EMP_ID,
+        sessionId: FAKE_SESSION_ID,
+        message: null,
+      } satisfies LoginResponse);
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCEMPLYEE')
+        .flush({ empId: FAKE_EMP_ID, firstName: FAKE_FIRST_NAME, lastName: FAKE_LAST_NAME });
+
+      const router = TestBed.inject(Router);
+      const navigateSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+
+      window.dispatchEvent(
+        new StorageEvent('storage', { key: 'some.other.key', newValue: storedSession('E2') }),
+      );
+
+      expect(service.isAuthenticated()).toBe(true);
+      expect(navigateSpy).not.toHaveBeenCalled();
     });
   });
 });

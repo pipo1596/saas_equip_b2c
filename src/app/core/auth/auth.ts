@@ -1,6 +1,7 @@
 import { isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Injectable, PLATFORM_ID, computed, inject, signal } from '@angular/core';
+import { DestroyRef, Injectable, PLATFORM_ID, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { type Observable, tap } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
@@ -34,6 +35,36 @@ const PENDING_MFA_STORAGE_KEY = 'auth.pendingMfa';
 
 function capitalize(value: string): string {
   return value ? value.charAt(0).toUpperCase() + value.slice(1) : '';
+}
+
+// Validates/normalizes a raw `AUTH_STORAGE_KEY` JSON string into a `Session`
+// — shared by this tab's own initial read (`restoreSession`) and by
+// reacting to a *different* tab's write of the same key (`onStorage`
+// below). Pure: never touches storage itself either way, so it's safe to
+// call against a value this tab doesn't own.
+function parseStoredSession(raw: string): Session | null {
+  try {
+    const parsed = JSON.parse(raw) as Partial<Session>;
+    // A session cached before a field (e.g. `locations`, `email`/`phone`)
+    // was added to the Session shape would otherwise silently restore
+    // without it — treat it as absent so the user logs in again and gets
+    // the full payload.
+    if (
+      !parsed.empId ||
+      !parsed.sessionId ||
+      !Array.isArray(parsed.locations) ||
+      typeof parsed.email !== 'string' ||
+      typeof parsed.phone !== 'string'
+    ) {
+      return null;
+    }
+    // Unlike the required fields above, a session cached before
+    // `impersonation` existed just means "not impersonating" — there's no
+    // reason to treat it as absent over it.
+    return { ...parsed, impersonation: parsed.impersonation ?? null } as Session;
+  } catch {
+    return null;
+  }
 }
 
 export interface LoginResponse {
@@ -98,8 +129,23 @@ export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly employeeService = inject(EmployeeService);
   private readonly cartService = inject(CartService);
+  private readonly router = inject(Router);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
   private readonly dispatchUrl = `${environment.apiBaseUrl}/cgi/APPSCDSPCH?SEPGM=APCLOGIN`;
+
+  constructor() {
+    if (!this.isBrowser) {
+      return;
+    }
+    // A *different* employee's session landing in another tab (a fresh
+    // login there, or — the case this is for — a shop-as redemption) means
+    // this tab's own in-memory identity is now stale and potentially the
+    // wrong person's data. `storage` only ever fires in a sibling tab, never
+    // the one that made the write, so there's no risk of a tab reacting to
+    // its own change.
+    window.addEventListener('storage', this.onStorage);
+    inject(DestroyRef).onDestroy(() => window.removeEventListener('storage', this.onStorage));
+  }
 
   readonly session = signal<Session | null>(this.restoreSession());
   readonly pendingMfa = signal<PendingMfa | null>(this.restorePendingMfa());
@@ -238,13 +284,38 @@ export class AuthService {
     );
   }
 
-  private clearLocalState(): void {
+  // Reacts to a *different* employee's session landing in `AUTH_STORAGE_KEY`
+  // from another tab — resets this tab's own reactive state and sends it
+  // back to the login page. Deliberately uses `resetReactiveState()` rather
+  // than `clearLocalState()`: localStorage already correctly holds the
+  // other tab's new session, and removing it here (as a full sign-out would)
+  // would sign that tab back out too. Same identity (or still nobody, on
+  // both sides) is a no-op — most writes to this key are just this same tab
+  // persisting its own session, which never reaches here since `storage`
+  // doesn't fire in the tab that made the write.
+  private readonly onStorage = (event: StorageEvent): void => {
+    if (event.key !== AUTH_STORAGE_KEY) {
+      return;
+    }
+    const incomingEmpId = event.newValue ? (parseStoredSession(event.newValue)?.empId ?? null) : null;
+    if (incomingEmpId === (this.session()?.empId ?? null)) {
+      return;
+    }
+    this.resetReactiveState();
+    this.router.navigateByUrl('/');
+  };
+
+  private resetReactiveState(): void {
     this.session.set(null);
     this.pendingMfa.set(null);
     this.pendingCredentials = null;
     this.employeeService.clear();
     this.cartService.reset();
     this.clearPendingMfa();
+  }
+
+  private clearLocalState(): void {
+    this.resetReactiveState();
     if (this.isBrowser) {
       localStorage.removeItem(AUTH_STORAGE_KEY);
     }
@@ -295,6 +366,15 @@ export class AuthService {
   // The login/MFA response's name/contact fields are a stopgap, and it
   // doesn't carry locations at all — the employee record is the source of
   // truth for all of it.
+  //
+  // `impersonation` is the one field this *doesn't* just take from
+  // `employee` outright — `*GET` doesn't reliably echo it back right after
+  // a fresh `redeemShopAs()` (seen live: the banner flashes in from the
+  // SHOPAS1 response, then disappears the moment this merge lands with a
+  // blank `impersonation`). Since nothing else in this merge is meant to be
+  // able to *end* an impersonation anyway (that's `endSession()`'s job
+  // alone), falling back to whatever the session already had is strictly
+  // safer than trusting `*GET` to carry it.
   private loadEmployeeDetails(session: Session): void {
     this.employeeService.load(session.empId, session.sessionId).subscribe((employee) => {
       const updated: Session = {
@@ -304,7 +384,7 @@ export class AuthService {
         email: employee.profile?.personal.email || session.email,
         phone: employee.profile?.personal.phone || session.phone,
         locations: employee.locations ?? session.locations,
-        impersonation: employee.impersonation,
+        impersonation: employee.impersonation ?? session.impersonation,
       };
       this.session.set(updated);
       this.persistSession(updated);
@@ -322,33 +402,18 @@ export class AuthService {
     if (!this.isBrowser) {
       return null;
     }
-    try {
-      const raw = localStorage.getItem(AUTH_STORAGE_KEY);
-      if (!raw) {
-        return null;
-      }
-      const parsed = JSON.parse(raw) as Partial<Session>;
-      // A session cached before a field (e.g. `locations`, `email`/`phone`)
-      // was added to the Session shape would otherwise silently restore
-      // without it — discard it instead so the user logs in again and gets
-      // the full payload.
-      if (
-        !parsed.empId ||
-        !parsed.sessionId ||
-        !Array.isArray(parsed.locations) ||
-        typeof parsed.email !== 'string' ||
-        typeof parsed.phone !== 'string'
-      ) {
-        localStorage.removeItem(AUTH_STORAGE_KEY);
-        return null;
-      }
-      // Unlike the required fields above, a session cached before
-      // `impersonation` existed just means "not impersonating" — there's no
-      // reason to force a re-login over it.
-      return { ...parsed, impersonation: parsed.impersonation ?? null } as Session;
-    } catch {
+    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (!raw) {
       return null;
     }
+    const session = parseStoredSession(raw);
+    if (!session) {
+      // Cached before a field in the current `Session` shape existed, or
+      // otherwise malformed — discard it so the user logs in again and gets
+      // the full payload, rather than silently restoring a partial session.
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+    }
+    return session;
   }
 
   private persistPendingMfa(pending: PendingMfa): void {

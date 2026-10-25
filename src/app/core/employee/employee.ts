@@ -94,15 +94,33 @@ export class EmployeeService {
 
   readonly employee = signal<EmployeeDetails | null>(null);
 
+  // Keyed by empId+sessionId, same reasoning as `CatalogViewService`'s own
+  // per-location cache — without this, a `redeemShopAs()` for a *different*
+  // employee than whoever's already cached in this tab (e.g. an admin who
+  // was browsing their own account, then shops as someone else without a
+  // full page reload in between) would silently keep returning that other
+  // employee's stale record — wrong name, wrong locations, and a stale
+  // `impersonation` flag — forever, since nothing here ever re-fetched for
+  // the new identity.
+  private cachedKey: string | null = null;
   private request$: Observable<EmployeeDetails> | null = null;
 
   /**
-   * Fetches the logged-in employee's details once and caches the result —
-   * called right after a successful login/MFA verification. Safe to call
-   * again from other places (e.g. a future profile page) since later callers
-   * reuse the cached value or the same in-flight request.
+   * Fetches an employee's details once per (empId, sessionId) and caches the
+   * result — called right after a successful login/MFA verification or a
+   * shop-as redemption. Safe to call again from other places (e.g. a future
+   * profile page) since later callers for the *same* identity reuse the
+   * cached value or the same in-flight request; a different identity
+   * invalidates the cache and fetches fresh.
    */
   load(empId: string, sessionId: string): Observable<EmployeeDetails> {
+    const key = `${empId}:${sessionId}`;
+    if (this.cachedKey !== key) {
+      this.cachedKey = key;
+      this.employee.set(null);
+      this.request$ = null;
+    }
+
     const cached = this.employee();
     if (cached) {
       return of(cached);
@@ -122,6 +140,7 @@ export class EmployeeService {
 
   clear(): void {
     this.employee.set(null);
+    this.cachedKey = null;
     this.request$ = null;
   }
 }

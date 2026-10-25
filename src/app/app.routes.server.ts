@@ -68,6 +68,19 @@ export const serverRoutes: ServerRoute[] = [
     path: 'approvals',
     renderMode: RenderMode.Client,
   },
+  // Reads its one-time token from `location.hash` (browser-only) and
+  // redirects based on the session it just established — `ngOnInit` itself
+  // no-ops during SSR (see `ShopAs.isBrowser`). Left on the prerender
+  // catch-all, this page (and the whole app shell around it, including
+  // `<app-impersonation-banner>`/`sessionEnded`) gets baked from an
+  // anonymous, no-session snapshot at build time; a real visitor's actual
+  // client-side auth state then mismatches that snapshot at hydration,
+  // which can leave part of the page (reportedly the header) never
+  // properly mounted after the redirect to `/home`.
+  {
+    path: 'shop-as',
+    renderMode: RenderMode.Client,
+  },
   {
     path: '**',
     renderMode: RenderMode.Prerender
