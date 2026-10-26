@@ -13,6 +13,7 @@ import {
   LineAllocation,
   LineTag,
   PayUnit,
+  preferSpecificCoverage,
   tileBalance,
   unitGrantForCategories,
 } from './cart';
@@ -279,13 +280,19 @@ export function effectiveLineTags(cart: Cart): Map<number, LineTag> {
     if (trulyAvailable > 0) {
       continue;
     }
-    const dollarRule = rules.find(
-      (candidate) =>
-        (candidate.allotType === 'DOLLAR' || candidate.allotType === 'DOLLAR_UNITS') &&
-        candidate.ruleId !== tag.ruleId &&
-        (candidate.covers.allAssortments === 'Y' ||
-          candidate.covers.categories.some((category) => item.progCatIds.includes(category.progCatId))) &&
-        (candidate.dollars?.available ?? 0) > 0,
+    // Prefer a dollar rule scoped to this item's own categories over a
+    // generic "any item" one, same as `ruleForCategories` does for the
+    // catalog preview — a department's own bespoke allotment should pick up
+    // the overflow before a catch-all does.
+    const dollarRule = preferSpecificCoverage(
+      rules.filter(
+        (candidate) =>
+          (candidate.allotType === 'DOLLAR' || candidate.allotType === 'DOLLAR_UNITS') &&
+          candidate.ruleId !== tag.ruleId &&
+          (candidate.covers.allAssortments === 'Y' ||
+            candidate.covers.categories.some((category) => item.progCatIds.includes(category.progCatId))) &&
+          (candidate.dollars?.available ?? 0) > 0,
+      ),
     );
     if (dollarRule) {
       effective.set(item.cartItemId, {

@@ -302,6 +302,18 @@ function unitsReallyExhausted(units: Balance): boolean {
   return units.total - units.used - (units.reserved ?? 0) <= 0;
 }
 
+// Prefers a rule scoped to specific categories over one that covers "any
+// item in the catalog" (`allAssortments: 'Y'`) when more than one rule of
+// the same pay type covers the same product — a department's own bespoke
+// allotment should get used ahead of a generic catch-all that happens to
+// cover everything else too. Ties (more than one specific match) keep
+// whichever comes first in the API's own rule order, same as a plain
+// `.find()` would; `candidates` is expected pre-filtered to rules that
+// already cover the product and (where relevant) still have room.
+export function preferSpecificCoverage<T extends AllotmentRule>(candidates: T[]): T | undefined {
+  return candidates.find((rule) => rule.covers.allAssortments === 'N') ?? candidates[0];
+}
+
 // Which rule (if any) a product is likely covered by, found by matching its
 // own program-category ids against each rule's covered categories, in the
 // same Units -> Dollars -> Points priority the real checkout allocation
@@ -346,8 +358,8 @@ export function ruleForCategories(
   const coveredByAssortments = (rule: AllotmentRule) =>
     rule.covers.allAssortments === 'Y' || rule.covers.categories.some((category) => progCatIds.includes(category.progCatId));
 
-  const dollarsRule = rules.find(
-    (rule) => (rule.allotType === 'DOLLAR' || rule.allotType === 'DOLLAR_UNITS') && coveredByAssortments(rule),
+  const dollarsRule = preferSpecificCoverage(
+    rules.filter((rule) => (rule.allotType === 'DOLLAR' || rule.allotType === 'DOLLAR_UNITS') && coveredByAssortments(rule)),
   );
   if (dollarsRule) {
     // A dollar rule that's in scope but empty still blocks points — it
@@ -355,8 +367,8 @@ export function ruleForCategories(
     return (dollarsRule.dollars?.available ?? 0) > 0 ? dollarsRule : null;
   }
 
-  const pointsRule = rules.find(
-    (rule) => rule.allotType === 'POINTS' && coveredByAssortments(rule) && (rule.points?.available ?? 0) > 0,
+  const pointsRule = preferSpecificCoverage(
+    rules.filter((rule) => rule.allotType === 'POINTS' && coveredByAssortments(rule) && (rule.points?.available ?? 0) > 0),
   );
   return pointsRule ?? null;
 }

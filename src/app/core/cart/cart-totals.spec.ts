@@ -785,6 +785,43 @@ describe('effectiveLineTags', () => {
     expect(lineTagByItemId(cart).get(1)?.ruleId).toBe(12);
   });
 
+  it('prefers a dollar rule scoped to the item\'s own category over a generic "any item" one, once units are exhausted', () => {
+    const exhaustedUnitsRule: AllotmentRule = {
+      ...UNITS_RULE,
+      covers: {
+        ...UNITS_RULE.covers,
+        unitGrants: [
+          { progCatId: 310, categoryName: 'Cap', unitQty: 2, remaining: 0, reserved: 0 },
+          { progCatId: 60, categoryName: 'Tactical', unitQty: 9, remaining: 9, reserved: 0 },
+        ],
+      },
+    };
+    const capSpecificDollarRule: AllotmentRule = {
+      ...DOLLAR_RULE,
+      ruleId: 41,
+      ruleName: 'Cap Allowance',
+      covers: { allAssortments: 'N', categories: [{ progCatId: 310, categoryName: 'Cap' }], unitGrants: [] },
+    };
+    const cap = makeItem({ cartItemId: 1, skuId: 1, quantity: 13, progCatIds: [310] });
+    const cart: Cart = {
+      cartId: 1,
+      itemCount: 1,
+      subtotalPrice: 0,
+      subtotalPoints: 0,
+      items: [cap],
+      roleRequiresApproval: 'N',
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        // The generic rule comes first in rule order — a plain `.find()`
+        // would wrongly pick it over the Cap-specific one.
+        rules: [exhaustedUnitsRule, DOLLAR_RULE, capSpecificDollarRule],
+        lineTags: [makeTag({ cartItemId: 1, skuId: 1, ruleId: 12, payUnit: 'UNITS' })],
+      },
+    };
+
+    expect(effectiveLineTags(cart).get(1)?.ruleId).toBe(41);
+  });
+
   it("keeps a line under its real units rule as long as its category still has *any* real room left, no matter how far the quantity is raised past it", () => {
     // Cap only grants 2, and 13 are in the cart — wildly over — but the
     // grant's own `remaining` (2) hasn't been touched by real usage, so

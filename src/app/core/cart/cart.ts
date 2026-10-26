@@ -27,6 +27,7 @@ export {
   coverageLabel,
   formatBalanceAmount,
   meterPct,
+  preferSpecificCoverage,
   ruleForCategories,
   tileBalance,
   unitGrantForCategories,
