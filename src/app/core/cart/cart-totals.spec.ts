@@ -377,6 +377,119 @@ describe('amountDueAtCheckout', () => {
     expect(amountDueAtCheckout(cart)).toBe(0);
     expect(pointsShortfall(cart)).toBe(1100);
   });
+
+  it("catches a dollar rule that's over-committed by a fallback split even though its own `available` is clamped at 0, not negative", () => {
+    // Reproduces a real reported case: a jacket split between two dollar
+    // rules (its own, plus a fallback once that ran out) and a trousers
+    // line fully on the fallback rule — the fallback rule's own pooled
+    // `inCart`/`available` get capped at its own $250 total server-side
+    // (never going negative), but the per-line allocations it was actually
+    // tagged for ($184.37 + $118.01 = $302.38) genuinely exceed that.
+    const officerUniform: AllotmentRule = {
+      ...POINTS_ONLY_ALLOTMENT.rules[0],
+      ruleId: 40,
+      ruleName: 'Officer 700 Uniform',
+      allotType: 'DOLLAR',
+      primaryUnit: 'DOLLARS',
+      points: null,
+      dollars: { total: 700, used: 606.91, inCart: 93.09, available: 0 },
+    };
+    const officerPants: AllotmentRule = {
+      ...POINTS_ONLY_ALLOTMENT.rules[0],
+      ruleId: 41,
+      ruleName: 'Officer Pants $250',
+      allotType: 'DOLLAR',
+      primaryUnit: 'DOLLARS',
+      points: null,
+      dollars: { total: 250, used: 0, inCart: 250, available: 0 },
+    };
+    const jacket = makeItem({ cartItemId: 1, skuId: 1, lineTotalPrice: 277.46, quantity: 1, progCatIds: [] });
+    const trousers = makeItem({ cartItemId: 2, skuId: 2, lineTotalPrice: 118.01, quantity: 1, progCatIds: [] });
+    const cart: Cart = {
+      cartId: 1,
+      itemCount: 2,
+      subtotalPrice: 395.47,
+      subtotalPoints: 0,
+      items: [jacket, trousers],
+      roleRequiresApproval: 'N',
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        rules: [officerUniform, officerPants],
+        lineTags: [
+          makeTag({
+            cartItemId: 1,
+            skuId: 1,
+            ruleId: 40,
+            payUnit: 'DOLLARS',
+            allocations: [
+              { ruleId: 40, payUnit: 'DOLLARS', amount: 93.09 },
+              { ruleId: 41, payUnit: 'DOLLARS', amount: 184.37 },
+            ],
+          }),
+          makeTag({ cartItemId: 2, skuId: 2, ruleId: 41, payUnit: 'DOLLARS', allocations: [{ ruleId: 41, payUnit: 'DOLLARS', amount: 118.01 }] }),
+        ],
+      },
+    };
+
+    expect(amountDueAtCheckout(cart)).toBeCloseTo(52.38, 2);
+
+    // "Paid from" total + Balance should now actually add up to the order
+    // value — the bug this fixes was exactly that they didn't.
+    const paidFromTotal = paidFromLines(cart).reduce((sum, line) => sum + line.amount, 0);
+    expect(paidFromTotal + amountDueAtCheckout(cart)).toBeCloseTo(cart.subtotalPrice, 2);
+  });
+
+  it("shows no balance when a line's *home* rule has nothing left but a fallback rule's own pooled balance already shows it fully covered", () => {
+    // Reproduces a second real reported case, the mirror image of the one
+    // above: the shirt's tag still names "Officer 700 Uniform" as its home
+    // rule (that's what it's grouped/displayed under) and carries no
+    // explicit `allocations` split at all, but that rule's own pooled
+    // `inCart` is $0 — none of this cart is really charged to it. The real
+    // charge landed entirely on the fallback, "Officer Pants $250", whose
+    // own pooled `inCart` ($120.14) already equals both lines combined.
+    // Crediting the shirt's full price to its named home rule (the old,
+    // simple per-line fallback) would wrongly invent a shortfall here.
+    const officerUniform: AllotmentRule = {
+      ...POINTS_ONLY_ALLOTMENT.rules[0],
+      ruleId: 40,
+      ruleName: 'Officer 700 Uniform',
+      allotType: 'DOLLAR',
+      primaryUnit: 'DOLLARS',
+      points: null,
+      dollars: { total: 700, used: 606.91, inCart: 0, available: 93.09 },
+    };
+    const officerPants: AllotmentRule = {
+      ...POINTS_ONLY_ALLOTMENT.rules[0],
+      ruleId: 41,
+      ruleName: 'Officer Pants $250',
+      allotType: 'DOLLAR',
+      primaryUnit: 'DOLLARS',
+      points: null,
+      dollars: { total: 250, used: 0, inCart: 120.14, available: 129.86 },
+    };
+    const shirt = makeItem({ cartItemId: 1, skuId: 1, lineTotalPrice: 105.14, quantity: 1, progCatIds: [] });
+    const thermal = makeItem({ cartItemId: 2, skuId: 2, lineTotalPrice: 15.0, quantity: 1, progCatIds: [] });
+    const cart: Cart = {
+      cartId: 1,
+      itemCount: 2,
+      subtotalPrice: 120.14,
+      subtotalPoints: 0,
+      items: [shirt, thermal],
+      roleRequiresApproval: 'N',
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        rules: [officerUniform, officerPants],
+        // Neither tag carries a split `allocations` array — exactly the
+        // common-case shape, not the richer split from the test above.
+        lineTags: [
+          makeTag({ cartItemId: 1, skuId: 1, ruleId: 40, payUnit: 'DOLLARS' }),
+          makeTag({ cartItemId: 2, skuId: 2, ruleId: 41, payUnit: 'DOLLARS' }),
+        ],
+      },
+    };
+
+    expect(amountDueAtCheckout(cart)).toBe(0);
+  });
 });
 
 const CAP_QUOTA: AllotmentQuota = {

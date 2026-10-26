@@ -337,25 +337,43 @@ export function paidFromLines(cart: Cart): PaidFromLine[] {
 }
 
 // Subtotal minus whatever every line's own allocations cover, corrected
-// back down for any rule that's actually over-drawn (a negative
-// `available` — its lines were tagged as covered, but the rule can't
-// really pay for all of them). A dollar rule's own shortfall is exact; a
-// units/points rule's shortfall is only a *count*, so it's prorated
-// across that rule's own lines by their share of the requested units, for
-// lack of a per-unit dollar rate to convert it exactly.
+// back down for any rule that's actually over-drawn. A units/points rule's
+// shortfall is only a *count*, so it's prorated across that rule's own
+// lines by their share of the requested units, for lack of a per-unit
+// dollar rate to convert it exactly.
+//
+// The dollar side deliberately does *not* try to attribute each line's
+// dollar value to whichever specific rule its own tag names — a line's tag
+// names a "home" rule for display/grouping, but once that rule's own
+// balance runs out, the real charge can land entirely on a fallback rule
+// instead, with the line's tag never updated to say so (it can even still
+// read $0 `available`-but-not-negative on its *home* rule while the
+// fallback rule's own pooled `inCart` already reflects the true, full
+// charge). Trusting the per-line tag here either overstates coverage (two
+// rules' line-level claims add up to more than either can really give) or
+// understates it (a line's tag claims its empty home rule when the
+// fallback actually covered it in full) depending on exactly what the
+// per-line data happens to say — neither of which matches what the dollar
+// rules' own pooled balances already report actually happened.
+//
+// So instead: total up every dollar-tagged line's value (`dollarEligible`,
+// regardless of which specific rule it names) and compare that against the
+// combined real capacity of every dollar rule together (`dollarCovered`,
+// each capped at its own `total - used` the same way `paidFromLines` caps
+// its own display) — whatever the combined pool can't give is the real
+// shortfall. Units/points allocations are excluded from this and still
+// handled per-rule below, same as before.
 export function amountDueAtCheckout(cart: Cart): number {
   const rules = cart.allotment?.rules ?? [];
   const byItemId = lineTagByItemId(cart);
   const requestedByRuleId = new Map<number, { units: number; dollarValue: number }>();
+  let dollarEligible = 0;
 
   const covered = cart.items.reduce((sum, item) => {
     const allocations = resolvedAllocations(item, byItemId.get(item.cartItemId));
     if (allocations.length === 0) {
       return sum;
     }
-    const dollarsCovered = allocations
-      .filter((allocation) => allocation.payUnit === 'DOLLARS')
-      .reduce((total, allocation) => total + allocation.amount, 0);
     const nonDollarAllocations = allocations.filter((allocation) => allocation.payUnit !== 'DOLLARS');
     for (const allocation of nonDollarAllocations) {
       const requested = requestedByRuleId.get(allocation.ruleId) ?? { units: 0, dollarValue: 0 };
@@ -363,16 +381,31 @@ export function amountDueAtCheckout(cart: Cart): number {
       requested.dollarValue += item.lineTotalPrice;
       requestedByRuleId.set(allocation.ruleId, requested);
     }
-    return sum + dollarsCovered + (nonDollarAllocations.length > 0 ? item.lineTotalPrice : 0);
+    if (nonDollarAllocations.length > 0) {
+      return sum + item.lineTotalPrice;
+    }
+    // Every allocation on this line is DOLLARS — counted against the
+    // combined dollar pool below, not this one line's own tagged rule.
+    dollarEligible += item.lineTotalPrice;
+    return sum;
   }, 0);
 
-  const shortfall = rules.reduce((sum, rule) => {
+  const dollarCovered = rules.reduce((sum, rule) => {
+    if (rule.primaryUnit !== 'DOLLARS') {
+      return sum;
+    }
+    const balance = tileBalance(rule);
+    return balance ? sum + Math.max(0, Math.min(balance.inCart, balance.total - balance.used)) : sum;
+  }, 0);
+  const dollarShortfall = Math.max(0, dollarEligible - dollarCovered);
+
+  const nonDollarShortfall = rules.reduce((sum, rule) => {
+    if (rule.primaryUnit === 'DOLLARS') {
+      return sum;
+    }
     const balance = tileBalance(rule);
     if (!balance || balance.available >= 0) {
       return sum;
-    }
-    if (rule.primaryUnit === 'DOLLARS') {
-      return sum - balance.available;
     }
     const requested = requestedByRuleId.get(rule.ruleId);
     if (!requested || requested.units <= 0) {
@@ -382,7 +415,7 @@ export function amountDueAtCheckout(cart: Cart): number {
     return sum + requested.dollarValue * (shortfallUnits / requested.units);
   }, 0);
 
-  return Math.max(0, cart.subtotalPrice - covered + shortfall);
+  return Math.max(0, cart.subtotalPrice - covered - dollarEligible + dollarShortfall + nonDollarShortfall);
 }
 
 // The points equivalent of `amountDueAtCheckout` — how many points, in
