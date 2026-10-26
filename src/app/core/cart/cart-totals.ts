@@ -56,6 +56,18 @@ export interface PaidFromLineCategory {
   amount: number;
 }
 
+// A fallback draw's own row names the rule it's standing in for, and which
+// item(s) spilled over — e.g. this row's own `ruleName` is "Officer Pants
+// $250" and `fromRuleName` is "Officer 700 Uniform", because its own Jacket
+// line couldn't be fully covered and fell back here. Shown as a separate
+// row from that rule's own home coverage, with a FALLBACK badge — same idea
+// as the order's own post-purchase "Paid from" breakdown once a real order
+// exists (see `order.ts`'s `PaidFrom`).
+export interface PaidFromFallbackSource {
+  fromRuleName: string;
+  itemTitles: string[];
+}
+
 export interface PaidFromLine {
   ruleName: string;
   unit: PayUnit;
@@ -69,6 +81,11 @@ export interface PaidFromLine {
   // an over-drawn rule — they're a per-category explanation of what's in
   // the cart right now, not a second checkout-math figure.
   categoryBreakdown: PaidFromLineCategory[];
+  // Set when this row IS a fallback draw rather than the rule's own home
+  // coverage — a rule covering both gets two separate rows, its own first,
+  // then one row per distinct rule it's absorbing overflow from. `null` for
+  // an ordinary row.
+  fallback: PaidFromFallbackSource | null;
 }
 
 export interface QuotaStatus {
@@ -308,32 +325,125 @@ export function effectiveLineTags(cart: Cart): Map<number, LineTag> {
   return effective;
 }
 
-// What actually pays for this order, one line per rule with anything
-// `inCart` right now — including a rule with no home items of its own,
-// since its own balance already folds in whatever it lent elsewhere.
+// This dollar rule's own real pre-cart capacity, capped the same way
+// `paidFromLines` caps what it can ever claim — `null` for a non-dollar
+// rule (fallbacks only ever exist among dollar rules, the same scope
+// `effectiveLineTags`'s own rescue already keeps to).
+function dollarCapacity(rule: AllotmentRule): number | null {
+  if (rule.primaryUnit !== 'DOLLARS') {
+    return null;
+  }
+  const balance = tileBalance(rule);
+  return balance ? Math.max(0, Math.min(balance.inCart, balance.total - balance.used)) : null;
+}
+
+// This rule's own home lines — the items whose *first* resolved allocation
+// names it — and what they actually cost. Deliberately doesn't look at a
+// line's own `allocations` split for anything beyond that first entry: a
+// plain, unsplit tag (the common case) never carries one at all, even when
+// a fallback really did kick in (see `amountDueAtCheckout`'s own comment
+// for the same reasoning — a line's tag can keep naming its empty "home"
+// rule while the real charge already landed on a fallback).
+function dollarHomeLines(
+  rule: AllotmentRule,
+  cart: Cart,
+  byItemId: Map<number, LineTag>,
+): { need: number; itemTitles: string[] } {
+  const homeItems = cart.items.filter(
+    (item) => resolvedAllocations(item, byItemId.get(item.cartItemId))[0]?.ruleId === rule.ruleId,
+  );
+  return {
+    need: homeItems.reduce((sum, item) => sum + item.lineTotalPrice, 0),
+    itemTitles: homeItems.map((item) => item.productTitle),
+  };
+}
+
+// What actually pays for this order. A dollar rule that's both covering its
+// own home line(s) *and* absorbing another rule's overflow gets two
+// separate rows — its own home coverage first, then one row per distinct
+// rule it's standing in for, each flagged via `fallback` — rather than one
+// pooled figure, so "Officer Pants $250" can show up twice: once for its
+// own item, once for the Jacket it rescued. This reconciles purely from
+// each rule's own pooled balance and its declared `fallbacks` chain, not
+// from any per-line split, for the same reason `dollarHomeLines` doesn't.
 export function paidFromLines(cart: Cart): PaidFromLine[] {
   const rules = cart.allotment?.rules ?? [];
-  return rules
-    .map((rule) => ({ rule, balance: tileBalance(rule) }))
-    .filter((entry) => !!entry.balance && entry.balance.inCart > 0)
-    .map((entry) => {
-      const balance = entry.balance!;
-      // `inCart` is what was *requested* against this rule, which can run
-      // past what it actually has left (a negative `available`) once
-      // there isn't enough to cover everything tagged to it — cap the
-      // claimed amount at the rule's real remaining balance so this line
-      // never states more than the rule can actually give. A dollar rule
-      // still has the "Balance" row to cover the true remainder by card;
-      // a points rule has no such fallback, so overstating it here would
-      // be the only number shown, and it'd be wrong.
-      const amount = Math.max(0, Math.min(balance.inCart, balance.total - balance.used));
-      return {
-        ruleName: entry.rule.ruleName,
-        unit: entry.rule.primaryUnit,
+  const byItemId = lineTagByItemId(cart);
+  const lines: PaidFromLine[] = [];
+  // How much of a dollar rule's own capacity, beyond its own home need, is
+  // still unclaimed as borrowers are matched to it below — lets one
+  // surplus rule's overflow split across more than one borrower, in the
+  // unlikely event it's declared as more than one rule's fallback.
+  const spareByRuleId = new Map<number, number>();
+  // Each dollar rule's own home need/items, computed once in the first
+  // pass below and reused in the second rather than re-filtering
+  // `cart.items` per rule.
+  const homeByRuleId = new Map<number, { need: number; itemTitles: string[] }>();
+
+  for (const rule of rules) {
+    const balance = tileBalance(rule);
+    if (!balance || balance.inCart <= 0) {
+      continue;
+    }
+    const amount = Math.max(0, Math.min(balance.inCart, balance.total - balance.used));
+    if (amount <= 0) {
+      continue;
+    }
+    if (rule.primaryUnit !== 'DOLLARS') {
+      lines.push({
+        ruleName: rule.ruleName,
+        unit: rule.primaryUnit,
         amount,
-        categoryBreakdown: unitCategoryBreakdown(entry.rule, cart),
-      };
-    });
+        categoryBreakdown: unitCategoryBreakdown(rule, cart),
+        fallback: null,
+      });
+      continue;
+    }
+    const { need, itemTitles } = dollarHomeLines(rule, cart, byItemId);
+    const ownAmount = Math.min(amount, need);
+    if (ownAmount > 0) {
+      lines.push({ ruleName: rule.ruleName, unit: 'DOLLARS', amount: ownAmount, categoryBreakdown: [], fallback: null });
+    }
+    spareByRuleId.set(rule.ruleId, amount - ownAmount);
+    // Stash each dollar rule's own home need/items again below without
+    // recomputing — `rule.ruleId` is unique, so a second map keyed the same
+    // way is cheaper than filtering `cart.items` a second time per rule.
+    homeByRuleId.set(rule.ruleId, { need, itemTitles });
+  }
+
+  for (const rule of rules) {
+    const capacity = dollarCapacity(rule);
+    if (capacity === null) {
+      continue;
+    }
+    const home = homeByRuleId.get(rule.ruleId) ?? dollarHomeLines(rule, cart, byItemId);
+    let shortfall = home.need - capacity;
+    if (shortfall <= 0 || home.itemTitles.length === 0) {
+      continue;
+    }
+    for (const fallback of [...rule.fallbacks].sort((a, b) => a.seq - b.seq)) {
+      if (shortfall <= 0) {
+        break;
+      }
+      const available = spareByRuleId.get(fallback.ruleId) ?? 0;
+      if (available <= 0) {
+        continue;
+      }
+      const draw = Math.min(available, shortfall);
+      const fallbackRule = rules.find((candidate) => candidate.ruleId === fallback.ruleId);
+      lines.push({
+        ruleName: fallbackRule?.ruleName ?? fallback.ruleName,
+        unit: 'DOLLARS',
+        amount: draw,
+        categoryBreakdown: [],
+        fallback: { fromRuleName: rule.ruleName, itemTitles: home.itemTitles },
+      });
+      spareByRuleId.set(fallback.ruleId, available - draw);
+      shortfall -= draw;
+    }
+  }
+
+  return lines;
 }
 
 // Subtotal minus whatever every line's own allocations cover, corrected

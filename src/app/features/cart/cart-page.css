@@ -304,6 +304,24 @@ a.cart-page__thumb-link {
 .cart-page__summary-amount--shortfall {
   color: var(--bs-danger, #dc3545);
 }
+.cart-page__summary-fallback-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  background: #fff4dd;
+  color: #8a4b00;
+  border: 1px solid #f0c27a;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.cart-page__summary-fallback-note {
+  margin-top: -6px;
+  font-size: 12px;
+  color: var(--slate-500);
+}
 
 .cart-page__checkout {
   display: flex;

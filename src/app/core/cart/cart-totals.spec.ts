@@ -219,7 +219,7 @@ describe('paidFromLines', () => {
     const cart = makeOverdrawnPointsCart(20);
 
     expect(paidFromLines(cart)).toEqual([
-      { ruleName: 'Points Allowance', unit: 'POINTS', amount: 400, categoryBreakdown: [] },
+      { ruleName: 'Points Allowance', unit: 'POINTS', amount: 400, categoryBreakdown: [], fallback: null },
     ]);
   });
 
@@ -227,7 +227,7 @@ describe('paidFromLines', () => {
     const cart = makeOverdrawnPointsCart(-50);
 
     expect(paidFromLines(cart)).toEqual([
-      { ruleName: 'Points Allowance', unit: 'POINTS', amount: 350, categoryBreakdown: [] },
+      { ruleName: 'Points Allowance', unit: 'POINTS', amount: 350, categoryBreakdown: [], fallback: null },
     ]);
   });
 
@@ -368,6 +368,164 @@ describe('paidFromLines', () => {
   });
 });
 
+describe('paidFromLines — fallback rows', () => {
+  const uniformRule: AllotmentRule = {
+    ...POINTS_ONLY_ALLOTMENT.rules[0],
+    ruleId: 21,
+    ruleName: 'Uniform allotment',
+    allotType: 'DOLLAR',
+    primaryUnit: 'DOLLARS',
+    points: null,
+    dollars: { total: 100, used: 0, inCart: 100, available: 0 },
+    fallbacks: [{ seq: 2, ruleId: 22, ruleName: 'Footwear allotment', unit: 'DOLLARS', available: 40 }],
+  };
+  const footwearRule: AllotmentRule = {
+    ...POINTS_ONLY_ALLOTMENT.rules[0],
+    ruleId: 22,
+    ruleName: 'Footwear allotment',
+    allotType: 'DOLLAR',
+    primaryUnit: 'DOLLARS',
+    points: null,
+    dollars: { total: 200, used: 0, inCart: 160, available: 40 },
+  };
+  const shirt = makeItem({
+    cartItemId: 1,
+    skuId: 1,
+    lineTotalPrice: 140,
+    quantity: 1,
+    progCatIds: [],
+    productTitle: 'Station Shirt',
+  });
+  const boot = makeItem({
+    cartItemId: 2,
+    skuId: 2,
+    lineTotalPrice: 120,
+    quantity: 1,
+    progCatIds: [],
+    productTitle: 'Station Boot',
+  });
+
+  function makeCart(): Cart {
+    return {
+      cartId: 1,
+      itemCount: 2,
+      subtotalPrice: 260,
+      subtotalPoints: 0,
+      items: [shirt, boot],
+      roleRequiresApproval: 'N',
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        rules: [uniformRule, footwearRule],
+        lineTags: [
+          makeTag({
+            cartItemId: 1,
+            skuId: 1,
+            ruleId: 21,
+            payUnit: 'DOLLARS',
+            allocations: [
+              { ruleId: 21, payUnit: 'DOLLARS', amount: 100 },
+              { ruleId: 22, payUnit: 'DOLLARS', amount: 40 },
+            ],
+          }),
+          makeTag({ cartItemId: 2, skuId: 2, ruleId: 22, payUnit: 'DOLLARS', allocations: [{ ruleId: 22, payUnit: 'DOLLARS', amount: 120 }] }),
+        ],
+      },
+    };
+  }
+
+  it('splits a rule that both covers its own home item and absorbs a fallback into two separate rows', () => {
+    const lines = paidFromLines(makeCart());
+
+    expect(lines).toEqual([
+      { ruleName: 'Uniform allotment', unit: 'DOLLARS', amount: 100, categoryBreakdown: [], fallback: null },
+      { ruleName: 'Footwear allotment', unit: 'DOLLARS', amount: 120, categoryBreakdown: [], fallback: null },
+      {
+        ruleName: 'Footwear allotment',
+        unit: 'DOLLARS',
+        amount: 40,
+        categoryBreakdown: [],
+        fallback: { fromRuleName: 'Uniform allotment', itemTitles: ['Station Shirt'] },
+      },
+    ]);
+  });
+
+  it('detects the overflow from a plain, unsplit line tag just as well — no `allocations` split required at all', () => {
+    // The common real-world shape: the shirt's tag just names "Uniform
+    // allotment" as its home rule, with no explicit `allocations` split —
+    // this must still be caught, purely from each rule's own pooled
+    // capacity vs. its own home lines' real cost.
+    const cart: Cart = {
+      cartId: 1,
+      itemCount: 2,
+      subtotalPrice: 260,
+      subtotalPoints: 0,
+      items: [shirt, boot],
+      roleRequiresApproval: 'N',
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        rules: [uniformRule, footwearRule],
+        lineTags: [
+          makeTag({ cartItemId: 1, skuId: 1, ruleId: 21, payUnit: 'DOLLARS' }),
+          makeTag({ cartItemId: 2, skuId: 2, ruleId: 22, payUnit: 'DOLLARS' }),
+        ],
+      },
+    };
+
+    const lines = paidFromLines(cart);
+    const fallbackRow = lines.find((line) => line.fallback !== null);
+    expect(fallbackRow?.ruleName).toBe('Footwear allotment');
+    expect(fallbackRow?.amount).toBeCloseTo(40, 2);
+    expect(fallbackRow?.fallback).toEqual({ fromRuleName: 'Uniform allotment', itemTitles: ['Station Shirt'] });
+  });
+
+  it("doesn't attribute spare capacity to a rule the short rule hasn't actually declared as its own fallback", () => {
+    const unrelatedRule: AllotmentRule = {
+      ...uniformRule,
+      ruleId: 23,
+      ruleName: 'Unrelated Allotment',
+      fallbacks: [], // Does NOT name footwearRule as its fallback.
+    };
+    const cart: Cart = {
+      cartId: 1,
+      itemCount: 2,
+      subtotalPrice: 260,
+      subtotalPoints: 0,
+      items: [shirt, boot],
+      roleRequiresApproval: 'N',
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        rules: [unrelatedRule, footwearRule],
+        lineTags: [
+          makeTag({ cartItemId: 1, skuId: 1, ruleId: 23, payUnit: 'DOLLARS' }),
+          makeTag({ cartItemId: 2, skuId: 2, ruleId: 22, payUnit: 'DOLLARS' }),
+        ],
+      },
+    };
+
+    expect(paidFromLines(cart).some((line) => line.fallback !== null)).toBe(false);
+  });
+
+  it('shows no fallback row, and a plain single row, when a rule only ever covers its own home items', () => {
+    const cart: Cart = {
+      cartId: 1,
+      itemCount: 1,
+      subtotalPrice: 120,
+      subtotalPoints: 0,
+      items: [boot],
+      roleRequiresApproval: 'N',
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        rules: [footwearRule],
+        lineTags: [makeTag({ cartItemId: 2, skuId: 2, ruleId: 22, payUnit: 'DOLLARS' })],
+      },
+    };
+
+    expect(paidFromLines(cart)).toEqual([
+      { ruleName: 'Footwear allotment', unit: 'DOLLARS', amount: 120, categoryBreakdown: [], fallback: null },
+    ]);
+  });
+});
+
 describe('amountDueAtCheckout', () => {
   it("stays 0 for a pure-points SKU (no dollar price) even when its points rule is badly over-drawn — the gap pointsShortfall exists to cover", () => {
     // Documents why `amountDueAtCheckout` alone can't gate a points-only
@@ -393,6 +551,7 @@ describe('amountDueAtCheckout', () => {
       primaryUnit: 'DOLLARS',
       points: null,
       dollars: { total: 700, used: 606.91, inCart: 93.09, available: 0 },
+      fallbacks: [{ seq: 2, ruleId: 41, ruleName: 'Officer Pants $250', unit: 'DOLLARS', available: 0 }],
     };
     const officerPants: AllotmentRule = {
       ...POINTS_ONLY_ALLOTMENT.rules[0],

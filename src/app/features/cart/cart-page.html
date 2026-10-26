@@ -126,9 +126,14 @@
               @if (paidFromLines().length > 0) {
                 <hr />
                 <p class="cart-page__summary-label">Paid from</p>
-                @for (line of paidFromLines(); track line.ruleName) {
+                @for (line of paidFromLines(); track line.ruleName + '|' + (line.fallback?.fromRuleName ?? '')) {
                   <div class="d-flex justify-content-between align-items-baseline mb-2">
-                    <span>{{ line.ruleName }}</span>
+                    <span class="d-flex align-items-center gap-2">
+                      {{ line.ruleName }}
+                      @if (line.fallback) {
+                        <span class="cart-page__summary-fallback-tag">Fallback</span>
+                      }
+                    </span>
                     <b
                       [class.cart-page__summary-amount--dollars]="line.unit === 'DOLLARS'"
                       [class.cart-page__summary-amount--units]="line.unit !== 'DOLLARS'"
@@ -136,6 +141,11 @@
                       {{ formatAmount(line.amount, line.unit) }}
                     </b>
                   </div>
+                  @if (line.fallback; as fallback) {
+                    <div class="cart-page__summary-fallback-note mb-2">
+                      for {{ fallback.fromRuleName }} 
+                    </div>
+                  }
                   @if (line.categoryBreakdown.length > 0) {
                     <ul class="cart-page__category-breakdown mb-2">
                       @for (category of line.categoryBreakdown; track category.categoryName) {

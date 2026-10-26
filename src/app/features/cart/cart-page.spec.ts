@@ -1270,6 +1270,29 @@ describe('CartPage', () => {
       );
     });
 
+    it('flags a Paid from row with a FALLBACK badge when it\'s absorbing another rule\'s overflow, but not the home rule\'s own row', () => {
+      const fixture = TestBed.createComponent(CartPage);
+      fixture.detectChanges();
+      flushInitialCartLoads(httpMock, GROUPED_CART);
+      fixture.detectChanges();
+
+      const summary: HTMLElement = fixture.nativeElement.querySelector('.cart-page__summary');
+      const rows: HTMLElement[] = Array.from(summary.querySelectorAll('.cart-page__summary-fallback-tag')).map(
+        (tag) => tag.closest('.d-flex')!,
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].textContent).toContain('Footwear allotment');
+
+      const uniformRow = Array.from(summary.querySelectorAll('.d-flex')).find((row) =>
+        row.textContent?.includes('Uniform allotment'),
+      )!;
+      expect(uniformRow.querySelector('.cart-page__summary-fallback-tag')).toBeNull();
+
+      expect(
+        summary.querySelector('.cart-page__summary-fallback-note')?.textContent?.trim(),
+      ).toBe('for Uniform allotment (Station Shirt)');
+    });
+
     it("shows a plain line total with no split for an item that isn't shared across allotments", () => {
       const fixture = TestBed.createComponent(CartPage);
       fixture.detectChanges();
@@ -1321,7 +1344,11 @@ describe('CartPage', () => {
       expect(summary.textContent).toContain('Uniform allotment');
       expect(summary.textContent).toContain('$100.00');
       expect(summary.textContent).toContain('Footwear allotment');
-      expect(summary.textContent).toContain('$160.00');
+      // Footwear's own $120.00 (the Boot) and its separate $40.00 fallback
+      // draw (absorbing the Shirt's overflow once Uniform ran out) show as
+      // two distinct rows now, rather than one pooled $160.00 figure.
+      expect(summary.textContent).toContain('$120.00');
+      expect(summary.textContent).toContain('$40.00');
       expect(summary.textContent).toContain('Balance');
       expect(summary.textContent).toContain('$0.00');
     });
