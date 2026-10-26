@@ -360,12 +360,21 @@ export class ProductList {
     });
   }
 
+  // Ranks two category-*specific* allotment rules against each other by how
+  // deep their matching category sits in the catalog tree — e.g. a rule
+  // scoped to "Trousers" outranks one only reaching this product through
+  // the broader "Outerwear" ancestor. See `ruleForCategories`.
+  private readonly categoryDepth = computed(() => {
+    const roots = this.categoryRoots();
+    return (progCatId: number) => findCategoryPath(roots, progCatId)?.length ?? null;
+  });
+
   // A preview, not the authoritative tag — matches the product's own
   // program categories against the active allotment's rules, same as the
   // cart's own `lineTags` would once it's actually added. `null` when
   // nothing covers it (or there's no allotment at all).
   coverageTag(product: Product): PayTag | null {
-    const rule = ruleForCategories(this.allotmentRules(), product.progCatIds);
+    const rule = ruleForCategories(this.allotmentRules(), product.progCatIds, this.categoryDepth());
     return rule ? { ruleId: rule.ruleId, payUnit: rule.primaryUnit, tagLabel: rule.ruleName } : null;
   }
 

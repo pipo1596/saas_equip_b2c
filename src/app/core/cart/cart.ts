@@ -17,6 +17,7 @@ export type {
   AllotmentRule,
   AllotmentUnitGrant,
   Balance,
+  CategoryDepth,
   LineAllocation,
   LineTag,
   PayTag,

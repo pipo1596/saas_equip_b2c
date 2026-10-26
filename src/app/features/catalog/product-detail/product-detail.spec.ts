@@ -7,8 +7,13 @@ import { AuthService } from '../../../core/auth/auth';
 import { FAKE_SESSION } from '../../../core/auth/auth.testing';
 import { CartService } from '../../../core/cart/cart';
 import { POINTS_ONLY_ALLOTMENT } from '../../../core/cart/cart.testing';
+import { CatalogCategory, CatalogMenu } from '../../../core/catalog/catalog-view';
 import { ProductDetailInfo } from '../../../core/catalog/product-detail';
 import { ProductDetail } from './product-detail';
+
+const LOCATIONS = [
+  { empLocId: 14998, locationId: 18, locationCode: '004', locationName: 'Edmonton Fire Dept Chief' },
+];
 
 const PRODUCT: ProductDetailInfo = {
   productPk: 12345,
@@ -1516,6 +1521,77 @@ describe('ProductDetail', () => {
 
     const card = fixture.nativeElement.querySelector('app-allotment-coverage-card');
     expect(card.querySelector('.coverage-card__title')?.textContent?.trim()).toBe('Covered by your Dollar 100');
+  });
+
+  it('prefers a dollar rule scoped to the deeper, more specific category over one matching only a broader ancestor', () => {
+    const trousers: CatalogCategory = {
+      progCatId: 20,
+      parentProgCatId: 10,
+      categoryName: 'Trousers',
+      sortOrder: 0,
+      status: 'ACTIVE',
+      productCount: 3,
+      children: [],
+    };
+    const outerwear: CatalogCategory = {
+      progCatId: 10,
+      parentProgCatId: null,
+      categoryName: 'Outerwear',
+      sortOrder: 0,
+      status: 'ACTIVE',
+      productCount: 5,
+      children: [trousers],
+    };
+    const menu: CatalogMenu = { clothing: [outerwear], footwear: [], gear: [] };
+    const outerwearRule = {
+      ...unitAndDollarRules({ total: 1, used: 0, inCart: 0, available: 1 })[0],
+      ruleId: 1,
+      ruleName: 'Officer 700 Uniform',
+      covers: { allAssortments: 'N' as const, categories: [{ progCatId: 10, categoryName: 'Outerwear' }], unitGrants: [] },
+    };
+    const trousersRule = {
+      ...outerwearRule,
+      ruleId: 2,
+      ruleName: 'Officer Pants $250',
+      covers: { allAssortments: 'N' as const, categories: [{ progCatId: 20, categoryName: 'Trousers' }], unitGrants: [] },
+    };
+
+    const fixture = TestBed.createComponent(ProductDetail);
+    const auth = TestBed.inject(AuthService);
+    auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
+    fixture.componentRef.setInput('productPk', '12345');
+    fixture.detectChanges();
+
+    expectRequest(httpMock, '*GET').flush({ ...RESPONSE, product: { ...PRODUCT, progCatIds: [10, 20] } });
+    expectProductTagCartRequest(httpMock).flush({
+      cartId: null,
+      itemCount: 0,
+      subtotalPrice: 0,
+      subtotalPoints: null,
+      items: [],
+      allotment: {
+        programId: 3,
+        allotmentBar: null,
+        ruleCount: 2,
+        allotExclTaxFreight: 'N',
+        // Broader rule listed first — a plain "first match" would wrongly
+        // pick it over the Trousers-specific one.
+        rules: [outerwearRule, trousersRule],
+        approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+        openOrders: null,
+        lineTags: [],
+        productTag: null,
+      },
+    });
+    httpMock
+      .match((req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCTPCVEW' && req.body?.action === '*MENU')
+      .forEach((req) => req.flush({ viewId: 1, programId: 1, categoryCount: 2, menu }));
+    fixture.detectChanges();
+
+    const card = fixture.nativeElement.querySelector('app-allotment-coverage-card');
+    expect(card.querySelector('.coverage-card__title')?.textContent?.trim()).toBe(
+      'Covered by your Officer Pants $250',
+    );
   });
 
   it('should not show the coverage card when there is no product tag', () => {

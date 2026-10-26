@@ -161,6 +161,76 @@ describe('ruleForCategories', () => {
   });
 });
 
+describe('ruleForCategories — category-depth tie-break', () => {
+  // Apparel(0) > Outerwear(1) > Trousers(2) — mirrors the real catalog
+  // shape: "Officer 700 Uniform" covers the broad "Outerwear" ancestor,
+  // "Officer Pants $250" covers "Trousers" itself, a category nested
+  // *under* Outerwear.
+  const DEPTHS: Record<number, number> = { 1: 0, 10: 1, 20: 2 }; // Apparel, Outerwear, Trousers
+  const categoryDepth = (progCatId: number) => DEPTHS[progCatId] ?? null;
+  const TROUSER_PROG_CAT_IDS = [1, 10, 20];
+
+  it('prefers the rule reaching the product through its deepest matching category, regardless of rule order', () => {
+    const outerwearRule: AllotmentRule = {
+      ...BASE_RULE,
+      ruleId: 1,
+      ruleName: 'Officer 700 Uniform',
+      covers: { allAssortments: 'N', categories: [{ progCatId: 10, categoryName: 'Outerwear' }], unitGrants: [] },
+    };
+    const trousersRule: AllotmentRule = {
+      ...BASE_RULE,
+      ruleId: 2,
+      ruleName: 'Officer Pants $250',
+      covers: { allAssortments: 'N', categories: [{ progCatId: 20, categoryName: 'Trousers' }], unitGrants: [] },
+    };
+
+    expect(ruleForCategories([outerwearRule, trousersRule], TROUSER_PROG_CAT_IDS, categoryDepth)).toBe(trousersRule);
+    expect(ruleForCategories([trousersRule, outerwearRule], TROUSER_PROG_CAT_IDS, categoryDepth)).toBe(trousersRule);
+  });
+
+  it('falls back to rule order when no categoryDepth resolver is given', () => {
+    const outerwearRule: AllotmentRule = {
+      ...BASE_RULE,
+      ruleId: 1,
+      ruleName: 'Officer 700 Uniform',
+      covers: { allAssortments: 'N', categories: [{ progCatId: 10, categoryName: 'Outerwear' }], unitGrants: [] },
+    };
+    const trousersRule: AllotmentRule = {
+      ...BASE_RULE,
+      ruleId: 2,
+      ruleName: 'Officer Pants $250',
+      covers: { allAssortments: 'N', categories: [{ progCatId: 20, categoryName: 'Trousers' }], unitGrants: [] },
+    };
+
+    expect(ruleForCategories([outerwearRule, trousersRule], TROUSER_PROG_CAT_IDS)).toBe(outerwearRule);
+  });
+
+  it('does the same depth tie-break among points rules', () => {
+    const genericPoints: AllotmentRule = {
+      ...BASE_RULE,
+      ruleId: 1,
+      ruleName: 'General Points',
+      allotType: 'POINTS',
+      primaryUnit: 'POINTS',
+      dollars: null,
+      points: { total: 500, used: 0, inCart: 0, available: 500 },
+      covers: { allAssortments: 'N', categories: [{ progCatId: 10, categoryName: 'Outerwear' }], unitGrants: [] },
+    };
+    const trouserPoints: AllotmentRule = {
+      ...BASE_RULE,
+      ruleId: 2,
+      ruleName: 'Trouser Points',
+      allotType: 'POINTS',
+      primaryUnit: 'POINTS',
+      dollars: null,
+      points: { total: 100, used: 0, inCart: 0, available: 100 },
+      covers: { allAssortments: 'N', categories: [{ progCatId: 20, categoryName: 'Trousers' }], unitGrants: [] },
+    };
+
+    expect(ruleForCategories([genericPoints, trouserPoints], TROUSER_PROG_CAT_IDS, categoryDepth)).toBe(trouserPoints);
+  });
+});
+
 describe('preferSpecificCoverage', () => {
   it('returns undefined for an empty list', () => {
     expect(preferSpecificCoverage([])).toBeUndefined();
@@ -186,7 +256,7 @@ describe('preferSpecificCoverage', () => {
     expect(preferSpecificCoverage([specific, generic])).toBe(specific);
   });
 
-  it('keeps the first specific candidate when more than one is specific', () => {
+  it('keeps the first specific candidate when more than one is specific and no categoryDepth is given', () => {
     const specificA: AllotmentRule = {
       ...BASE_RULE,
       ruleId: 1,
@@ -198,5 +268,40 @@ describe('preferSpecificCoverage', () => {
       covers: { allAssortments: 'N', categories: [{ progCatId: 11, categoryName: 'Shirt' }], unitGrants: [] },
     };
     expect(preferSpecificCoverage([specificA, specificB])).toBe(specificA);
+  });
+
+  it('with a categoryDepth resolver, breaks a tie between two specific candidates by picking the deeper matching category', () => {
+    const outerwear: AllotmentRule = {
+      ...BASE_RULE,
+      ruleId: 1,
+      covers: { allAssortments: 'N', categories: [{ progCatId: 10, categoryName: 'Outerwear' }], unitGrants: [] },
+    };
+    const trousers: AllotmentRule = {
+      ...BASE_RULE,
+      ruleId: 2,
+      covers: { allAssortments: 'N', categories: [{ progCatId: 20, categoryName: 'Trousers' }], unitGrants: [] },
+    };
+    const depth = (id: number) => ({ 10: 1, 20: 2 })[id as 10 | 20] ?? null;
+
+    expect(preferSpecificCoverage([outerwear, trousers], [10, 20], depth)).toBe(trousers);
+    expect(preferSpecificCoverage([trousers, outerwear], [10, 20], depth)).toBe(trousers);
+  });
+
+  it('ignores a candidate whose covered category is not actually in progCatIds when ranking by depth', () => {
+    const outerwear: AllotmentRule = {
+      ...BASE_RULE,
+      ruleId: 1,
+      covers: { allAssortments: 'N', categories: [{ progCatId: 10, categoryName: 'Outerwear' }], unitGrants: [] },
+    };
+    // Covers a deep category the product doesn't actually belong to — must
+    // not win just because its (irrelevant) category resolves a high depth.
+    const unrelatedDeepRule: AllotmentRule = {
+      ...BASE_RULE,
+      ruleId: 2,
+      covers: { allAssortments: 'N', categories: [{ progCatId: 99, categoryName: 'Somewhere else' }], unitGrants: [] },
+    };
+    const depth = (id: number) => ({ 10: 1, 99: 5 })[id as 10 | 99] ?? null;
+
+    expect(preferSpecificCoverage([outerwear, unrelatedDeepRule], [10], depth)).toBe(outerwear);
   });
 });

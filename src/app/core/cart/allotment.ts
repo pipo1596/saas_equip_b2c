@@ -302,16 +302,54 @@ function unitsReallyExhausted(units: Balance): boolean {
   return units.total - units.used - (units.reserved ?? 0) <= 0;
 }
 
+// A category's own depth in the catalog tree (root = shallowest) — supplied
+// by a caller that actually has the tree (the catalog pages do; the cart
+// doesn't), so `preferSpecificCoverage`/`ruleForCategories` can rank two
+// category-*specific* rules against each other, not just tell "any item"
+// apart from "specific". `null` when the category can't be found (an id
+// that's gone stale, or no tree was supplied at all).
+export type CategoryDepth = (progCatId: number) => number | null;
+
 // Prefers a rule scoped to specific categories over one that covers "any
 // item in the catalog" (`allAssortments: 'Y'`) when more than one rule of
 // the same pay type covers the same product — a department's own bespoke
 // allotment should get used ahead of a generic catch-all that happens to
-// cover everything else too. Ties (more than one specific match) keep
-// whichever comes first in the API's own rule order, same as a plain
-// `.find()` would; `candidates` is expected pre-filtered to rules that
-// already cover the product and (where relevant) still have room.
-export function preferSpecificCoverage<T extends AllotmentRule>(candidates: T[]): T | undefined {
-  return candidates.find((rule) => rule.covers.allAssortments === 'N') ?? candidates[0];
+// cover everything else too. `candidates` is expected pre-filtered to rules
+// that already cover the product and (where relevant) still have room.
+//
+// When more than one candidate is itself category-specific — e.g. one rule
+// covers "Outerwear" and another covers "Trousers", a category nested
+// *under* Outerwear — `categoryDepth` (when given) breaks that tie by
+// depth: the rule reaching this product through its deepest, most specific
+// matching category wins, the same way a shopper would expect a
+// trouser-only allotment to apply ahead of a broader outerwear one. Without
+// `categoryDepth` (or when neither candidate's matching category resolves a
+// depth), ties keep whichever comes first in the API's own rule order, same
+// as a plain `.find()` would.
+export function preferSpecificCoverage<T extends AllotmentRule>(
+  candidates: T[],
+  progCatIds?: readonly number[],
+  categoryDepth?: CategoryDepth,
+): T | undefined {
+  const specific = candidates.filter((rule) => rule.covers.allAssortments === 'N');
+  const pool = specific.length > 0 ? specific : candidates;
+  if (pool.length <= 1 || !progCatIds || !categoryDepth) {
+    return pool[0];
+  }
+
+  // The deepest depth among a rule's own covered categories that actually
+  // matches this product — `-1` (never wins a tie) when none of its
+  // categories match or resolve a depth at all.
+  const deepestMatch = (rule: T): number =>
+    rule.covers.categories.reduce((deepest, category) => {
+      if (!progCatIds.includes(category.progCatId)) {
+        return deepest;
+      }
+      const depth = categoryDepth(category.progCatId);
+      return depth !== null && depth > deepest ? depth : deepest;
+    }, -1);
+
+  return pool.reduce((deepest, rule) => (deepestMatch(rule) > deepestMatch(deepest) ? rule : deepest));
 }
 
 // Which rule (if any) a product is likely covered by, found by matching its
@@ -339,6 +377,7 @@ export function preferSpecificCoverage<T extends AllotmentRule>(candidates: T[])
 export function ruleForCategories(
   rules: readonly AllotmentRule[],
   progCatIds: readonly number[],
+  categoryDepth?: CategoryDepth,
 ): AllotmentRule | null {
   // Units coverage is tested against a rule's `unitGrants`, never its
   // `categories` — the two are separate coverage lists on the same rule
@@ -360,6 +399,8 @@ export function ruleForCategories(
 
   const dollarsRule = preferSpecificCoverage(
     rules.filter((rule) => (rule.allotType === 'DOLLAR' || rule.allotType === 'DOLLAR_UNITS') && coveredByAssortments(rule)),
+    progCatIds,
+    categoryDepth,
   );
   if (dollarsRule) {
     // A dollar rule that's in scope but empty still blocks points — it
@@ -369,6 +410,8 @@ export function ruleForCategories(
 
   const pointsRule = preferSpecificCoverage(
     rules.filter((rule) => rule.allotType === 'POINTS' && coveredByAssortments(rule) && (rule.points?.available ?? 0) > 0),
+    progCatIds,
+    categoryDepth,
   );
   return pointsRule ?? null;
 }

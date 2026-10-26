@@ -27,6 +27,7 @@ import {
 } from '../../../core/cart/cart';
 import { unitGrantBalance } from '../../../core/cart/cart-totals';
 import { Breadcrumb, hasCrumbs } from '../../../core/catalog/breadcrumb';
+import { CatalogViewService, allCategoryRoots, findCategoryPath } from '../../../core/catalog/catalog-view';
 import {
   ProductAttribute,
   ProductDetailData,
@@ -71,6 +72,7 @@ export class ProductDetail implements OnInit {
   private readonly productDetailService = inject(ProductDetailService);
   private readonly cartService = inject(CartService);
   private readonly locationSelectionService = inject(LocationSelectionService);
+  private readonly catalogViewService = inject(CatalogViewService);
   private readonly router = inject(Router);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 
@@ -155,13 +157,22 @@ export class ProductDetail implements OnInit {
   // cart *without* `productPk` and would otherwise null this back out.
   readonly productTag = signal<PayTag | null>(null);
   private readonly allotmentRules = computed(() => this.cartService.cart().allotment?.rules ?? []);
+  // Ranks two category-*specific* allotment rules against each other by how
+  // deep their matching category sits in the catalog tree — e.g. a rule
+  // scoped to "Trousers" outranks one only reaching this product through
+  // the broader "Outerwear" ancestor. See `ruleForCategories`.
+  private readonly categoryDepth = computed(() => {
+    const menu = this.catalogViewService.menu();
+    const roots = menu ? allCategoryRoots(menu) : [];
+    return (progCatId: number) => findCategoryPath(roots, progCatId)?.length ?? null;
+  });
   // The rule most likely to cover this product, previewed client-side the
   // same way a listing card's badge is (see `ruleForCategories`) — not
   // `productTag`/`lineTags`, which only exist once a *specific SKU* is
   // actually in the cart; this needs an answer before that, from just the
   // product's own `progCatIds`.
   readonly coveringRule = computed<AllotmentRule | null>(() =>
-    ruleForCategories(this.allotmentRules(), this.product()?.progCatIds ?? []),
+    ruleForCategories(this.allotmentRules(), this.product()?.progCatIds ?? [], this.categoryDepth()),
   );
   // The specific assortment grant this product actually draws from, now
   // that units are tracked per assortment rather than as one pooled total
@@ -276,6 +287,19 @@ export class ProductDetail implements OnInit {
   // meantime, or picking a new color/photo gets silently overridden back
   // to the old variant's photo until the new `*GET_SKU` catches up — so
   // it only counts once it was actually fetched for the current selection.
+  // The category tree, so `coveringRule` can rank two category-specific
+  // allotment rules by how deep their matching category sits in it (see
+  // `categoryDepth` below) — same `*MENU` the header's mega menu and the
+  // product listing's sidebar tree use, cached per location by
+  // `CatalogViewService`, so this is a no-op once the header's already
+  // loaded it for this location.
+  private readonly loadMenuOnLocationChange = effect(() => {
+    const location = this.locationSelectionService.activeLocation();
+    if (location && this.isBrowser) {
+      this.catalogViewService.load(location.locationId).subscribe();
+    }
+  });
+
   private readonly syncActiveImageWithSelection = effect(() => {
     const manualImageUrl = this.manualImageUrl();
     if (manualImageUrl) {

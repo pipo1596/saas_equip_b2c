@@ -456,6 +456,65 @@ describe('ProductList', () => {
 
       expect(fixture.nativeElement.querySelector('.pay-tag')).toBeNull();
     });
+
+    it('prefers a dollar rule scoped to the deeper, more specific category over one matching only a broader ancestor', () => {
+      const fixture = TestBed.createComponent(ProductList);
+      const trousers: CatalogCategory = {
+        progCatId: 20,
+        parentProgCatId: 10,
+        categoryName: 'Trousers',
+        sortOrder: 0,
+        status: 'ACTIVE',
+        productCount: 3,
+        children: [],
+      };
+      const outerwear: CatalogCategory = {
+        progCatId: 10,
+        parentProgCatId: null,
+        categoryName: 'Outerwear',
+        sortOrder: 0,
+        status: 'ACTIVE',
+        productCount: 5,
+        children: [trousers],
+      };
+      const outerwearRule = {
+        ...CATEGORY_RULE,
+        ruleId: 1,
+        ruleName: 'Officer 700 Uniform',
+        covers: { allAssortments: 'N' as const, categories: [{ progCatId: 10, categoryName: 'Outerwear' }], unitGrants: [] },
+      };
+      const trousersRule = {
+        ...CATEGORY_RULE,
+        ruleId: 2,
+        ruleName: 'Officer Pants $250',
+        covers: { allAssortments: 'N' as const, categories: [{ progCatId: 20, categoryName: 'Trousers' }], unitGrants: [] },
+      };
+      TestBed.inject(CartService).cart.update((cart) => ({
+        ...cart,
+        // Broader rule listed first — a plain "first match" would wrongly
+        // pick it over the Trousers-specific one.
+        allotment: { ...POINTS_ONLY_ALLOTMENT, rules: [outerwearRule, trousersRule] },
+      }));
+      fixture.componentRef.setInput('categoryId', '20');
+      const auth = TestBed.inject(AuthService);
+      auth.session.set({ ...FAKE_SESSION, locations: LOCATIONS });
+      fixture.detectChanges();
+      flushBoth(httpMock, { products: [{ ...SAMPLE_LIST.products[0], progCatIds: [10, 20] }] });
+      httpMock
+        .match((req) => req.url === '/cgi/APPSCDSPCH?SEPGM=APCTPCVEW' && req.body?.action === '*MENU')
+        .forEach((req) =>
+          req.flush({
+            viewId: 1,
+            programId: 1,
+            categoryCount: 2,
+            menu: { clothing: [outerwear], footwear: [], gear: [] },
+          }),
+        );
+      fixture.detectChanges();
+
+      const tag: HTMLElement = fixture.nativeElement.querySelector('.pay-tag');
+      expect(tag?.textContent?.trim()).toBe('Officer Pants $250');
+    });
   });
 
   it('should omit categoryId from the product link on a bucket/full-catalog page (no real category)', () => {
