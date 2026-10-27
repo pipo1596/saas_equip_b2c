@@ -210,6 +210,39 @@ describe('pointsShortfall', () => {
 
     expect(pointsShortfall(cartWithExtraUncoveredItem)).toBe(255);
   });
+
+  it("catches a points rule that's over-committed even though its own `available` is clamped at 0, not negative", () => {
+    // Reproduces a real reported case: Total 100, Used 10, In cart 90,
+    // Available 0 — the server never reports a negative `available` once
+    // `inCart` itself is already capped at what the rule can really give,
+    // even though the two lines tagged to it actually need 114 points
+    // combined (42 + 72). The old `available < 0` check saw nothing wrong
+    // here and let checkout proceed with no "Balance" shown at all.
+    const rule: AllotmentRule = {
+      ...POINTS_ONLY_ALLOTMENT.rules[0],
+      points: { total: 100, used: 10, inCart: 90, available: 0 },
+    };
+    const itemA = makeItem({ cartItemId: 81, lineTotalPrice: 0, lineTotalPoints: 42, quantity: 3 });
+    const itemB = makeItem({ cartItemId: 82, lineTotalPrice: 0, lineTotalPoints: 72, quantity: 8 });
+    const cart: Cart = {
+      cartId: 1,
+      itemCount: 11,
+      subtotalPrice: 0,
+      subtotalPoints: 114,
+      items: [itemA, itemB],
+      roleRequiresApproval: 'N',
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        rules: [rule],
+        lineTags: [
+          { cartItemId: 81, skuId: 63416, ruleId: rule.ruleId, payUnit: 'POINTS', tagLabel: 'Points Allowance', allocations: [] },
+          { cartItemId: 82, skuId: 63416, ruleId: rule.ruleId, payUnit: 'POINTS', tagLabel: 'Points Allowance', allocations: [] },
+        ],
+      },
+    };
+
+    expect(pointsShortfall(cart)).toBe(24);
+  });
 });
 
 describe('paidFromLines', () => {

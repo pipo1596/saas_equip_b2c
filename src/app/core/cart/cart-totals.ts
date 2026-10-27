@@ -535,13 +535,19 @@ export function amountDueAtCheckout(cart: Cart): number {
 //   - a line with no points allocation at all (no rule covers it, the same
 //     case that would fall to a credit-card balance in dollar mode) adds
 //     its own `lineTotalPoints` straight to the total.
-//   - a points rule that's actually over-drawn adds the exact amount past
-//     its own `available` balance — that figure already states the
-//     shortfall directly, no per-line estimate needed.
+//   - every points-tagged line's value, pooled against every points rule's
+//     own combined capacity. Deliberately doesn't key off any one rule's own
+//     `available` balance (which the backend clamps at 0 rather than
+//     negative once a rule's `inCart` itself is already capped at what it
+//     can really give — the exact same reasoning as `amountDueAtCheckout`'s
+//     own dollar-side comment, and the same fix: compare total eligible
+//     demand against total real capacity instead of trusting a single
+//     rule's own `available` to ever go negative).
 export function pointsShortfall(cart: Cart): number {
   const rules = cart.allotment?.rules ?? [];
   const byItemId = lineTagByItemId(cart);
 
+  let pointsEligible = 0;
   const uncovered = cart.items.reduce((sum, item) => {
     if (item.lineTotalPoints === null) {
       return sum;
@@ -549,16 +555,20 @@ export function pointsShortfall(cart: Cart): number {
     const hasPointsCoverage = resolvedAllocations(item, byItemId.get(item.cartItemId)).some(
       (allocation) => allocation.payUnit === 'POINTS',
     );
-    return hasPointsCoverage ? sum : sum + item.lineTotalPoints;
+    if (hasPointsCoverage) {
+      pointsEligible += item.lineTotalPoints;
+      return sum;
+    }
+    return sum + item.lineTotalPoints;
   }, 0);
 
-  const ruleShortfall = rules.reduce((sum, rule) => {
+  const pointsCovered = rules.reduce((sum, rule) => {
     if (rule.primaryUnit !== 'POINTS') {
       return sum;
     }
     const balance = tileBalance(rule);
-    return balance && balance.available < 0 ? sum - balance.available : sum;
+    return balance ? sum + Math.max(0, Math.min(balance.inCart, balance.total - balance.used)) : sum;
   }, 0);
 
-  return uncovered + ruleShortfall;
+  return uncovered + Math.max(0, pointsEligible - pointsCovered);
 }

@@ -159,9 +159,14 @@ describe('CartPage', () => {
     const fixture = TestBed.createComponent(CartPage);
     fixture.detectChanges();
 
+    // Realistic shape: a points rule's own `inCart` never exceeds what it
+    // can really give (`total - used`) — the backend caps it there rather
+    // than reporting the true, over-capacity demand — so the two lines'
+    // real combined total (450, from `CART`) is what reveals the shortfall,
+    // not this rule's own (capped-at-0) `available`.
     const OVERDRAWN_POINTS_ALLOTMENT = {
       ...POINTS_ONLY_ALLOTMENT,
-      rules: [{ ...POINTS_ONLY_ALLOTMENT.rules[0], points: { total: 400, used: 0, inCart: 420, available: -20 } }],
+      rules: [{ ...POINTS_ONLY_ALLOTMENT.rules[0], points: { total: 400, used: 0, inCart: 400, available: 0 } }],
       lineTags: [
         { cartItemId: 9001, skuId: 9001, ruleId: 90, payUnit: 'POINTS' as const, tagLabel: 'Points Allowance', allocations: [] },
         { cartItemId: 9002, skuId: 9002, ruleId: 90, payUnit: 'POINTS' as const, tagLabel: 'Points Allowance', allocations: [] },
@@ -172,9 +177,8 @@ describe('CartPage', () => {
 
     const summary: HTMLElement = fixture.nativeElement.querySelector('.cart-page__summary');
     expect(summary.textContent).toContain('400 pts');
-    expect(summary.textContent).not.toContain('420 pts');
     expect(summary.textContent).toContain('Balance');
-    expect(summary.textContent).toContain('20 pts');
+    expect(summary.textContent).toContain('50 pts');
   });
 
   it("breaks a multi-assortment unit allotment's 'Paid from' line down by category", () => {
@@ -249,6 +253,11 @@ describe('CartPage', () => {
 
     const FULLY_TAGGED_ALLOTMENT = {
       ...POINTS_ONLY_ALLOTMENT,
+      // `inCart` matches the two lines' real combined total (450, from
+      // `CART`) rather than the default fixture's unrelated 150 — a rule
+      // that genuinely covers everything reports `inCart` as that real
+      // demand, not some smaller, stale figure.
+      rules: [{ ...POINTS_ONLY_ALLOTMENT.rules[0], points: { total: 1000, used: 300, inCart: 450, available: 250 } }],
       lineTags: [
         { cartItemId: 9001, skuId: 9001, ruleId: 90, payUnit: 'POINTS' as const, tagLabel: 'Points Allowance', allocations: [] },
         { cartItemId: 9002, skuId: 9002, ruleId: 90, payUnit: 'POINTS' as const, tagLabel: 'Points Allowance', allocations: [] },
