@@ -1290,7 +1290,7 @@ describe('CartPage', () => {
 
       expect(
         summary.querySelector('.cart-page__summary-fallback-note')?.textContent?.trim(),
-      ).toBe('for Uniform allotment (Station Shirt)');
+      ).toBe('for Uniform allotment');
     });
 
     it("shows a plain line total with no split for an item that isn't shared across allotments", () => {

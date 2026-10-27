@@ -32,6 +32,7 @@ import { LocationSelectionService } from '../../core/location/location-selection
 import { TenantSettings, TenantSettingsService } from '../../core/tenant/tenant-settings';
 import { AllotmentRuleCard } from '../allotment/rule-card';
 import { PayTagBadge } from '../allotment/pay-tag';
+import { avatarColorForId } from '../avatar-color';
 import { ConfirmService } from '../confirm/confirm';
 import { computeAdaptiveLogoHeight } from '../logo-sizing';
 
@@ -248,6 +249,11 @@ export class Header implements OnInit {
   readonly firstName = this.authService.firstName;
   readonly fullName = this.authService.fullName;
   readonly initials = this.authService.initials;
+  // Same palette/hash as the Admin Employees grid's own avatars — a
+  // non-numeric `empId` (shouldn't happen, but `Session.empId` is typed as
+  // a plain string) falls back to the palette's first color rather than
+  // breaking.
+  readonly avatarColor = computed(() => avatarColorForId(Number(this.session()?.empId)));
 
   readonly tenantSettings = this.tenantSettingsService.settings;
 

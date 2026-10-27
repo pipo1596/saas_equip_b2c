@@ -1247,6 +1247,40 @@ describe('Header', () => {
     });
   });
 
+  describe('Admin menu item', () => {
+    // No access rule has been defined yet — shown unconditionally until one
+    // is wired up, unlike the Approvals link above.
+    it('shows the Admin link to everyone', () => {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+      fixture.detectChanges();
+      header.toggleUserMenu();
+      fixture.detectChanges();
+
+      const link: HTMLAnchorElement = fixture.nativeElement.querySelector('.user-menu a[href="/admin"]');
+      expect(link.textContent).toContain('Admin');
+    });
+
+    it('closes the menu when the Admin link is clicked', () => {
+      const fixture = TestBed.createComponent(Header);
+      const header = fixture.componentInstance;
+      fixture.detectChanges();
+
+      // No `/admin` route is registered in this spec's bare
+      // `provideRouter([])` — mocked so the click below doesn't reject with
+      // "Cannot match any routes" as an unhandled rejection.
+      vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+
+      header.toggleUserMenu();
+      fixture.detectChanges();
+      expect(header.userMenuOpen()).toBe(true);
+
+      const link: HTMLAnchorElement = fixture.nativeElement.querySelector('.user-menu a[href="/admin"]');
+      link.click();
+      expect(header.userMenuOpen()).toBe(false);
+    });
+  });
+
   describe('notification bell', () => {
     function cartWithApprovals(approvals: {
       canApprove: 'Y' | 'N';

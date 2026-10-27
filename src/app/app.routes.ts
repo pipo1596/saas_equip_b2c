@@ -92,4 +92,23 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/announcements/announcements-page').then((m) => m.AnnouncementsPage),
   },
+  {
+    // No admin-specific guard yet — the access rule hasn't been defined, so
+    // this is only gated on being signed in at all (same as every other
+    // route above) until that rule exists.
+    path: 'admin',
+    pathMatch: 'full',
+    redirectTo: 'admin/employees',
+  },
+  {
+    path: 'admin/employees',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/admin/employees/employees').then((m) => m.AdminEmployees),
+  },
+  {
+    path: 'admin/employees/:empId',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/admin/employee-detail/employee-detail').then((m) => m.AdminEmployeeDetail),
+  },
 ];

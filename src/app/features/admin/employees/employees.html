@@ -1,0 +1,205 @@
+<app-header />
+
+<section class="admin-employees">
+  <div class="container py-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a routerLink="/home">Home</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Employees</li>
+      </ol>
+    </nav>
+
+    <app-admin-nav active="employees" />
+
+    <h1 class="admin-employees__title mb-3">Employees</h1>
+
+    <div class="admin-employees__filters">
+      <div class="admin-employees__filter-row">
+        <div class="admin-employees__field admin-employees__field--search">
+          <label for="employee-search" class="admin-employees__field-label">Search</label>
+          <div class="admin-employees__search">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="M21 21l-4-4" />
+            </svg>
+            <input
+              id="employee-search"
+              type="search"
+              placeholder="Name, email or employee #"
+              [formControl]="searchControl"
+            />
+          </div>
+        </div>
+        <div class="admin-employees__field">
+          <label for="employee-role" class="admin-employees__field-label">Role</label>
+          <select id="employee-role" [value]="roleId()" (change)="onRoleChange($any($event.target).value)">
+            <option value="0">All roles</option>
+            @for (role of roles(); track role.roleId) {
+              <option [value]="role.roleId">{{ role.roleName }}</option>
+            }
+          </select>
+        </div>
+        <div class="admin-employees__field">
+          <label for="employee-hire-from" class="admin-employees__field-label">Hired from</label>
+          <input
+            id="employee-hire-from"
+            type="date"
+            [value]="hireFrom()"
+            (change)="onHireFromChange($any($event.target).value)"
+          />
+        </div>
+        <div class="admin-employees__field">
+          <label for="employee-hire-to" class="admin-employees__field-label">Hired to</label>
+          <input
+            id="employee-hire-to"
+            type="date"
+            [value]="hireTo()"
+            (change)="onHireToChange($any($event.target).value)"
+          />
+        </div>
+      </div>
+
+      @if (hasFilters()) {
+        <div class="admin-employees__filter-actions">
+          <button type="button" class="btn btn-outline-secondary btn-sm" (click)="clearFilters()">
+            Clear filters
+          </button>
+        </div>
+      }
+    </div>
+
+    @if (loading()) {
+      <div class="admin-employees__table" role="status">
+        <span class="visually-hidden">Loading employees…</span>
+        @for (n of [1, 2, 3, 4, 5]; track n) {
+          <div class="admin-employees__row" aria-hidden="true">
+            <div class="d-flex align-items-center gap-2">
+              <div class="skeleton" style="width: 36px; height: 36px; border-radius: 50%; flex: none"></div>
+              <div class="skeleton skeleton--text" style="width: 65%"></div>
+            </div>
+            <div class="skeleton skeleton--text" style="width: 50%"></div>
+            <div class="skeleton skeleton--text" style="width: 60%"></div>
+            <div class="skeleton skeleton--text" style="width: 40%"></div>
+            <div class="skeleton" style="width: 90px; height: 24px; border-radius: 999px"></div>
+            <div class="skeleton" style="width: 70px; height: 22px; border-radius: 999px"></div>
+            <div></div>
+          </div>
+        }
+      </div>
+    } @else if (error(); as message) {
+      <div class="alert alert-danger" role="alert">{{ message }}</div>
+    } @else if (employees().length === 0) {
+      <div class="admin-employees__empty text-center py-5">
+        <p class="mb-0">No employees match your search.</p>
+      </div>
+    } @else {
+      @if (pagination(); as p) {
+        <p class="admin-employees__count mb-2">
+          Showing <b>{{ employees().length }}</b> of <b>{{ p.totalRows }}</b> employee{{
+            p.totalRows === 1 ? '' : 's'
+          }}
+        </p>
+      }
+
+      <div class="admin-employees__table">
+        <div class="admin-employees__table-head">
+          <span>Name &amp; email</span>
+          <span>Employee #</span>
+          <span>Role</span>
+          <span>Rank</span>
+          <span>Locations</span>
+          <span>Status</span>
+          <span>Actions</span>
+        </div>
+        @for (employee of employees(); track employee.empId) {
+          <div class="admin-employees__row">
+            <div class="admin-employees__identity">
+              <span class="admin-employees__avatar" [style.background]="avatarColor(employee)">
+                {{ initials(employee) }}
+              </span>
+              <span class="admin-employees__identity-text">
+                <span class="admin-employees__name">{{ employee.firstName }} {{ employee.lastName }}</span>
+                <span class="admin-employees__email">{{ employee.emailAddress }}</span>
+              </span>
+            </div>
+            <span>{{ employee.empNum ?? '—' }}</span>
+            <span>{{ employee.roleName ?? '—' }}</span>
+            <span>{{ employee.empRank ?? '—' }}</span>
+            <span class="admin-employees__locations">
+              @for (location of employee.locations; track location.locationId) {
+                <span class="admin-employees__location-chip" [attr.title]="location.locationName">
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 21s7-7.2 7-12a7 7 0 1 0-14 0c0 4.8 7 12 7 12z" />
+                    <circle cx="12" cy="9" r="2.5" />
+                  </svg>
+                  <span class="admin-employees__location-name">{{ location.locationName }}</span>
+                </span>
+              } @empty {
+                <span>—</span>
+              }
+            </span>
+            <span
+              class="admin-employees__status"
+              [class.admin-employees__status--active]="employee.status === 'ACTIVE'"
+            >
+              {{ employee.status === 'ACTIVE' ? 'Active' : employee.status }}
+            </span>
+            <a
+              class="admin-employees__view"
+              [routerLink]="['/admin/employees', employee.empId]"
+              [attr.aria-label]="'View ' + employee.firstName + ' ' + employee.lastName"
+            >
+              View
+            </a>
+          </div>
+        }
+      </div>
+
+      @if (pagination(); as p) {
+        @if (p.totalPages > 1) {
+          <nav class="admin-employees__pager" aria-label="Employee pages">
+            <button
+              type="button"
+              class="btn btn-outline-secondary btn-sm"
+              [disabled]="p.page <= 1"
+              (click)="goToPage(p.page - 1)"
+            >
+              Previous
+            </button>
+            <span class="admin-employees__pager-label">Page {{ p.page }} of {{ p.totalPages }}</span>
+            <button
+              type="button"
+              class="btn btn-outline-secondary btn-sm"
+              [disabled]="p.page >= p.totalPages"
+              (click)="goToPage(p.page + 1)"
+            >
+              Next
+            </button>
+          </nav>
+        }
+      }
+    }
+  </div>
+</section>
+
+<app-footer />

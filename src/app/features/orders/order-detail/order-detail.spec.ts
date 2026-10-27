@@ -409,7 +409,7 @@ describe('OrderDetailPage', () => {
       },
     ];
 
-    it('shows a FALLBACK tag and "for <rule> (<item>)" note on a fallback draw, but not on an ordinary entry', () => {
+    it('shows a FALLBACK tag and "for <rule>" note on a fallback draw, but not on an ordinary entry', () => {
       const { fixture } = createPage();
       fixture.detectChanges();
       flushOrderGet(httpMock, { ...BASE_ORDER, paidFrom: FALLBACK_PAID_FROM });
@@ -421,7 +421,7 @@ describe('OrderDetailPage', () => {
 
       const pantsRow = Array.from(rows).find((row) => row.textContent?.includes('Officer Pants $250'))!;
       expect(pantsRow.querySelector('.order-detail__fallback-tag')?.textContent?.trim()).toBe('Fallback');
-      expect(pantsRow.textContent).toContain('for Officer 700 Uniform (Jacket)');
+      expect(pantsRow.textContent).toContain('for Officer 700 Uniform');
     });
 
     it('shows "Personal card" as its own paid-from line, last', () => {

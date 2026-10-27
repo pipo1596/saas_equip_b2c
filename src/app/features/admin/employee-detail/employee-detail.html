@@ -1,0 +1,137 @@
+<app-header />
+
+<section class="employee-detail">
+  <div class="container py-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a routerLink="/home">Home</a></li>
+        <li class="breadcrumb-item"><a routerLink="/admin/employees">Employees</a></li>
+        <li class="breadcrumb-item active" aria-current="page">
+          {{ employee() ? employee()!.firstName + ' ' + employee()!.lastName : 'Employee' }}
+        </li>
+      </ol>
+    </nav>
+
+    <app-admin-nav active="employees" />
+
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 my-3">
+      <h1 class="employee-detail__title mb-0 fs-4">Employee details</h1>
+      <a routerLink="/admin/employees" class="employee-detail__back btn btn-outline-secondary btn-sm">
+        ← Back to Employees
+      </a>
+    </div>
+
+    @if (loading()) {
+          <div role="status">
+            <span class="visually-hidden">Loading employee…</span>
+            <div class="employee-detail__panel d-flex flex-wrap align-items-center gap-3 mb-4" aria-hidden="true">
+              <div class="skeleton" style="width: 56px; height: 56px; border-radius: 50%; flex: none"></div>
+              <div style="flex: 1 1 200px">
+                <div class="skeleton skeleton--text mb-2" style="width: 160px; height: 18px"></div>
+                <div class="skeleton skeleton--text" style="width: 220px; height: 13px"></div>
+              </div>
+            </div>
+            @for (n of [1, 2]; track n) {
+              <div class="employee-detail__panel mb-4" aria-hidden="true">
+                <div class="skeleton skeleton--text mb-3" style="width: 140px; height: 16px"></div>
+                <div class="row g-3">
+                  @for (field of [1, 2, 3, 4]; track field) {
+                    <div class="col-md-3">
+                      <div class="skeleton skeleton--text mb-2" style="width: 70%; height: 11px"></div>
+                      <div class="skeleton skeleton--text" style="width: 90%"></div>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        } @else if (notFound()) {
+          <div class="employee-detail__empty text-center py-5">
+            <p class="mb-0">That employee couldn't be found.</p>
+          </div>
+        } @else if (error(); as message) {
+          <div class="alert alert-danger" role="alert">{{ message }}</div>
+        } @else if (employee(); as employee) {
+          <section
+            aria-label="Employee summary"
+            class="employee-detail__panel d-flex flex-wrap align-items-center gap-3 mb-4"
+          >
+            <div class="employee-detail__avatar" aria-hidden="true">{{ initials(employee) }}</div>
+            <div style="flex: 1 1 200px">
+              <p class="employee-detail__name mb-0">{{ employee.firstName }} {{ employee.lastName }}</p>
+              <p class="employee-detail__meta mb-0">
+                {{ employee.roleName ?? 'No role' }}
+                @if (employee.empRank) {
+                  · {{ employee.empRank }}
+                }
+              </p>
+            </div>
+            <span
+              class="employee-detail__status"
+              [class.employee-detail__status--active]="employee.status === 'ACTIVE'"
+            >
+              <span class="employee-detail__status-dot" aria-hidden="true"></span>
+              {{ employee.status === 'ACTIVE' ? 'Active' : employee.status }}
+            </span>
+          </section>
+
+          <section aria-labelledby="h-employment" class="employee-detail__panel mb-4">
+            <h2 id="h-employment" class="employee-detail__section-title">Employment</h2>
+            <dl class="employee-detail__fields mb-0">
+              <div>
+                <dt>Employee #</dt>
+                <dd>{{ employee.empNum ?? '—' }}</dd>
+              </div>
+              <div>
+                <dt>Badge #</dt>
+                <dd>{{ employee.badgeNum ?? '—' }}</dd>
+              </div>
+              <div>
+                <dt>Hire date</dt>
+                <dd>{{ formatHireDate(employee.hireDate) }}</dd>
+              </div>
+              <div>
+                <dt>Locations</dt>
+                <dd>{{ employee.locationCount }}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section aria-labelledby="h-contact" class="employee-detail__panel mb-4">
+            <h2 id="h-contact" class="employee-detail__section-title">Contact</h2>
+            <dl class="employee-detail__fields mb-0">
+              <div>
+                <dt>Email</dt>
+                <dd>{{ employee.emailAddress }}</dd>
+              </div>
+              <div>
+                <dt>Phone</dt>
+                <dd>{{ employee.phoneNumber ?? '—' }}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section aria-labelledby="h-security" class="employee-detail__panel">
+            <h2 id="h-security" class="employee-detail__section-title">Sign-in &amp; security</h2>
+            <dl class="employee-detail__fields mb-0">
+              <div>
+                <dt>MFA enabled</dt>
+                <dd>{{ employee.mfaEnabled === 'Y' ? 'Yes' : 'No' }}</dd>
+              </div>
+              @if (employee.mfaMethod) {
+                <div>
+                  <dt>MFA method</dt>
+                  <dd>{{ employee.mfaMethod }}</dd>
+                </div>
+              }
+              <div>
+                <dt>Last login</dt>
+                <dd>{{ employee.lastLoginTs ?? '—' }}</dd>
+              </div>
+            </dl>
+          </section>
+        }
+  </div>
+</section>
+
+<app-footer />

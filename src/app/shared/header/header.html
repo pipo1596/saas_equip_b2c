@@ -139,6 +139,7 @@
           aria-haspopup="menu"
           [attr.aria-expanded]="userMenuOpen()"
           [attr.aria-label]="fullName() ? 'Account menu for ' + fullName() : 'Account menu'"
+          [style.background]="avatarColor()"
           (click)="toggleUserMenu()"
         >
           {{ initials() ?? '?' }}
@@ -208,6 +209,20 @@
               <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
             </svg>
             My Allotment
+          </a>
+          <!-- Visible to everyone for now — no access rule has been defined
+               yet. Gate this behind an `isAdmin()`-style signal once one
+               exists, the same way `canApprove()` gates Approvals above. -->
+          <a
+            routerLink="/admin"
+            class="dropdown-item d-flex align-items-center gap-2"
+            (click)="userMenuOpen.set(false)"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V5z" />
+              <path d="M9.5 12l1.8 1.8L15 10" />
+            </svg>
+            Admin
           </a>
           <button type="button" class="dropdown-item d-flex align-items-center gap-2 text-danger" (click)="logOut()">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

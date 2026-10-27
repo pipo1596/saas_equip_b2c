@@ -1,0 +1,31 @@
+.admin-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-radius: 10px;
+  padding: 6px;
+  margin-bottom: 16px;
+}
+.admin-nav__link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 8px;
+  color: var(--slate-600);
+  text-decoration: none;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.admin-nav__link:hover {
+  background: var(--slate-100);
+  color: var(--slate-900);
+}
+.admin-nav__link--active {
+  background: color-mix(in srgb, var(--action) 10%, white);
+  color: var(--action);
+}
+.admin-nav__link--active:hover {
+  background: color-mix(in srgb, var(--action) 10%, white);
+}
