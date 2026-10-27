@@ -3,13 +3,12 @@ import { ChangeDetectionStrategy, Component, OnInit, PLATFORM_ID, inject, input,
 import { RouterLink } from '@angular/router';
 
 import { EmployeeDetail, EmployeeDirectoryService, formatHireDate } from '../../../core/employee/employee-directory';
-import { AdminNav } from '../../../shared/admin-nav/admin-nav';
 import { Footer } from '../../../shared/footer/footer';
 import { Header } from '../../../shared/header/header';
 
 @Component({
   selector: 'app-admin-employee-detail',
-  imports: [Header, Footer, RouterLink, AdminNav],
+  imports: [Header, Footer, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './employee-detail.html',
   styleUrls: ['../../../shared/shared.css', './employee-detail.css'],

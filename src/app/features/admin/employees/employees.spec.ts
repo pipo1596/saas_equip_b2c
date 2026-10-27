@@ -81,17 +81,16 @@ describe('AdminEmployees', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it('shows the admin nav with "Employees" marked as the current page', () => {
+  it('links back to the Admin home page', () => {
     const fixture = TestBed.createComponent(AdminEmployees);
     fixture.detectChanges();
     flushTenantSettings(httpMock);
     flushEmployeesList(httpMock, { pagination: { page: 1, pageSize: 25, totalRows: 0, totalPages: 1 }, data: [] });
     fixture.detectChanges();
 
-    const link: HTMLAnchorElement = fixture.nativeElement.querySelector(
-      'app-admin-nav a[href="/admin/employees"]',
-    );
-    expect(link.getAttribute('aria-current')).toBe('page');
+    const link: HTMLAnchorElement = fixture.nativeElement.querySelector('.admin-employees__back');
+    expect(link.getAttribute('href')).toBe('/admin');
+    expect(link.textContent).toContain('Back to Admin');
   });
 
   it('uses APCTPCEMCA instead of APCTPCEMP for a Canada-residency customer', () => {

@@ -97,8 +97,8 @@ export const routes: Routes = [
     // this is only gated on being signed in at all (same as every other
     // route above) until that rule exists.
     path: 'admin',
-    pathMatch: 'full',
-    redirectTo: 'admin/employees',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/admin/admin-home/admin-home').then((m) => m.AdminHome),
   },
   {
     path: 'admin/employees',

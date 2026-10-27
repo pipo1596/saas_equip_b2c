@@ -140,6 +140,20 @@
   border-bottom: 1px solid var(--slate-100);
   margin-bottom: 4px;
 }
+/* Set apart from the rest of the account menu — its own entry point into a
+   different part of the app, not another "my ___" link. */
+.user-menu__admin-link {
+  margin-top: 4px;
+  margin-bottom: 4px;
+  border-top: 1px solid var(--slate-100);
+  border-bottom: 1px solid var(--slate-100);
+  color: var(--action);
+  font-weight: 700;
+}
+.user-menu__admin-link:hover {
+  background: color-mix(in srgb, var(--action) 8%, white);
+  color: var(--action-hover);
+}
 .notif-menu {
   width: 240px;
 }

@@ -1,0 +1,66 @@
+:host {
+  display: block;
+  background: #e9f0f7;
+  min-height: 60vh;
+}
+
+.admin-home__title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(24px, 3vw, 32px);
+  color: var(--navy);
+}
+
+.admin-home__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.admin-home__card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 18px 20px;
+  text-decoration: none;
+  color: inherit;
+}
+.admin-home__card:hover {
+  box-shadow: var(--shadow);
+}
+
+.admin-home__card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  flex: none;
+  background: color-mix(in srgb, var(--action) 10%, white);
+  color: var(--action);
+}
+
+.admin-home__card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.admin-home__card-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--slate-900);
+}
+.admin-home__card-description {
+  font-size: 13px;
+  color: var(--slate-500);
+}
+
+.admin-home__card-chevron {
+  margin-left: auto;
+  color: var(--slate-400);
+  flex: none;
+}

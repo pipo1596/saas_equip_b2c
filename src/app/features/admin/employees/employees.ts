@@ -11,7 +11,6 @@ import {
   EmployeeRole,
   EmployeeSummary,
 } from '../../../core/employee/employee-directory';
-import { AdminNav } from '../../../shared/admin-nav/admin-nav';
 import { avatarColorForId } from '../../../shared/avatar-color';
 import { Footer } from '../../../shared/footer/footer';
 import { Header } from '../../../shared/header/header';
@@ -20,7 +19,7 @@ const PAGE_SIZE = 25;
 
 @Component({
   selector: 'app-admin-employees',
-  imports: [Header, Footer, RouterLink, ReactiveFormsModule, AdminNav],
+  imports: [Header, Footer, RouterLink, ReactiveFormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './employees.html',
   styleUrls: ['../../../shared/shared.css', './employees.css'],

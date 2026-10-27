@@ -1,0 +1,58 @@
+<app-header />
+
+<section class="admin-home">
+  <div class="container py-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a routerLink="/home">Home</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Admin</li>
+      </ol>
+    </nav>
+
+    <h1 class="admin-home__title mb-3">Admin</h1>
+
+    <div class="admin-home__grid">
+      @for (screen of screens; track screen.routerLink) {
+        <a class="admin-home__card" [routerLink]="screen.routerLink">
+          <span class="admin-home__card-icon" aria-hidden="true">
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          </span>
+          <span class="admin-home__card-body">
+            <span class="admin-home__card-title">{{ screen.title }}</span>
+            <span class="admin-home__card-description">{{ screen.description }}</span>
+          </span>
+          <svg
+            class="admin-home__card-chevron"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+        </a>
+      }
+    </div>
+  </div>
+</section>
+
+<app-footer />

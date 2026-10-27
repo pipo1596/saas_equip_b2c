@@ -5,13 +5,15 @@
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb">
         <li class="breadcrumb-item"><a routerLink="/home">Home</a></li>
+        <li class="breadcrumb-item"><a routerLink="/admin">Admin</a></li>
         <li class="breadcrumb-item active" aria-current="page">Employees</li>
       </ol>
     </nav>
 
-    <app-admin-nav active="employees" />
-
-    <h1 class="admin-employees__title mb-3">Employees</h1>
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+      <h1 class="admin-employees__title mb-0">Employees</h1>
+      <a routerLink="/admin" class="admin-employees__back btn btn-outline-secondary btn-sm">← Back to Admin</a>
+    </div>
 
     <div class="admin-employees__filters">
       <div class="admin-employees__filter-row">

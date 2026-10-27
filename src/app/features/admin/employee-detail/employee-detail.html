@@ -5,14 +5,13 @@
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb">
         <li class="breadcrumb-item"><a routerLink="/home">Home</a></li>
+        <li class="breadcrumb-item"><a routerLink="/admin">Admin</a></li>
         <li class="breadcrumb-item"><a routerLink="/admin/employees">Employees</a></li>
         <li class="breadcrumb-item active" aria-current="page">
           {{ employee() ? employee()!.firstName + ' ' + employee()!.lastName : 'Employee' }}
         </li>
       </ol>
     </nav>
-
-    <app-admin-nav active="employees" />
 
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 my-3">
       <h1 class="employee-detail__title mb-0 fs-4">Employee details</h1>
