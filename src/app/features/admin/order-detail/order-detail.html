@@ -1,0 +1,219 @@
+<app-header />
+
+<section class="admin-order-detail">
+  <div class="container py-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a routerLink="/home">Home</a></li>
+        <li class="breadcrumb-item"><a routerLink="/admin">Admin</a></li>
+        <li class="breadcrumb-item"><a routerLink="/admin/orders">Orders</a></li>
+        <li class="breadcrumb-item active" aria-current="page">
+          {{ order() ? order()!.orderNumber : 'Order' }}
+        </li>
+      </ol>
+    </nav>
+
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 my-3">
+      <h1 class="admin-order-detail__title mb-0 fs-4">Order details</h1>
+      <a routerLink="/admin/orders" class="admin-order-detail__back btn btn-outline-secondary btn-sm">
+        ← Back to Orders
+      </a>
+    </div>
+
+    @if (loading()) {
+      <div role="status">
+        <span class="visually-hidden">Loading order…</span>
+        <div class="admin-order-detail__panel mb-4" aria-hidden="true">
+          <div class="skeleton skeleton--text mb-2" style="width: 220px; height: 18px"></div>
+          <div class="skeleton skeleton--text" style="width: 160px; height: 13px"></div>
+        </div>
+        @for (n of [1, 2]; track n) {
+          <div class="admin-order-detail__panel mb-4" aria-hidden="true">
+            <div class="skeleton skeleton--text mb-3" style="width: 140px; height: 16px"></div>
+            <div class="skeleton skeleton--text mb-2" style="width: 80%"></div>
+            <div class="skeleton skeleton--text" style="width: 60%"></div>
+          </div>
+        }
+      </div>
+    } @else if (notFound()) {
+      <div class="admin-order-detail__empty text-center py-5">
+        <p class="mb-0">That order couldn't be found.</p>
+      </div>
+    } @else if (error(); as message) {
+      <div class="alert alert-danger" role="alert">{{ message }}</div>
+    } @else if (order(); as order) {
+      <section aria-label="Order summary" class="admin-order-detail__panel mb-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <div>
+            <p class="admin-order-detail__order-number mb-1">{{ order.orderNumber }}</p>
+            <p class="admin-order-detail__meta mb-0">Placed {{ order.placedTs }}</p>
+          </div>
+          <span [class]="'admin-order-detail__status admin-order-detail__status--' + statusTone(order.status)">
+            {{ statusLabel(order.status) }}
+          </span>
+        </div>
+        @if (order.status === 'REJECTED' && order.rejectReason) {
+          <p class="admin-order-detail__reject-reason mt-2 mb-0">{{ order.rejectReason }}</p>
+        }
+      </section>
+
+      <section aria-labelledby="h-items" class="admin-order-detail__panel mb-4">
+        <h2 id="h-items" class="admin-order-detail__section-title">Items</h2>
+        <div class="admin-order-detail__item-list">
+          @for (line of order.lines; track line.orderLineId) {
+            <div class="admin-order-detail__item">
+              <img class="admin-order-detail__item-thumb" [src]="line.imageUrl ?? placeholderImage" [alt]="line.productTitle" />
+              <div class="admin-order-detail__item-body">
+                <span class="admin-order-detail__item-name">{{ line.productTitle }}</span>
+                <span class="admin-order-detail__item-sku">
+                  {{ line.skuCode }}
+                  @if (line.optionDesc) {
+                    · {{ line.optionDesc }}
+                  }
+                </span>
+                @if (lineStatusNote(line); as note) {
+                  <span class="admin-order-detail__item-status">{{ note }}</span>
+                }
+              </div>
+              <span class="admin-order-detail__item-price">
+                @if (line.unitsUsed === line.qtyOrdered && line.lineTotal === 0) {
+                  <span class="admin-order-detail__item-linetotal">
+                    Covered by {{ line.unitsUsed }} unit{{ line.unitsUsed === 1 ? '' : 's' }}
+                  </span>
+                } @else if (!isPointsOnly()) {
+                  <span class="admin-order-detail__item-linetotal">{{ line.lineTotal | currency }}</span>
+                  <span class="admin-order-detail__item-unit-price">{{ line.qtyOrdered }} × {{ line.unitPrice | currency }}</span>
+                } @else if (line.linePoints !== null) {
+                  <span class="admin-order-detail__item-linetotal">{{ line.linePoints }} pts</span>
+                  @if (line.unitPoints !== null) {
+                    <span class="admin-order-detail__item-unit-price">{{ line.qtyOrdered }} × {{ line.unitPoints }} pts</span>
+                  }
+                }
+              </span>
+            </div>
+          }
+        </div>
+      </section>
+
+      <section aria-labelledby="h-contact" class="admin-order-detail__panel mb-4">
+        <h2 id="h-contact" class="admin-order-detail__section-title">Contact &amp; shipping</h2>
+        <div class="admin-order-detail__contact-ship">
+          <div>
+            <div class="admin-order-detail__label">Placed by</div>
+            <p class="admin-order-detail__line">{{ order.contact.firstName }} {{ order.contact.lastName }}</p>
+            <p class="admin-order-detail__line">{{ order.contact.email }}</p>
+            <p class="admin-order-detail__line">
+              {{ order.contact.phone }}
+              @if (order.contact.phoneExt) {
+                ext. {{ order.contact.phoneExt }}
+              }
+            </p>
+          </div>
+          <div>
+            <div class="admin-order-detail__label">Shipping address</div>
+            @if (order.shipTo.attention) {
+              <p class="admin-order-detail__line">{{ order.shipTo.attention }}</p>
+            }
+            <p class="admin-order-detail__line">{{ order.shipTo.addressLine1 }}</p>
+            @if (order.shipTo.addressLine2) {
+              <p class="admin-order-detail__line">{{ order.shipTo.addressLine2 }}</p>
+            }
+            <p class="admin-order-detail__line">
+              {{ order.shipTo.city }}, {{ order.shipTo.province }} {{ order.shipTo.postalCode }}
+            </p>
+            <p class="admin-order-detail__line">{{ order.shipTo.country }}</p>
+          </div>
+          <div>
+            <div class="admin-order-detail__label">Shipping method</div>
+            <p class="admin-order-detail__line">{{ order.shipMethod.name }}</p>
+            @if (order.shipMethod.carrier) {
+              <p class="admin-order-detail__line">
+                {{ order.shipMethod.carrier }}
+                @if (order.shipMethod.serviceCode) {
+                  · {{ order.shipMethod.serviceCode }}
+                }
+              </p>
+            }
+          </div>
+        </div>
+      </section>
+
+      @if (order.paidFrom.length > 0) {
+        <section aria-labelledby="h-paid-from" class="admin-order-detail__panel mb-4">
+          <h2 id="h-paid-from" class="admin-order-detail__section-title">Paid from</h2>
+          @for (paid of order.paidFrom; track $index) {
+            <div class="d-flex justify-content-between align-items-baseline gap-2 mb-2">
+              <span>
+                {{ paid.ruleName }}
+                @if (paid.state === 'RESERVED') {
+                  <span class="admin-order-detail__meta">(reserved)</span>
+                }
+              </span>
+              <b>{{ formatAmount(paid.amount, paid.amountType) }}</b>
+            </div>
+          }
+          @if (!isPointsOnly()) {
+            <hr />
+            <div class="d-flex justify-content-between align-items-baseline">
+              <span>Total</span>
+              <b>{{ order.totals.total | currency }}</b>
+            </div>
+          }
+        </section>
+      }
+
+      @if (order.shipments.length > 0) {
+        <section aria-labelledby="h-shipments" class="admin-order-detail__panel mb-4">
+          <h2 id="h-shipments" class="admin-order-detail__section-title">Shipments</h2>
+          @for (shipment of order.shipments; track shipment.shipmentId) {
+            <div class="admin-order-detail__shipment">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <p class="admin-order-detail__line">
+                    <b>{{ shipment.carrier }}</b>
+                    @if (shipment.serviceCode) {
+                      {{ shipment.serviceCode }}
+                    }
+                  </p>
+                  @if (shipment.trackingNumber) {
+                    <p class="admin-order-detail__line">
+                      @if (shipment.trackingUrl) {
+                        <a [href]="shipment.trackingUrl" target="_blank" rel="noopener">{{ shipment.trackingNumber }}</a>
+                      } @else {
+                        {{ shipment.trackingNumber }}
+                      }
+                    </p>
+                  }
+                </div>
+                <span class="admin-order-detail__shipment-status">{{ shipmentStatusLabel(shipment.status) }}</span>
+              </div>
+              @if (shipment.shippedTs) {
+                <p class="admin-order-detail__line admin-order-detail__line--muted">Shipped {{ shipment.shippedTs }}</p>
+              }
+              @if (shipment.deliveredTs) {
+                <p class="admin-order-detail__line admin-order-detail__line--muted">Delivered {{ shipment.deliveredTs }}</p>
+              }
+            </div>
+          }
+        </section>
+      }
+
+      <section aria-labelledby="h-timeline" class="admin-order-detail__panel">
+        <h2 id="h-timeline" class="admin-order-detail__section-title">Timeline</h2>
+        <ol class="admin-order-detail__timeline">
+          @for (entry of sortedHistory(); track entry.ts + entry.toStatus + (entry.orderLineId ?? '')) {
+            <li class="admin-order-detail__timeline-entry">
+              <span class="admin-order-detail__timeline-label">{{ historyEntryLabel(entry) }}</span>
+              <span class="admin-order-detail__timeline-meta">{{ historyByLabel(entry) }} · {{ entry.ts }}</span>
+              @if (entry.note) {
+                <p class="admin-order-detail__timeline-note">{{ entry.note }}</p>
+              }
+            </li>
+          }
+        </ol>
+      </section>
+    }
+  </div>
+</section>
+
+<app-footer />

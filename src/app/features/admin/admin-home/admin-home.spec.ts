@@ -46,4 +46,12 @@ describe('AdminHome', () => {
     const link: HTMLAnchorElement = fixture.nativeElement.querySelector('a[href="/admin/employees"]');
     expect(link.textContent).toContain('Employees');
   });
+
+  it('links to the Orders screen', () => {
+    const fixture = TestBed.createComponent(AdminHome);
+    fixture.detectChanges();
+
+    const link: HTMLAnchorElement = fixture.nativeElement.querySelector('a[href="/admin/orders"]');
+    expect(link.textContent).toContain('Orders');
+  });
 });

@@ -18,6 +18,11 @@ const ADMIN_SCREENS: AdminScreenLink[] = [
     title: 'Employees',
     description: 'Look up any employee by name, email, role, or hire date.',
   },
+  {
+    routerLink: '/admin/orders',
+    title: 'Orders',
+    description: 'Search every order placed by any employee under your customer.',
+  },
 ];
 
 @Component({

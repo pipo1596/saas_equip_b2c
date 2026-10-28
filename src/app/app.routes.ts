@@ -111,4 +111,15 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/admin/employee-detail/employee-detail').then((m) => m.AdminEmployeeDetail),
   },
+  {
+    path: 'admin/orders',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/admin/orders/orders').then((m) => m.AdminOrders),
+  },
+  {
+    path: 'admin/orders/:orderId',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/admin/order-detail/order-detail').then((m) => m.AdminOrderDetail),
+  },
 ];

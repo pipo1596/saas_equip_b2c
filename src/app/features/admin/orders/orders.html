@@ -1,0 +1,169 @@
+<app-header />
+
+<section class="admin-orders">
+  <div class="container py-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a routerLink="/home">Home</a></li>
+        <li class="breadcrumb-item"><a routerLink="/admin">Admin</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Orders</li>
+      </ol>
+    </nav>
+
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+      <h1 class="admin-orders__title mb-0">Orders</h1>
+      <a routerLink="/admin" class="admin-orders__back btn btn-outline-secondary btn-sm">← Back to Admin</a>
+    </div>
+
+    <div class="admin-orders__filters">
+      <div class="admin-orders__filter-row">
+        <div class="admin-orders__field admin-orders__field--search">
+          <label for="order-search" class="admin-orders__field-label">Search</label>
+          <div class="admin-orders__search">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="M21 21l-4-4" />
+            </svg>
+            <input id="order-search" type="search" placeholder="Order #" [formControl]="searchControl" />
+          </div>
+        </div>
+        <div class="admin-orders__field">
+          <label for="order-status" class="admin-orders__field-label">Status</label>
+          <select id="order-status" [value]="status()" (change)="onStatusChange($any($event.target).value)">
+            @for (option of statusOptions; track option.value) {
+              <option [value]="option.value">{{ option.label }}</option>
+            }
+          </select>
+        </div>
+        <div class="admin-orders__field">
+          <label for="order-date-from" class="admin-orders__field-label">Placed from</label>
+          <input
+            id="order-date-from"
+            type="date"
+            [value]="dateFrom()"
+            (change)="onDateFromChange($any($event.target).value)"
+          />
+        </div>
+        <div class="admin-orders__field">
+          <label for="order-date-to" class="admin-orders__field-label">Placed to</label>
+          <input
+            id="order-date-to"
+            type="date"
+            [value]="dateTo()"
+            (change)="onDateToChange($any($event.target).value)"
+          />
+        </div>
+      </div>
+
+      @if (hasFilters()) {
+        <div class="admin-orders__filter-actions">
+          <button type="button" class="btn btn-outline-secondary btn-sm" (click)="clearFilters()">
+            Clear filters
+          </button>
+        </div>
+      }
+    </div>
+
+    @if (loading()) {
+      <div class="admin-orders__table" role="status">
+        <span class="visually-hidden">Loading orders…</span>
+        @for (n of [1, 2, 3, 4, 5]; track n) {
+          <div class="admin-orders__row" aria-hidden="true">
+            <div class="skeleton skeleton--text" style="width: 65%"></div>
+            <div class="skeleton skeleton--text" style="width: 55%"></div>
+            <div class="skeleton skeleton--text" style="width: 50%"></div>
+            <div class="skeleton skeleton--text" style="width: 40%"></div>
+            <div class="skeleton skeleton--text" style="width: 50%"></div>
+            <div></div>
+          </div>
+        }
+      </div>
+    } @else if (error(); as message) {
+      <div class="alert alert-danger" role="alert">{{ message }}</div>
+    } @else if (orders().length === 0) {
+      <div class="admin-orders__empty text-center py-5">
+        <p class="mb-0">No orders match your search.</p>
+      </div>
+    } @else {
+      @if (pagination(); as p) {
+        <p class="admin-orders__count mb-2">
+          Showing <b>{{ orders().length }}</b> of <b>{{ p.totalRows }}</b> order{{ p.totalRows === 1 ? '' : 's' }}
+        </p>
+      }
+
+      <div class="admin-orders__table">
+        <div class="admin-orders__table-head">
+          <span>Order #</span>
+          <span>Placed by</span>
+          <span>Placed</span>
+          <span>Items</span>
+          <span>Total</span>
+          <span>Actions</span>
+        </div>
+        @for (order of orders(); track order.orderId) {
+          <div class="admin-orders__row">
+            <span class="admin-orders__order-id">
+              <span class="admin-orders__order-number">{{ order.orderNumber }}</span>
+              <span [class]="'admin-orders__status admin-orders__status--' + statusTone(order.status)">
+                {{ statusLabel(order.status) }}
+              </span>
+            </span>
+            <span>{{ placedByLabel(order) ?? '—' }}</span>
+            <span>{{ orderDate(order.placedTs) }}</span>
+            <span>{{ order.itemCount }}</span>
+            <span>
+              @if (order.subtotalPoints !== null) {
+                {{ order.subtotalPoints }} pts
+              } @else {
+                {{ order.orderTotal | currency }}
+              }
+            </span>
+            <a
+              class="admin-orders__view"
+              [routerLink]="['/admin/orders', order.orderId]"
+              [attr.aria-label]="'View order ' + order.orderNumber"
+            >
+              View
+            </a>
+          </div>
+        }
+      </div>
+
+      @if (pagination(); as p) {
+        @if (p.totalPages > 1) {
+          <nav class="admin-orders__pager" aria-label="Order pages">
+            <button
+              type="button"
+              class="btn btn-outline-secondary btn-sm"
+              [disabled]="p.page <= 1"
+              (click)="goToPage(p.page - 1)"
+            >
+              Previous
+            </button>
+            <span class="admin-orders__pager-label">Page {{ p.page }} of {{ p.totalPages }}</span>
+            <button
+              type="button"
+              class="btn btn-outline-secondary btn-sm"
+              [disabled]="p.page >= p.totalPages"
+              (click)="goToPage(p.page + 1)"
+            >
+              Next
+            </button>
+          </nav>
+        }
+      }
+    }
+  </div>
+</section>
+
+<app-footer />

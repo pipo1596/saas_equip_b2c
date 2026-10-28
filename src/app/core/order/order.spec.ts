@@ -487,6 +487,72 @@ describe('OrderService', () => {
     });
   });
 
+  describe('listForCustomer', () => {
+    const SUMMARY = {
+      orderId: 42,
+      orderNumber: 'EQ100001',
+      status: 'PROCESSING' as const,
+      placedTs: '2026-09-30 10:00:00',
+      itemCount: 2,
+      lineCount: 1,
+      thumbnails: [
+        { lineNo: 1, skuId: 9001, productTitle: "Men's Trail Jacket", imageUrl: 'https://cdn.example.com/black-m.jpg' },
+      ],
+      orderTotal: 221.28,
+      allotDollarsUsed: 179.98,
+      allotUnitsUsed: 0,
+      shipMethodName: 'Standard Ground',
+      trackingCount: 0,
+    };
+
+    it('posts *CUSTLIST (not *LIST) with the same status/page/pageSize params', () => {
+      service.listForCustomer({ status: '', page: 1, pageSize: 25 }).subscribe();
+
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      expect(req.request.body).toEqual({ action: '*CUSTLIST', status: '', page: 1, pageSize: 25 });
+      req.flush({ pagination: { page: 1, pageSize: 25, totalRows: 1, totalPages: 1 }, data: [SUMMARY] });
+    });
+
+    it('only includes the optional filter fields that are actually set, same as `list`', () => {
+      service
+        .listForCustomer({ status: 'PROCESSING', orderNumber: '1003', sort: 'OLDEST', page: 1, pageSize: 25 })
+        .subscribe();
+
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      expect(req.request.body).toEqual({
+        action: '*CUSTLIST',
+        status: 'PROCESSING',
+        orderNumber: '1003',
+        sort: 'OLDEST',
+        page: 1,
+        pageSize: 25,
+      });
+      req.flush({ pagination: { page: 1, pageSize: 25, totalRows: 0, totalPages: 0 }, data: [] });
+    });
+
+    it('normalizes a null data array to [], same as `list`', () => {
+      let result: OrderPage | ApiError | undefined;
+      service.listForCustomer({ status: '', page: 1, pageSize: 25 }).subscribe((res) => (result = res));
+
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER')
+        .flush({ pagination: { page: 1, pageSize: 25, totalRows: 0, totalPages: 0 }, data: null });
+
+      expect((result as OrderPage).data).toEqual([]);
+    });
+
+    it('passes a failure straight through', () => {
+      let result: OrderPage | ApiError | undefined;
+      service.listForCustomer({ status: '', page: 1, pageSize: 25 }).subscribe((res) => (result = res));
+
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER')
+        .flush({ success: false, code: 'ERR', message: 'Session is not associated with a customer.' });
+
+      expect(result).toEqual({ success: false, code: 'ERR', message: 'Session is not associated with a customer.' });
+    });
+  });
+
   describe('listApprovals', () => {
     const QUEUE_ROW = {
       orderId: 86,

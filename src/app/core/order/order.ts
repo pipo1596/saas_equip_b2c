@@ -610,6 +610,23 @@ export class OrderService {
       .pipe(map((response) => ('success' in response ? response : normalizeOrderDetail(response))));
   }
 
+  // Shared by `list`/`listForCustomer` — the filter/pagination contract is
+  // identical between them, only the `action` (and so the scope of rows it
+  // matches server-side) differs.
+  private buildListBody(action: '*LIST' | '*CUSTLIST', params: ListOrdersParams) {
+    return {
+      action,
+      status: params.status,
+      page: params.page,
+      pageSize: params.pageSize,
+      ...(params.orderNumber ? { orderNumber: params.orderNumber } : {}),
+      ...(params.dateFrom ? { dateFrom: params.dateFrom } : {}),
+      ...(params.dateTo ? { dateTo: params.dateTo } : {}),
+      ...(params.datePreset ? { datePreset: params.datePreset } : {}),
+      ...(params.sort && params.sort !== 'NEWEST' ? { sort: params.sort } : {}),
+    };
+  }
+
   // Newest first, same "no `success` key means real data" rule as `get`.
   // An empty result (`data: []`, `totalRows: 0`) isn't a failure — that's
   // just an employee with no orders yet. Every optional field is left out
@@ -617,17 +634,16 @@ export class OrderService {
   // request (and the request-shape assertions in tests) minimal.
   list(params: ListOrdersParams): Observable<OrderPage | ApiError> {
     return this.http
-      .post<RawOrderPage | ApiError>(this.dispatchUrl, {
-        action: '*LIST',
-        status: params.status,
-        page: params.page,
-        pageSize: params.pageSize,
-        ...(params.orderNumber ? { orderNumber: params.orderNumber } : {}),
-        ...(params.dateFrom ? { dateFrom: params.dateFrom } : {}),
-        ...(params.dateTo ? { dateTo: params.dateTo } : {}),
-        ...(params.datePreset ? { datePreset: params.datePreset } : {}),
-        ...(params.sort && params.sort !== 'NEWEST' ? { sort: params.sort } : {}),
-      })
+      .post<RawOrderPage | ApiError>(this.dispatchUrl, this.buildListBody('*LIST', params))
+      .pipe(map((response) => ('success' in response ? response : normalizeOrderPage(response))));
+  }
+
+  // `*CUSTLIST` — same request/response contract as `*LIST`, except scoped
+  // to every employee under the customer instead of just the caller's own
+  // orders. Used only by the Admin order list (`AdminOrders`).
+  listForCustomer(params: ListOrdersParams): Observable<OrderPage | ApiError> {
+    return this.http
+      .post<RawOrderPage | ApiError>(this.dispatchUrl, this.buildListBody('*CUSTLIST', params))
       .pipe(map((response) => ('success' in response ? response : normalizeOrderPage(response))));
   }
 
