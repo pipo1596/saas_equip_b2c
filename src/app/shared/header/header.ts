@@ -27,6 +27,7 @@ import {
   formatCartItemOptions,
   tileBalance,
 } from '../../core/cart/cart';
+import { effectiveLineTags } from '../../core/cart/cart-totals';
 import { CatalogCategory, CatalogMenu, CatalogViewService } from '../../core/catalog/catalog-view';
 import { LocationSelectionService } from '../../core/location/location-selection';
 import { TenantSettings, TenantSettingsService } from '../../core/tenant/tenant-settings';
@@ -420,8 +421,16 @@ export class Header implements OnInit {
     return rule ? tileBalance(rule) : null;
   });
 
+  // Reattributed the same way `CartPage`'s own `tagsByItemId` is — a line
+  // whose own units grant is actually exhausted shows as covered by
+  // whichever dollar rule really picks it up instead of the raw (and by
+  // then stale) "uses units" tag the API still sends for it (see
+  // `effectiveLineTags`'s own comment for why the raw tag can't be trusted
+  // here either).
+  private readonly tagsByItemId = computed(() => effectiveLineTags(this.cart()));
+
   lineTag(cartItemId: number): PayTag | null {
-    return this.allotment()?.lineTags.find((tag) => tag.cartItemId === cartItemId) ?? null;
+    return this.tagsByItemId().get(cartItemId) ?? null;
   }
 
   ngOnInit(): void {

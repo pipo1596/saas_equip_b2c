@@ -174,6 +174,17 @@ export class ProductDetail implements OnInit {
   readonly coveringRule = computed<AllotmentRule | null>(() =>
     ruleForCategories(this.allotmentRules(), this.product()?.progCatIds ?? [], this.categoryDepth()),
   );
+  // The top-of-page badge is built from `coveringRule` too, not the
+  // backend's own `productTag` (see `productTag`'s comment below) — the
+  // backend's preview doesn't account for a specific unit grant being
+  // exhausted the way `ruleForCategories`/`unitsReallyExhausted` does, so it
+  // can keep naming an exhausted units rule even once the coverage card
+  // below has already (correctly) fallen through to a dollar rule. Same
+  // pattern as a listing card's own badge — see `ProductList.coverageTag`.
+  readonly coverageTag = computed<PayTag | null>(() => {
+    const rule = this.coveringRule();
+    return rule ? { ruleId: rule.ruleId, payUnit: rule.primaryUnit, tagLabel: rule.ruleName } : null;
+  });
   // The specific assortment grant this product actually draws from, now
   // that units are tracked per assortment rather than as one pooled total
   // — `null` for a non-units rule, or a units rule with no grant matching

@@ -195,6 +195,15 @@ export class CartService {
       rules.every((rule) => rule.primaryUnit !== 'DOLLARS')
     );
   });
+  // Whether this employee has a points rule at all, mixed-allotment or not —
+  // every SKU still carries its own `lineTotalPoints`/`currentPoints`/
+  // `subtotalPoints` regardless of the employee's actual allotment, so a
+  // fallback that only checked those for `!== null` ended up showing "0 pts"
+  // even for an employee with no points rule whatsoever. Gate any points
+  // display that isn't already behind `pointsOnly()` on this instead.
+  readonly hasPointsAllotment = computed(() =>
+    (this.cart().allotment?.rules ?? []).some((rule) => rule.primaryUnit === 'POINTS'),
+  );
   // Owned here (not by the header) so any component with a "success" moment
   // — e.g. product detail after `addItem` resolves — can pop the header's
   // cart drawer open as confirmation, without reaching into the header.

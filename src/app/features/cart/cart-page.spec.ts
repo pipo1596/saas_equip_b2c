@@ -291,6 +291,59 @@ describe('CartPage', () => {
     expect(summary.textContent).toContain('150 pts');
   });
 
+  it("never shows a Points figure for an employee with no points rule at all, even though every SKU still carries its own lineTotalPoints", () => {
+    const fixture = TestBed.createComponent(CartPage);
+    fixture.detectChanges();
+
+    // Dollar-only allotment whose rule has nothing `inCart` — `paidFromLines`
+    // is empty, which used to fall through to a "Points" line driven purely
+    // by `cart().subtotalPoints !== null` (a field every SKU carries
+    // regardless of the employee's actual allotment), showing "0 pts" for
+    // someone who has no points rule whatsoever.
+    const DOLLAR_ONLY_NOTHING_IN_CART_ALLOTMENT = {
+      programId: 3,
+      allotmentBar: null,
+      ruleCount: 1,
+      allotExclTaxFreight: 'N' as const,
+      allowCcOverage: 'N' as const,
+      rules: [
+        {
+          ruleId: 50,
+          ruleName: 'Dollar 100',
+          allotType: 'DOLLAR' as const,
+          primaryUnit: 'DOLLARS' as const,
+          isBarRule: 'N' as const,
+          dollars: { total: 100, used: 33.06, inCart: 0, available: 66.94 },
+          units: null,
+          points: null,
+          cycle: {
+            renewalBasis: 'FIXED' as const,
+            renewalPeriodMonths: 12,
+            cycleStart: null,
+            cycleEnd: null,
+            renewsOn: null,
+            expirationDate: null,
+            onExpiration: 'SUSPEND' as const,
+          },
+          covers: { allAssortments: 'Y' as const, categories: [], unitGrants: [] },
+          carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
+          quotas: [],
+          fallbacks: [],
+        },
+      ],
+      approvals: { canApprove: 'N' as const, pendingApprovals: null, awaitingApproval: null },
+      openOrders: null,
+      lineTags: [],
+      productTag: null,
+    };
+    flushInitialCartLoads(httpMock, { ...CART, allotment: DOLLAR_ONLY_NOTHING_IN_CART_ALLOTMENT });
+    fixture.detectChanges();
+
+    const summary: HTMLElement = fixture.nativeElement.querySelector('.cart-page__summary');
+    expect(summary.textContent).not.toContain('Points');
+    expect(summary.textContent).not.toContain('pts');
+  });
+
   it('should show the quantity × unit-price math for every line, regardless of quantity', () => {
     const fixture = TestBed.createComponent(CartPage);
     fixture.detectChanges();

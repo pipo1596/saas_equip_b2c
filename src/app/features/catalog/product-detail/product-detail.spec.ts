@@ -1052,7 +1052,11 @@ describe('ProductDetail', () => {
     });
   });
 
-  it("should show the product's pay-with tag from the cart's own *GET", () => {
+  it("captures the product's pay-with tag from the cart's own *GET", () => {
+    // `productTag()` itself is still populated straight from the response —
+    // what the *badge* actually renders is covered separately (see
+    // `coverageTag`'s own tests), since it's deliberately derived from
+    // `coveringRule()` rather than trusting this raw value directly.
     const fixture = TestBed.createComponent(ProductDetail);
     const detail = fixture.componentInstance;
     fixture.componentRef.setInput('productPk', '12345');
@@ -1087,7 +1091,6 @@ describe('ProductDetail', () => {
       payUnit: 'UNITS',
       tagLabel: 'uses units',
     });
-    expect(fixture.nativeElement.querySelector('.pay-tag')?.textContent?.trim()).toBe('uses units');
   });
 
   it('should keep showing the product tag after adding to cart, even though that response has none', () => {
@@ -1514,13 +1517,22 @@ describe('ProductDetail', () => {
         approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
         openOrders: null,
         lineTags: [],
-        productTag: null,
+        // A real, reported case: the backend's own preview tag still names
+        // the (really exhausted) units rule even though its own pooled
+        // balance above already shows nothing left — the top badge must not
+        // trust this directly, the same way the coverage card below already
+        // doesn't.
+        productTag: { productPk: 12345, ruleId: 11, payUnit: 'UNITS', tagLabel: 'uses units' },
       },
     });
     fixture.detectChanges();
 
     const card = fixture.nativeElement.querySelector('app-allotment-coverage-card');
     expect(card.querySelector('.coverage-card__title')?.textContent?.trim()).toBe('Covered by your Dollar 100');
+
+    const badge = fixture.nativeElement.querySelector('.product-detail__panel .pay-tag');
+    expect(badge?.textContent?.trim()).toBe('Dollar 100');
+    expect(badge?.classList).not.toContain('pay-tag--units');
   });
 
   it('prefers a dollar rule scoped to the deeper, more specific category over one matching only a broader ancestor', () => {

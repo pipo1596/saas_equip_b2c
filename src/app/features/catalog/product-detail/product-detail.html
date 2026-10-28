@@ -124,7 +124,7 @@
         <div class="col-lg-6">
           <div class="product-detail__panel">
             @if (product(); as p) {
-              @if (p.brandLogoUrl || p.vendor || productTag()) {
+              @if (p.brandLogoUrl || p.vendor || coverageTag()) {
                 <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
                   <div class="d-flex align-items-center gap-2">
                     @if (p.brandLogoUrl) {
@@ -134,7 +134,7 @@
                       <span class="text-secondary">{{ p.vendor }}</span>
                     }
                   </div>
-                  <app-pay-tag [tag]="productTag()" />
+                  <app-pay-tag [tag]="coverageTag()" />
                 </div>
               }
               <p class="text-secondary small mb-3">{{ p.productId }}</p>

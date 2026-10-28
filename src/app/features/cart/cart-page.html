@@ -170,7 +170,7 @@
                     <b class="cart-page__summary-amount--shortfall">{{ pointsShortfall() }} pts</b>
                   </div>
                 }
-              } @else if (cart().subtotalPoints !== null) {
+              } @else if (hasPointsAllotment() && cart().subtotalPoints !== null) {
                 <div class="d-flex justify-content-between align-items-baseline mb-2">
                   <span>Points</span>
                   <b>{{ cart().subtotalPoints }} pts</b>
@@ -312,7 +312,7 @@
       } @else if (!pointsOnly()) {
         <span class="cart-page__linetotal">{{ item.lineTotalPrice | currency }}</span>
         <span class="cart-page__unit-price">{{ item.quantity }} × {{ item.currentPrice | currency }}</span>
-        @if (item.lineTotalPoints !== null) {
+        @if (hasPointsAllotment() && item.lineTotalPoints !== null) {
           <span class="cart-page__points">{{ item.lineTotalPoints }} pts</span>
         }
       } @else if (item.lineTotalPoints !== null) {

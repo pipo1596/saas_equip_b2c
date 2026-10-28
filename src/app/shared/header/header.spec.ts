@@ -854,6 +854,116 @@ describe('Header', () => {
     expect(editLink?.textContent?.trim()).toBe('Edit');
   });
 
+  it("shows a line's pay tag reattributed to a dollar rule, not its raw (now-exhausted) units tag, same as the cart page", () => {
+    // Mirrors `effectiveLineTags`'s own reattribution test in
+    // cart-totals.spec.ts: a Cap line tagged UNITS, but that grant's
+    // `remaining` is already 0 and a dollar rule covering it still has room
+    // — the badge should read "$ allotment" here too, not "uses units".
+    const fixture = TestBed.createComponent(Header);
+    const header = fixture.componentInstance;
+    fixture.detectChanges();
+
+    const httpMock = TestBed.inject(HttpTestingController);
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS').flush({} as never);
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCCART').flush({
+      cartId: 501,
+      itemCount: 1,
+      subtotalPrice: 25,
+      subtotalPoints: null,
+      items: [
+        {
+          cartItemId: 1,
+          skuId: 1,
+          quantity: 1,
+          priceAtAdd: 25,
+          pointsAtAdd: null,
+          lineTotalPrice: 25,
+          lineTotalPoints: null,
+          productPk: 999,
+          productTitle: 'Tactical Cap',
+          handle: 'tactical-cap',
+          skuCode: 'CAP-1',
+          currentPrice: 25,
+          currentPoints: null,
+          priceChanged: 'N',
+          pointsChanged: 'N',
+          isAvailable: 'Y',
+          imageUrl: null,
+          options: [],
+          progCatIds: [310],
+        },
+      ],
+      allotment: {
+        programId: 3,
+        allotmentBar: null,
+        ruleCount: 2,
+        allotExclTaxFreight: 'N',
+        allowCcOverage: 'N',
+        rules: [
+          {
+            ruleId: 12,
+            ruleName: 'Unit Allotment',
+            allotType: 'UNITS',
+            primaryUnit: 'UNITS',
+            isBarRule: 'N',
+            dollars: null,
+            units: { total: 2, used: 0, inCart: 1, available: 1 },
+            points: null,
+            cycle: {
+              renewalBasis: 'FIXED',
+              renewalPeriodMonths: 12,
+              cycleStart: null,
+              cycleEnd: null,
+              renewsOn: null,
+              expirationDate: null,
+              onExpiration: 'SUSPEND',
+            },
+            covers: {
+              allAssortments: 'N',
+              categories: null,
+              unitGrants: [{ progCatId: 310, categoryName: 'Cap', unitQty: 2, remaining: 0, reserved: 0 }],
+            },
+            carryover: { type: 'FORFEIT', pct: null, capAmount: null, carriedIn: null },
+            quotas: null,
+            fallbacks: null,
+          },
+          {
+            ruleId: 40,
+            ruleName: 'General Allotment',
+            allotType: 'DOLLAR',
+            primaryUnit: 'DOLLARS',
+            isBarRule: 'Y',
+            dollars: { total: 500, used: 0, inCart: 0, available: 500 },
+            units: null,
+            points: null,
+            cycle: {
+              renewalBasis: 'FIXED',
+              renewalPeriodMonths: 12,
+              cycleStart: null,
+              cycleEnd: null,
+              renewsOn: null,
+              expirationDate: null,
+              onExpiration: 'SUSPEND',
+            },
+            covers: { allAssortments: 'Y', categories: null, unitGrants: null },
+            carryover: { type: 'FORFEIT', pct: null, capAmount: null, carriedIn: null },
+            quotas: null,
+            fallbacks: null,
+          },
+        ],
+        approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+        openOrders: null,
+        lineTags: [{ cartItemId: 1, skuId: 1, ruleId: 12, payUnit: 'UNITS', tagLabel: 'uses units', allocations: null }],
+        productTag: null,
+      },
+    } as never);
+    fixture.detectChanges();
+
+    const badge = fixture.nativeElement.querySelector('.cart-item .pay-tag');
+    expect(badge?.classList).not.toContain('pay-tag--units');
+    expect(badge?.textContent?.trim()).toBe('$ allotment');
+  });
+
   it('should close the drawer when a cart line is clicked to edit it', () => {
     const fixture = TestBed.createComponent(Header);
     const header = fixture.componentInstance;
