@@ -344,6 +344,79 @@ describe('CartPage', () => {
     expect(summary.textContent).not.toContain('pts');
   });
 
+  it('shows a real Balance due even when nothing qualifies for a "Paid from" line at all', () => {
+    // Reproduces a real reported case: a Unit Allotment that's genuinely
+    // exhausted (Total 6, Used 6, In cart 0) with both lines still
+    // raw-tagged UNITS against it, and a Dollar 100 rule with nothing
+    // `inCart` either — `paidFromLines` is empty either way, which used to
+    // mean the whole Balance section never rendered at all, even though
+    // $117.25 of real order value has nowhere accounted for.
+    const fixture = TestBed.createComponent(CartPage);
+    fixture.detectChanges();
+
+    const UNIT_RULE = {
+      ruleId: 12,
+      ruleName: 'Unit Allotment',
+      allotType: 'UNITS' as const,
+      primaryUnit: 'UNITS' as const,
+      isBarRule: 'N' as const,
+      dollars: null,
+      units: { total: 6, used: 6, inCart: 0, available: 0 },
+      points: null,
+      cycle: {
+        renewalBasis: 'FIXED' as const,
+        renewalPeriodMonths: 12,
+        cycleStart: null,
+        cycleEnd: null,
+        renewsOn: null,
+        expirationDate: null,
+        onExpiration: 'SUSPEND' as const,
+      },
+      covers: { allAssortments: 'N' as const, categories: [], unitGrants: [{ progCatId: 52, categoryName: 'Jacket', unitQty: 6 }] },
+      carryover: { type: 'FORFEIT' as const, pct: null, capAmount: null, carriedIn: null },
+      quotas: [],
+      fallbacks: [],
+    };
+    const DOLLAR_RULE = {
+      ...UNIT_RULE,
+      ruleId: 50,
+      ruleName: 'Dollar 100',
+      allotType: 'DOLLAR' as const,
+      primaryUnit: 'DOLLARS' as const,
+      dollars: { total: 100, used: 33.06, inCart: 0, available: 66.94 },
+      units: null,
+      covers: { allAssortments: 'Y' as const, categories: [], unitGrants: [] },
+    };
+    flushInitialCartLoads(httpMock, {
+      ...CART,
+      items: [
+        { ...CART.items[0], progCatIds: [52] },
+        { ...CART.items[1], progCatIds: [52] },
+      ],
+      allotment: {
+        programId: 3,
+        allotmentBar: null,
+        ruleCount: 2,
+        allotExclTaxFreight: 'N',
+        allowCcOverage: 'N',
+        rules: [UNIT_RULE, DOLLAR_RULE],
+        approvals: { canApprove: 'N', pendingApprovals: null, awaitingApproval: null },
+        openOrders: null,
+        lineTags: [
+          { cartItemId: 9001, skuId: 9001, ruleId: 12, payUnit: 'UNITS', tagLabel: 'uses units', allocations: [] },
+          { cartItemId: 9002, skuId: 9002, ruleId: 12, payUnit: 'UNITS', tagLabel: 'uses units', allocations: [] },
+        ],
+        productTag: null,
+      },
+    });
+    fixture.detectChanges();
+
+    const summary: HTMLElement = fixture.nativeElement.querySelector('.cart-page__summary');
+    expect(summary.querySelector('.cart-page__summary-label')).toBeNull();
+    expect(summary.textContent).toContain('Balance');
+    expect(summary.textContent).toContain('$269.97');
+  });
+
   it('should show the quantity × unit-price math for every line, regardless of quantity', () => {
     const fixture = TestBed.createComponent(CartPage);
     fixture.detectChanges();

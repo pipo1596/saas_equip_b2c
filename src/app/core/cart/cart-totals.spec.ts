@@ -682,6 +682,51 @@ describe('amountDueAtCheckout', () => {
 
     expect(amountDueAtCheckout(cart)).toBe(0);
   });
+
+  it("catches a units rule that's genuinely exhausted even though its own `available` is clamped at 0, not negative", () => {
+    // Reproduces a real reported case: a Unit Allotment with Total 6, Used
+    // 6, In cart 0, Available 0 (real usage alone already spent the whole
+    // thing — not just this cart's own contents) — 7 shirts are still
+    // raw-tagged UNITS against it (the backend hasn't moved the charge to
+    // the dollar rule either), so the old `available < 0` check saw nothing
+    // to flag and this $117.25 silently vanished from both "Paid from" and
+    // the Balance due, even though nothing anywhere actually covers it.
+    const unitAllotment: AllotmentRule = {
+      ...POINTS_ONLY_ALLOTMENT.rules[0],
+      ruleId: 12,
+      ruleName: 'Unit Allotment',
+      allotType: 'UNITS',
+      primaryUnit: 'UNITS',
+      points: null,
+      units: { total: 6, used: 6, inCart: 0, available: 0 },
+      covers: { allAssortments: 'N', categories: [], unitGrants: [{ progCatId: 100, categoryName: 'Shirt', unitQty: 6 }] },
+    };
+    const dollarRule: AllotmentRule = {
+      ...POINTS_ONLY_ALLOTMENT.rules[0],
+      ruleId: 50,
+      ruleName: 'Dollar 100',
+      allotType: 'DOLLAR',
+      primaryUnit: 'DOLLARS',
+      points: null,
+      dollars: { total: 100, used: 33.06, inCart: 0, available: 66.94 },
+    };
+    const shirt = makeItem({ cartItemId: 1, skuId: 1, lineTotalPrice: 117.25, quantity: 7, progCatIds: [100] });
+    const cart: Cart = {
+      cartId: 1,
+      itemCount: 7,
+      subtotalPrice: 117.25,
+      subtotalPoints: 0,
+      items: [shirt],
+      roleRequiresApproval: 'N',
+      allotment: {
+        ...POINTS_ONLY_ALLOTMENT,
+        rules: [unitAllotment, dollarRule],
+        lineTags: [makeTag({ cartItemId: 1, skuId: 1, ruleId: 12, payUnit: 'UNITS' })],
+      },
+    };
+
+    expect(amountDueAtCheckout(cart)).toBeCloseTo(117.25, 2);
+  });
 });
 
 const CAP_QUOTA: AllotmentQuota = {

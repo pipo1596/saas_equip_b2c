@@ -143,7 +143,7 @@
                   </div>
                   @if (line.fallback; as fallback) {
                     <div class="cart-page__summary-fallback-note mb-2">
-                      for {{ fallback.fromRuleName }} 
+                      for {{ fallback.fromRuleName }}
                     </div>
                   }
                   @if (line.categoryBreakdown.length > 0) {
@@ -157,6 +157,20 @@
                     </ul>
                   }
                 }
+              } @else if (hasPointsAllotment() && cart().subtotalPoints !== null) {
+                <div class="d-flex justify-content-between align-items-baseline mb-2">
+                  <span>Points</span>
+                  <b>{{ cart().subtotalPoints }} pts</b>
+                </div>
+              }
+
+              <!-- Independent of whether any rule's own pooled balance
+                   happened to claim a "Paid from" line above — the real due
+                   amount (`amountDueAtCheckout`/`pointsShortfall`) is robust
+                   to a rule's `inCart`/`available` not reflecting a line's
+                   real attribution yet, and shouldn't just vanish because
+                   nothing else rendered above it. -->
+              @if (cart().allotment) {
                 @if (!pointsOnly()) {
                   <hr />
                   <div class="d-flex justify-content-between align-items-baseline mb-3">
@@ -170,11 +184,6 @@
                     <b class="cart-page__summary-amount--shortfall">{{ pointsShortfall() }} pts</b>
                   </div>
                 }
-              } @else if (hasPointsAllotment() && cart().subtotalPoints !== null) {
-                <div class="d-flex justify-content-between align-items-baseline mb-2">
-                  <span>Points</span>
-                  <b>{{ cart().subtotalPoints }} pts</b>
-                </div>
               }
 
               @if (exceededQuotas().length === 0 && exceededUnitRules().length === 0 && exceededUnitGrants().length === 0) {

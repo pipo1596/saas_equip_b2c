@@ -509,19 +509,31 @@ export function amountDueAtCheckout(cart: Cart): number {
   }, 0);
   const dollarShortfall = Math.max(0, dollarEligible - dollarCovered);
 
+  // Same reasoning as the dollar side above — a non-dollar rule's own
+  // `available` is clamped at 0 (never negative) once `inCart` itself is
+  // already capped, so it can't be trusted to flag an over-commitment
+  // either. This cart's own tagged lines already say exactly how many units
+  // each rule was really asked for (`requestedByRuleId`, built above from
+  // each line's raw allocation, independent of anything the rule's own
+  // pooled balance reports); compared against the rule's real, stable
+  // capacity (`total - used - reserved`, the same figure
+  // `unitsReallyExhausted` uses), whatever's left over is the real
+  // shortfall — not a pooled comparison like the dollar side, since units
+  // from different rules aren't fungible with each other.
   const nonDollarShortfall = rules.reduce((sum, rule) => {
     if (rule.primaryUnit === 'DOLLARS') {
       return sum;
     }
     const balance = tileBalance(rule);
-    if (!balance || balance.available >= 0) {
-      return sum;
-    }
     const requested = requestedByRuleId.get(rule.ruleId);
-    if (!requested || requested.units <= 0) {
+    if (!balance || !requested || requested.units <= 0) {
       return sum;
     }
-    const shortfallUnits = Math.min(-balance.available, requested.units);
+    const capacity = Math.max(0, balance.total - balance.used - (balance.reserved ?? 0));
+    const shortfallUnits = Math.max(0, requested.units - capacity);
+    if (shortfallUnits <= 0) {
+      return sum;
+    }
     return sum + requested.dollarValue * (shortfallUnits / requested.units);
   }, 0);
 
