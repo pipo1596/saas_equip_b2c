@@ -1,0 +1,284 @@
+:host {
+  display: block;
+  background: #e9f0f7;
+  min-height: 60vh;
+}
+
+.admin-approvals__title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(24px, 3vw, 32px);
+  color: var(--navy);
+}
+
+.admin-approvals__empty {
+  color: var(--slate-600);
+}
+
+.admin-approvals__count {
+  font-size: 13px;
+  color: var(--slate-600);
+}
+.admin-approvals__count b {
+  color: var(--slate-900);
+}
+
+/* ---------- filters card ---------- */
+.admin-approvals__filters {
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px 24px;
+  margin-bottom: 16px;
+}
+.admin-approvals__field {
+  border: 1px solid var(--slate-200);
+  border-radius: 8px;
+  padding: 8px 14px;
+  max-width: 420px;
+}
+.admin-approvals__field:focus-within {
+  border-color: var(--action);
+}
+.admin-approvals__field-label {
+  display: block;
+  font-size: 12px;
+  color: var(--slate-500);
+  margin: 0 0 2px;
+}
+.admin-approvals__field input {
+  display: block;
+  width: 100%;
+  border: none;
+  outline: none;
+  padding: 0;
+  background: transparent;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--slate-900);
+}
+.admin-approvals__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--slate-400);
+}
+
+/* ---------- table ---------- */
+.admin-approvals__table {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-approvals__table-head,
+.admin-approvals__row {
+  grid-template-columns: minmax(100px, 0.8fr) minmax(130px, 1.1fr) 90px minmax(150px, 1.2fr) 100px minmax(170px, 1.3fr) minmax(150px, 1fr);
+}
+.admin-approvals__table-head {
+  display: grid;
+  gap: 16px;
+  align-items: center;
+  background: var(--navy);
+  border-radius: 10px;
+  padding: 14px 20px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.admin-approvals__row {
+  display: grid;
+  align-items: center;
+  gap: 16px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px 20px;
+  border: 1.5px solid transparent;
+}
+.admin-approvals__row > * {
+  min-width: 0;
+}
+.admin-approvals__row--overdue {
+  border-color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 6%, white);
+}
+
+.admin-approvals__order-number {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--slate-900);
+}
+
+.admin-approvals__employee {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.admin-approvals__employee-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--slate-900);
+}
+.admin-approvals__employee-number {
+  font-size: 12px;
+  color: var(--slate-500);
+}
+
+.admin-approvals__submitted {
+  font-size: 13px;
+  color: var(--slate-600);
+}
+
+.admin-approvals__items {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.admin-approvals__thumbs {
+  display: flex;
+  align-items: center;
+  width: 90px;
+  flex: none;
+}
+.admin-approvals__thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #edf1f6;
+  border: 2px solid #fff;
+  margin-left: -8px;
+}
+.admin-approvals__thumb:first-child {
+  margin-left: 0;
+}
+.admin-approvals__items-count {
+  font-size: 12.5px;
+  color: var(--slate-600);
+  white-space: nowrap;
+}
+.admin-approvals__items-count b {
+  color: var(--slate-900);
+}
+
+.admin-approvals__total {
+  display: flex;
+  flex-direction: column;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--navy);
+}
+.admin-approvals__total-points {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--slate-500);
+}
+
+.admin-approvals__status {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.admin-approvals__step {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--slate-700);
+}
+.admin-approvals__due {
+  font-size: 12px;
+  color: var(--slate-500);
+}
+.admin-approvals__due--overdue {
+  color: var(--amber);
+  font-weight: 700;
+}
+
+.admin-approvals__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: 140px;
+  justify-self: end;
+}
+.admin-approvals__actions .btn {
+  white-space: nowrap;
+}
+.admin-approvals__your-order {
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--slate-500);
+  background: var(--slate-100);
+  border-radius: 999px;
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+
+.admin-approvals__pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 20px;
+}
+.admin-approvals__pager-label {
+  font-size: 13px;
+  color: var(--slate-600);
+}
+
+@media (max-width: 1150px) {
+  .admin-approvals__table-head {
+    display: none;
+  }
+  .admin-approvals__table-head,
+  .admin-approvals__row {
+    grid-template-columns: 1fr;
+  }
+  .admin-approvals__row {
+    justify-items: start;
+    gap: 8px;
+  }
+  .admin-approvals__actions,
+  .admin-approvals__your-order {
+    justify-self: start;
+  }
+}
+
+/* Approve/Reject dialog — same custom-property setup as
+   `order-detail.ts`'s own action dialog (and `confirm-dialog.ts`), since
+   this doesn't use Bootstrap's own .modal wrapper either. */
+.admin-approvals__action-dialog {
+  --bs-modal-padding: 1rem;
+  --bs-modal-color: var(--bs-body-color);
+  --bs-modal-bg: var(--bs-body-bg);
+  --bs-modal-border-color: var(--bs-border-color-translucent);
+  --bs-modal-border-width: var(--bs-border-width);
+  --bs-modal-border-radius: var(--bs-border-radius-lg);
+  --bs-modal-inner-border-radius: calc(var(--bs-border-radius-lg) - var(--bs-border-width));
+  --bs-modal-header-padding-x: 1rem;
+  --bs-modal-header-padding-y: 1rem;
+  --bs-modal-header-padding: 1rem 1rem;
+  --bs-modal-header-border-color: var(--bs-border-color);
+  --bs-modal-header-border-width: var(--bs-border-width);
+  --bs-modal-title-line-height: 1.5;
+  --bs-modal-footer-gap: 0.5rem;
+  --bs-modal-footer-bg: ;
+  --bs-modal-footer-border-color: var(--bs-border-color);
+  --bs-modal-footer-border-width: var(--bs-border-width);
+  padding: 0;
+  border: none;
+  background: transparent;
+  width: min(440px, calc(100vw - 32px));
+  max-width: none;
+}
+.admin-approvals__action-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.5);
+}

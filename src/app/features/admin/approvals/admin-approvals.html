@@ -1,0 +1,230 @@
+<app-header />
+
+<section class="admin-approvals">
+  <div class="container py-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a routerLink="/home">Home</a></li>
+        <li class="breadcrumb-item"><a routerLink="/admin">Admin</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Global Approvals</li>
+      </ol>
+    </nav>
+
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+      <h1 class="admin-approvals__title mb-0">Global Approvals</h1>
+      <a routerLink="/admin" class="admin-approvals__back btn btn-outline-secondary btn-sm">← Back to Admin</a>
+    </div>
+
+    @if (bannerMessage(); as msg) {
+      <div
+        class="alert mb-3"
+        [class.alert-success]="msg.tone === 'success'"
+        [class.alert-danger]="msg.tone === 'danger'"
+        [attr.role]="msg.tone === 'danger' ? 'alert' : 'status'"
+      >
+        {{ msg.text }}
+      </div>
+    }
+
+    <div class="admin-approvals__filters">
+      <div class="admin-approvals__field admin-approvals__field--search">
+        <label for="approvals-search" class="admin-approvals__field-label">Search</label>
+        <div class="admin-approvals__search">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M21 21l-4-4" />
+          </svg>
+          <input id="approvals-search" type="search" placeholder="Order #, name, email, or employee #" [formControl]="searchControl" />
+        </div>
+      </div>
+    </div>
+
+    @if (loading()) {
+      <div class="admin-approvals__table" role="status">
+        <span class="visually-hidden">Loading approvals…</span>
+        @for (n of [1, 2, 3, 4]; track n) {
+          <div class="admin-approvals__row" aria-hidden="true">
+            <div class="skeleton skeleton--text" style="width: 80px"></div>
+            <div class="skeleton skeleton--text" style="width: 100px"></div>
+            <div class="skeleton skeleton--text" style="width: 70px"></div>
+            <div class="skeleton skeleton--text" style="width: 110px"></div>
+            <div class="skeleton skeleton--text" style="width: 60px"></div>
+            <div class="skeleton skeleton--text" style="width: 130px"></div>
+          </div>
+        }
+      </div>
+    } @else if (error(); as message) {
+      <div class="alert alert-danger" role="alert">{{ message }}</div>
+    } @else if (rows().length === 0) {
+      <div class="admin-approvals__empty text-center py-5">
+        <p class="mb-0">Nothing waiting for approval.</p>
+      </div>
+    } @else {
+      @if (pagination(); as p) {
+        <p class="admin-approvals__count mb-2">
+          Showing <b>{{ rows().length }}</b> of <b>{{ p.totalRows }}</b> order{{ p.totalRows === 1 ? '' : 's' }}
+        </p>
+      }
+
+      <div class="admin-approvals__table">
+        <div class="admin-approvals__table-head">
+          <span>Order</span>
+          <span>Employee</span>
+          <span>Submitted</span>
+          <span>Items</span>
+          <span>Total</span>
+          <span>Status</span>
+          <span>Actions</span>
+        </div>
+        @for (row of rows(); track row.orderId) {
+          <div class="admin-approvals__row" [class.admin-approvals__row--overdue]="row.overdue === 'Y'">
+            <span class="admin-approvals__order-number">{{ row.orderNumber }}</span>
+
+            <span class="admin-approvals__employee">
+              <span class="admin-approvals__employee-name">{{ placedByName(row) }}</span>
+              @if (row.placedBy.employeeNumber) {
+                <span class="admin-approvals__employee-number">{{ row.placedBy.employeeNumber }}</span>
+              }
+            </span>
+
+            <span class="admin-approvals__submitted">{{ dateOnly(row.placedTs) }}</span>
+
+            <span class="admin-approvals__items">
+              <span class="admin-approvals__thumbs">
+                @for (thumb of displayedThumbs(row); track thumb.lineNo) {
+                  <img class="admin-approvals__thumb" [src]="thumb.imageUrl ?? placeholderImage" [alt]="thumb.productTitle" />
+                }
+              </span>
+              <span class="admin-approvals__items-count">
+                @if (row.moreCount > 0) {
+                  <b>+{{ row.moreCount }}</b>
+                }
+                {{ row.itemCount }} item{{ row.itemCount === 1 ? '' : 's' }}
+              </span>
+            </span>
+
+            <span class="admin-approvals__total">
+              {{ row.orderTotal | currency }}
+              @if (row.subtotalPoints && row.subtotalPoints > 0) {
+                <span class="admin-approvals__total-points">{{ row.subtotalPoints }} pts</span>
+              }
+            </span>
+
+            <span class="admin-approvals__status">
+              <span class="admin-approvals__step">{{ waitingOnLabel(row.approvalStep) }}</span>
+              @if (decideByDate(row); as due) {
+                <span class="admin-approvals__due" [class.admin-approvals__due--overdue]="row.overdue === 'Y'">
+                  {{ row.overdue === 'Y' ? 'Overdue since' : 'Decide by' }} {{ due }}
+                </span>
+              }
+            </span>
+
+            <span class="admin-approvals__actions">
+              <a
+                class="btn btn-outline-secondary btn-sm d-flex align-items-center justify-content-center gap-1"
+                [routerLink]="['/admin/orders', row.orderId]"
+                [queryParams]="{ from: 'approvals' }"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                View order
+              </a>
+              @if (row.adminCanAct === 'Y') {
+                <button type="button" class="btn btn-success btn-sm d-flex align-items-center justify-content-center gap-1" (click)="openApprove(row)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M1 12l5 5L17 6" />
+                    <path d="M7 12l5 5L23 6" />
+                  </svg>
+                  Approve
+                </button>
+                <button type="button" class="btn btn-danger btn-sm d-flex align-items-center justify-content-center gap-1" (click)="openReject(row)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M6 6l12 12M18 6L6 18" />
+                  </svg>
+                  Reject
+                </button>
+              } @else {
+                <span class="admin-approvals__your-order">Your order</span>
+              }
+            </span>
+          </div>
+        }
+      </div>
+
+      @if (pagination(); as p) {
+        @if (p.totalPages > 1) {
+          <nav class="admin-approvals__pager" aria-label="Approval queue pages">
+            <button type="button" class="btn btn-outline-secondary btn-sm" [disabled]="p.page <= 1" (click)="goToPage(p.page - 1)">
+              Previous
+            </button>
+            <span class="admin-approvals__pager-label">Page {{ p.page }} of {{ p.totalPages }}</span>
+            <button type="button" class="btn btn-outline-secondary btn-sm" [disabled]="p.page >= p.totalPages" (click)="goToPage(p.page + 1)">
+              Next
+            </button>
+          </nav>
+        }
+      }
+    }
+
+    <dialog
+      #actionDialogEl
+      class="admin-approvals__action-dialog"
+      [attr.aria-labelledby]="actionKind() === 'reject' ? 'reject-dialog-title' : 'approve-dialog-title'"
+      (close)="onActionDialogNativeClose()"
+      (click)="onActionDialogBackdropClick($event)"
+    >
+      @if (actionRow(); as row) {
+        @if (actionKind(); as kind) {
+          <div class="modal-content shadow-lg">
+            <div class="modal-header">
+              <h2 [id]="kind === 'reject' ? 'reject-dialog-title' : 'approve-dialog-title'" class="modal-title fs-5">
+                {{ kind === 'reject' ? 'Reject order' : 'Approve order' }} {{ row.orderNumber }}
+              </h2>
+              <button type="button" class="btn-close" aria-label="Close" (click)="closeActionDialog()"></button>
+            </div>
+            <div class="modal-body">
+              <label for="admin-action-notes" class="form-label">
+                {{ kind === 'reject' ? 'Reason for rejecting (required)' : 'Approval note (required)' }}
+              </label>
+              <textarea
+                id="admin-action-notes"
+                class="form-control"
+                rows="3"
+                maxlength="500"
+                required
+                [formControl]="actionNotes"
+              ></textarea>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" (click)="closeActionDialog()">Cancel</button>
+              <button
+                type="button"
+                class="btn d-flex align-items-center gap-2"
+                [class.btn-danger]="kind === 'reject'"
+                [class.btn-success]="kind !== 'reject'"
+                [disabled]="!canSubmitAction() || actionPending()"
+                (click)="submitAction()"
+              >
+                @if (kind === 'reject') {
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M6 6l12 12M18 6L6 18" />
+                  </svg>
+                } @else {
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M1 12l5 5L17 6" />
+                    <path d="M7 12l5 5L23 6" />
+                  </svg>
+                }
+                {{ kind === 'reject' ? 'Reject' : 'Approve' }}
+              </button>
+            </div>
+          </div>
+        }
+      }
+    </dialog>
+  </div>
+</section>
+
+<app-footer />

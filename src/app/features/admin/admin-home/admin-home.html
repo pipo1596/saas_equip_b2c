@@ -51,6 +51,35 @@
           </svg>
         </a>
       }
+
+      @if (showApprovals()) {
+        <a class="admin-home__card" routerLink="/admin/approvals">
+          <span class="admin-home__card-icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V5z" />
+              <path d="M9.5 12l1.8 1.8L15 10" />
+            </svg>
+          </span>
+          <span class="admin-home__card-body">
+            <span class="admin-home__card-title">Global Approvals</span>
+            <span class="admin-home__card-description">Approve or reject any order waiting on the customer.</span>
+          </span>
+          <svg
+            class="admin-home__card-chevron"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+        </a>
+      }
     </div>
   </div>
 </section>

@@ -92,6 +92,10 @@ export const serverRoutes: ServerRoute[] = [
     path: 'admin/orders/:orderId',
     renderMode: RenderMode.Client,
   },
+  {
+    path: 'admin/approvals',
+    renderMode: RenderMode.Client,
+  },
   // Reads its one-time token from `location.hash` (browser-only) and
   // redirects based on the session it just established — `ngOnInit` itself
   // no-ops during SSR (see `ShopAs.isBrowser`). Left on the prerender

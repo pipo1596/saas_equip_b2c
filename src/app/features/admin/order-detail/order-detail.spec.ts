@@ -162,7 +162,7 @@ describe('AdminOrderDetail', () => {
     expect(fixture.nativeElement.textContent).toContain('Pat Doe');
   });
 
-  it('links back to the orders list', () => {
+  it('links back to the orders list by default', () => {
     const fixture = createPage('42');
     fixture.detectChanges();
     flushOrderGet(httpMock, RAW_ORDER);
@@ -171,6 +171,19 @@ describe('AdminOrderDetail', () => {
     const backLink: HTMLAnchorElement = fixture.nativeElement.querySelector('.admin-order-detail__back');
     expect(backLink.getAttribute('href')).toBe('/admin/orders');
     expect(backLink.textContent).toContain('Back to Orders');
+  });
+
+  it('links back to Global Approvals instead when opened with ?from=approvals', () => {
+    const fixture = createPage('42');
+    fixture.componentRef.setInput('from', 'approvals');
+    fixture.detectChanges();
+    flushOrderGet(httpMock, RAW_ORDER);
+    fixture.detectChanges();
+
+    const backLink: HTMLAnchorElement = fixture.nativeElement.querySelector('.admin-order-detail__back');
+    expect(backLink.getAttribute('href')).toBe('/admin/approvals');
+    expect(backLink.textContent).toContain('Back to Global Approvals');
+    expect(fixture.nativeElement.querySelector('a[href="/admin/approvals"]')).not.toBeNull();
   });
 
   it('shows a not-found state for a non-numeric orderId, without calling the API', () => {

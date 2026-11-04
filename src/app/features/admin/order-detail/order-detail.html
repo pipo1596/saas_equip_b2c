@@ -6,7 +6,7 @@
       <ol class="breadcrumb">
         <li class="breadcrumb-item"><a routerLink="/home">Home</a></li>
         <li class="breadcrumb-item"><a routerLink="/admin">Admin</a></li>
-        <li class="breadcrumb-item"><a routerLink="/admin/orders">Orders</a></li>
+        <li class="breadcrumb-item"><a [routerLink]="backLink()">{{ backLabel() }}</a></li>
         <li class="breadcrumb-item active" aria-current="page">
           {{ order() ? order()!.orderNumber : 'Order' }}
         </li>
@@ -15,8 +15,8 @@
 
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 my-3">
       <h1 class="admin-order-detail__title mb-0 fs-4">Order details</h1>
-      <a routerLink="/admin/orders" class="admin-order-detail__back btn btn-outline-secondary btn-sm">
-        ← Back to Orders
+      <a [routerLink]="backLink()" class="admin-order-detail__back btn btn-outline-secondary btn-sm">
+        ← Back to {{ backLabel() }}
       </a>
     </div>
 

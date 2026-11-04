@@ -33,6 +33,14 @@ export class AdminOrderDetail implements OnInit {
   // Bound from the route (`/admin/orders/:orderId`, see app.routes.ts).
   readonly orderId = input('');
 
+  // Bound from `?from=approvals` — set only by the "View order" link on the
+  // Global Approvals queue (`admin-approvals.html`), so the breadcrumb/back
+  // link can return there instead of defaulting to the Orders list. A query
+  // param (not router navigation state) so it survives a refresh.
+  readonly from = input<string | null>(null);
+  readonly backLink = computed(() => (this.from() === 'approvals' ? '/admin/approvals' : '/admin/orders'));
+  readonly backLabel = computed(() => (this.from() === 'approvals' ? 'Global Approvals' : 'Orders'));
+
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly notFound = signal(false);

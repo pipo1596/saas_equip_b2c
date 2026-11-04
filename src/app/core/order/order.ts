@@ -582,6 +582,78 @@ export function historyStatusLabel(status: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+// ---- *ADMAPRQ / *ADMGET / *ADMAPPR / *ADMREJ (admin approvals) ----
+
+export interface AdmApprovalThumb {
+  lineNo: number;
+  skuId: number | null;
+  productTitle: string;
+  imageUrl: string | null;
+}
+
+export interface AdmApprovalLocation {
+  locationId: number | null;
+  code: string | null;
+  name: string | null;
+}
+
+export interface AdmApprovalRow {
+  orderId: number;
+  orderNumber: string;
+  status: 'PENDING_APPROVAL';
+  placedTs: string;
+  itemCount: number;
+  lineCount: number;
+  moreCount: number;
+  subtotal: number;
+  orderTotal: number;
+  subtotalPoints: number | null;
+  allotDollarsUsed: number | null;
+  allotPointsUsed: number | null;
+  allotUnitsUsed: number | null;
+  shipMethodName: string | null;
+  thumbnails: AdmApprovalThumb[];
+  // Same shape `*APPRQ`'s own `placedBy` already uses.
+  placedBy: ApprovalPlacedBy;
+  location: AdmApprovalLocation;
+  // Same shape `*APPRQ`'s own `approvalStep` already uses.
+  approvalStep: ApprovalStepSummary;
+  overdue: 'Y' | 'N';
+  // 'N' only on the viewer's own order — unlike `*APPRQ`, this queue still
+  // includes it (flagged, not filtered out), just with Approve/Reject
+  // replaced by a "Your order" tag client-side.
+  adminCanAct: 'Y' | 'N';
+}
+
+export interface AdmApprovalFilters {
+  locationId: number | null;
+  employeeId: number | null;
+  search: string | null;
+}
+
+export interface AdmApprovalsResponse {
+  pagination: OrderPagination;
+  // Absent on an empty page.
+  filters?: AdmApprovalFilters;
+  data: AdmApprovalRow[];
+}
+
+export interface ListAdminApprovalsParams {
+  locationId?: number;
+  employeeId?: number;
+  search?: string;
+  page: number;
+  pageSize: number;
+}
+
+interface RawAdmApprovalsResponse extends Omit<AdmApprovalsResponse, 'data'> {
+  data: AdmApprovalRow[] | null;
+}
+
+function normalizeAdmApprovalsResponse(raw: RawAdmApprovalsResponse): AdmApprovalsResponse {
+  return { ...raw, data: raw.data ?? [] };
+}
+
 @Injectable({ providedIn: 'root' })
 export class OrderService {
   private readonly http = inject(HttpClient);
@@ -670,5 +742,47 @@ export class OrderService {
   // blocked submission on an empty one.
   reject(orderId: number, notes: string): Observable<OrderWriteResult | ApiError> {
     return this.http.post<OrderWriteResult | ApiError>(this.dispatchUrl, { action: '*REJECT', orderId, notes });
+  }
+
+  // The administrator queue — every `PENDING_APPROVAL` order of the
+  // customer at any step (including the viewer's own, flagged
+  // `adminCanAct: 'N'`), unlike `listApprovals` (`*APPRQ`) which is scoped to
+  // just this approver's own waiting step. `AdminHome` also uses a
+  // `pageSize: 1` call here to decide whether to show the Approvals entry at
+  // all for a customer administrator — the session never exposes their
+  // Override flag to the UI directly, so this probe (failing with `ERR` for
+  // anyone else) stands in for it. A shop-as admin always gets the entry.
+  listAdminApprovals(params: ListAdminApprovalsParams): Observable<AdmApprovalsResponse | ApiError> {
+    return this.http
+      .post<RawAdmApprovalsResponse | ApiError>(this.dispatchUrl, {
+        action: '*ADMAPRQ',
+        locationId: params.locationId ?? 0,
+        employeeId: params.employeeId ?? 0,
+        search: params.search ?? '',
+        page: params.page,
+        pageSize: params.pageSize,
+      })
+      .pipe(map((response) => ('success' in response ? response : normalizeAdmApprovalsResponse(response))));
+  }
+
+  // `*ADMGET` — the same order JSON `get()`/`*GET` returns, but with no
+  // viewer check: a shop-as admin can open any order of the customer,
+  // including ones the impersonated employee couldn't see themselves.
+  getAdminOrder(orderId: number): Observable<OrderDetail | ApiError> {
+    return this.http
+      .post<RawOrderDetail | ApiError>(this.dispatchUrl, { action: '*ADMGET', orderId })
+      .pipe(map((response) => ('success' in response ? response : normalizeOrderDetail(response))));
+  }
+
+  // `notes` is required on both — an administrator decision always needs
+  // one (blank -> `ERR`), unlike the level-approver `approve()`'s optional
+  // note. An administrator decision is always final: it moves the order
+  // straight to `PROCESSING`/`REJECTED`, never forwarding to another level.
+  adminApprove(orderId: number, notes: string): Observable<OrderWriteResult | ApiError> {
+    return this.http.post<OrderWriteResult | ApiError>(this.dispatchUrl, { action: '*ADMAPPR', orderId, notes });
+  }
+
+  adminReject(orderId: number, notes: string): Observable<OrderWriteResult | ApiError> {
+    return this.http.post<OrderWriteResult | ApiError>(this.dispatchUrl, { action: '*ADMREJ', orderId, notes });
   }
 }

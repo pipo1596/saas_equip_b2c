@@ -687,6 +687,169 @@ describe('OrderService', () => {
       expect(result).toEqual({ success: false, code: 'ERR', message: 'A reason is required to reject an order.' });
     });
   });
+
+  describe('listAdminApprovals', () => {
+    const ADM_ROW = {
+      orderId: 1001,
+      orderNumber: 'EQ100001',
+      status: 'PENDING_APPROVAL' as const,
+      placedTs: '2026-11-02 09:14:00',
+      itemCount: 4,
+      lineCount: 2,
+      moreCount: 0,
+      subtotal: 1500,
+      orderTotal: 1695,
+      subtotalPoints: 0,
+      allotDollarsUsed: 1695,
+      allotPointsUsed: 0,
+      allotUnitsUsed: 0,
+      shipMethodName: 'Ground',
+      thumbnails: [{ lineNo: 1, skuId: 55, productTitle: 'Duty Jacket', imageUrl: 'https://cdn.example.com/x.jpg' }],
+      placedBy: { employeeId: 77, employeeNumber: 'A123', firstName: 'Sam', lastName: 'Lee', email: 'sam@example.com' },
+      location: { locationId: 9, code: 'ST01', name: 'Station 1' },
+      approvalStep: {
+        stepNo: 2,
+        kind: 'LEVEL' as const,
+        levelNo: 2,
+        roleNames: 'Captain',
+        scope: 'LOCATION' as const,
+        locationId: 9,
+        waitingSince: '2026-11-03 10:00:00',
+        dueTs: '2026-11-06 10:00:00',
+      },
+      overdue: 'N' as const,
+      adminCanAct: 'Y' as const,
+    };
+
+    it('posts *ADMAPRQ with the full filter/pagination contract, defaulting unset filters', () => {
+      service.listAdminApprovals({ page: 1, pageSize: 25 }).subscribe();
+
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      expect(req.request.body).toEqual({
+        action: '*ADMAPRQ',
+        locationId: 0,
+        employeeId: 0,
+        search: '',
+        page: 1,
+        pageSize: 25,
+      });
+      req.flush({
+        pagination: { page: 1, pageSize: 25, totalRows: 1, totalPages: 1 },
+        filters: { locationId: null, employeeId: null, search: null },
+        data: [ADM_ROW],
+      });
+    });
+
+    it('passes locationId/employeeId/search through when given', () => {
+      service.listAdminApprovals({ locationId: 9, employeeId: 77, search: 'Lee', page: 1, pageSize: 25 }).subscribe();
+
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      expect(req.request.body).toEqual({
+        action: '*ADMAPRQ',
+        locationId: 9,
+        employeeId: 77,
+        search: 'Lee',
+        page: 1,
+        pageSize: 25,
+      });
+      req.flush({ pagination: { page: 1, pageSize: 25, totalRows: 0, totalPages: 0 }, data: [] });
+    });
+
+    it('normalizes a null data array to []', () => {
+      let result: unknown;
+      service.listAdminApprovals({ page: 1, pageSize: 25 }).subscribe((res) => (result = res));
+
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER')
+        .flush({ pagination: { page: 1, pageSize: 25, totalRows: 0, totalPages: 0 }, data: null });
+
+      expect((result as { data: unknown[] }).data).toEqual([]);
+    });
+
+    it('passes a failure straight through', () => {
+      let result: unknown;
+      service.listAdminApprovals({ page: 1, pageSize: 25 }).subscribe((res) => (result = res));
+
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER')
+        .flush({ success: false, code: 'ERR', message: 'Only an administrator can open the approvals screen.' });
+
+      expect(result).toEqual({
+        success: false,
+        code: 'ERR',
+        message: 'Only an administrator can open the approvals screen.',
+      });
+    });
+  });
+
+  describe('getAdminOrder', () => {
+    it('posts *ADMGET with the orderId', () => {
+      service.getAdminOrder(1001).subscribe();
+
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      expect(req.request.body).toEqual({ action: '*ADMGET', orderId: 1001 });
+      req.flush(RAW_ORDER);
+    });
+
+    it('passes a failure straight through', () => {
+      let result: OrderDetail | ApiError | undefined;
+      service.getAdminOrder(1001).subscribe((res) => (result = res));
+
+      httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER').flush({ success: false, code: 'NFD', message: 'Order not found.' });
+
+      expect(result).toEqual({ success: false, code: 'NFD', message: 'Order not found.' });
+    });
+  });
+
+  describe('adminApprove', () => {
+    it('posts *ADMAPPR with the orderId and required note', () => {
+      service.adminApprove(1001, 'Approved -- replacement gear after the Elm St fire.').subscribe();
+
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      expect(req.request.body).toEqual({
+        action: '*ADMAPPR',
+        orderId: 1001,
+        notes: 'Approved -- replacement gear after the Elm St fire.',
+      });
+      req.flush({ success: true, message: 'Order EQ100001 approved.', orderId: 1001, orderNumber: 'EQ100001', status: 'PROCESSING' });
+    });
+
+    it('passes a failure straight through', () => {
+      let result: OrderWriteResult | ApiError | undefined;
+      service.adminApprove(1001, 'Approved.').subscribe((res) => (result = res));
+
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER')
+        .flush({ success: false, code: 'ERR', message: 'You cannot approve or reject your own order.' });
+
+      expect(result).toEqual({ success: false, code: 'ERR', message: 'You cannot approve or reject your own order.' });
+    });
+  });
+
+  describe('adminReject', () => {
+    it('posts *ADMREJ with the orderId and required note', () => {
+      service.adminReject(1001, 'Duplicate of EQ099876.').subscribe();
+
+      const req = httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER');
+      expect(req.request.body).toEqual({ action: '*ADMREJ', orderId: 1001, notes: 'Duplicate of EQ099876.' });
+      req.flush({ success: true, message: 'Order EQ100001 rejected.', orderId: 1001, orderNumber: 'EQ100001', status: 'REJECTED' });
+    });
+
+    it('passes a failure straight through', () => {
+      let result: OrderWriteResult | ApiError | undefined;
+      service.adminReject(1001, '').subscribe((res) => (result = res));
+
+      httpMock
+        .expectOne('/cgi/APPSCDSPCH?SEPGM=APCORDER')
+        .flush({ success: false, code: 'ERR', message: 'A note is required for an administrator decision.' });
+
+      expect(result).toEqual({
+        success: false,
+        code: 'ERR',
+        message: 'A note is required for an administrator decision.',
+      });
+    });
+  });
 });
 
 describe('PRODUCT_IMAGE_PLACEHOLDER', () => {

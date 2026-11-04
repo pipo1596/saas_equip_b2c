@@ -122,4 +122,10 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/admin/order-detail/order-detail').then((m) => m.AdminOrderDetail),
   },
+  {
+    path: 'admin/approvals',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/admin/approvals/admin-approvals').then((m) => m.AdminApprovals),
+  },
 ];
