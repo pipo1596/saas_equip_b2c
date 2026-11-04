@@ -110,6 +110,38 @@ describe('TenantSettingsService', () => {
     expect(service.loading()).toBe(false);
   });
 
+  it('does not set connectionError for an ordinary backend failure (e.g. a 500)', () => {
+    service.load().subscribe({ error: () => {} });
+
+    httpMock
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS')
+      .flush('failure', { status: 500, statusText: 'Server Error' });
+
+    expect(service.connectionError()).toBe(false);
+  });
+
+  it("sets connectionError on a status-0 failure — a true network outage, or a 301 to a different domain the browser's CORS policy then blocks reading", () => {
+    service.load().subscribe({ error: () => {} });
+    expect(service.connectionError()).toBe(false);
+
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS').flush('', { status: 0, statusText: 'Unknown Error' });
+
+    expect(service.connectionError()).toBe(true);
+  });
+
+  it('retrying after a status-0 failure issues a fresh request instead of replaying the cached failure', () => {
+    service.load().subscribe({ error: () => {} });
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS').flush('', { status: 0, statusText: 'Unknown Error' });
+    expect(service.connectionError()).toBe(true);
+
+    let result: TenantSettings | undefined;
+    service.load().subscribe((settings) => (result = settings));
+    httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS').flush(SAMPLE);
+
+    expect(result).toEqual(SAMPLE);
+    expect(service.connectionError()).toBe(false);
+  });
+
   it('does not report loading for a call that just returns the cached value', () => {
     service.load().subscribe();
     httpMock.expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS').flush(SAMPLE);

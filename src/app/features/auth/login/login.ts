@@ -41,6 +41,10 @@ export class Login implements OnInit {
   // Gates the whole screen behind a loader while tenant branding loads.
   readonly showLoadingGate = this.tenantSettingsService.loading;
 
+  // Replaces the whole screen with an error instead of a silently
+  // unbranded (or worse, stuck) login form — see `TenantSettingsService`.
+  readonly connectionError = this.tenantSettingsService.connectionError;
+
   readonly form = this.formBuilder.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
     password: ['', Validators.required],
@@ -48,12 +52,20 @@ export class Login implements OnInit {
 
   ngOnInit(): void {
     if (this.isBrowser) {
-      this.tenantSettingsService.load().subscribe();
+      this.retryTenantSettings();
     }
   }
 
   togglePasswordVisibility(): void {
     this.showPassword.update((visible) => !visible);
+  }
+
+  // The service's own `connectionError`/`settings` signals (read by the
+  // template above) are what this screen actually reacts to — the
+  // subscription itself needs nothing beyond not letting a failure go
+  // unhandled.
+  retryTenantSettings(): void {
+    this.tenantSettingsService.load().subscribe({ error: () => {} });
   }
 
   async onSubmit(): Promise<void> {

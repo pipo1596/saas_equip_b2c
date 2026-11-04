@@ -169,4 +169,43 @@ describe('Login', () => {
 
     expect(login.showLoadingGate()).toBe(false);
   });
+
+  it('shows a connection-error screen instead of the form when tenant settings fail with status 0', () => {
+    const fixture = TestBed.createComponent(Login);
+    const login = fixture.componentInstance;
+    // Triggers `ngOnInit()` itself (its first change-detection pass) —
+    // unlike this file's other tests, this one needs the rendered template,
+    // so it can't also call `login.ngOnInit()` manually beforehand (Angular
+    // would then run it a second time here, firing a second request).
+    fixture.detectChanges();
+
+    TestBed.inject(HttpTestingController)
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS')
+      .flush('', { status: 0, statusText: 'Unknown Error' });
+    fixture.detectChanges();
+
+    expect(login.connectionError()).toBe(true);
+    expect(fixture.nativeElement.textContent).toContain("We can't reach the sign-in service");
+    expect(fixture.nativeElement.querySelector('#email')).toBeNull();
+  });
+
+  it('retrying after a connection error issues a fresh request', () => {
+    const fixture = TestBed.createComponent(Login);
+    const login = fixture.componentInstance;
+    const httpMock = TestBed.inject(HttpTestingController);
+    fixture.detectChanges();
+
+    httpMock
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS')
+      .flush('', { status: 0, statusText: 'Unknown Error' });
+    expect(login.connectionError()).toBe(true);
+
+    login.retryTenantSettings();
+    httpMock
+      .expectOne('/cgi/APPSCDSPCH?SEPGM=APCTPSTNGS')
+      .flush({ logo_url: '/photos/partner-2/logo.jpg' } as TenantSettings);
+
+    expect(login.connectionError()).toBe(false);
+    expect(login.tenantSettings()?.logo_url).toBe('/photos/partner-2/logo.jpg');
+  });
 });

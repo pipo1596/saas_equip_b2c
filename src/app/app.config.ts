@@ -9,6 +9,7 @@ import {
 import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 
 import { charsetDecodeInterceptor } from './core/http/charset-decode.interceptor';
+import { tenantRedirectInterceptor } from './core/http/tenant-redirect.interceptor';
 import { NoRouteReuseStrategy } from './core/routing/no-reuse-route-strategy';
 import { routes } from './app.routes';
 import { provideClientHydration, withEventReplay } from '@angular/platform-browser';
@@ -38,6 +39,6 @@ export const appConfig: ApplicationConfig = {
     // URL or not — recreate the page fresh.
     { provide: RouteReuseStrategy, useClass: NoRouteReuseStrategy },
     provideClientHydration(withEventReplay()),
-    provideHttpClient(withFetch(), withInterceptors([charsetDecodeInterceptor])),
+    provideHttpClient(withFetch(), withInterceptors([charsetDecodeInterceptor, tenantRedirectInterceptor])),
   ],
 };

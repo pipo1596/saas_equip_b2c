@@ -1,7 +1,7 @@
 import { DOCUMENT, isPlatformBrowser } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, PLATFORM_ID, inject, signal } from '@angular/core';
-import { Observable, finalize, of, shareReplay, tap } from 'rxjs';
+import { Observable, catchError, finalize, of, shareReplay, tap, throwError } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 
@@ -71,6 +71,17 @@ export class TenantSettingsService {
   // just handed back the already-cached value, so callers can show a
   // loading state without it firing on every repeat call.
   readonly loading = signal(false);
+  // `status: 0` is the browser's catch-all for "the request never really
+  // completed" — a true network outage, but also this same dispatch
+  // endpoint 301'ing to a different domain whose CORS headers don't allow
+  // this origin (see `tenantRedirectInterceptor`, which can only act once it
+  // has a *readable* redirected response — a cross-origin target without the
+  // right headers never gets that far, and the browser hides everything
+  // else about why it failed). Either way there's no tenant data to show and
+  // no URL to send the visitor on to, so the only honest thing left to do is
+  // say so — callers (the login page, most importantly) show a real error
+  // instead of silently rendering with no branding.
+  readonly connectionError = signal(false);
 
   private request$: Observable<TenantSettings> | null = null;
 
@@ -88,12 +99,23 @@ export class TenantSettingsService {
 
     if (!this.request$) {
       this.loading.set(true);
+      this.connectionError.set(false);
       this.request$ = this.http
         .post<TenantSettings>(this.dispatchUrl, { action: '*GET' })
         .pipe(
           tap((settings) => {
             this.settings.set(settings);
             this.applyFavicon(settings.logo_url);
+          }),
+          catchError((error: unknown) => {
+            // Cleared so the next `load()` call (e.g. a "Try again" button)
+            // gets a fresh attempt instead of `shareReplay` just handing
+            // back this same cached failure forever.
+            this.request$ = null;
+            if (error instanceof HttpErrorResponse && error.status === 0) {
+              this.connectionError.set(true);
+            }
+            return throwError(() => error);
           }),
           finalize(() => this.loading.set(false)),
           shareReplay(1),

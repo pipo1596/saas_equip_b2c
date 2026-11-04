@@ -4,6 +4,16 @@
       <span class="visually-hidden">Loading…</span>
     </div>
   </div>
+} @else if (connectionError()) {
+  <div class="d-flex align-items-center justify-content-center min-vh-100 bg-dark p-4">
+    <div class="text-center text-white" style="max-width: 420px" role="alert">
+      <h1 class="font-display fw-semibold fs-4 mb-2">We can't reach the sign-in service</h1>
+      <p class="small mb-4" style="color: #9fb6cc">
+        Please check your connection and try again. If this keeps happening, contact support.
+      </p>
+      <button type="button" class="btn btn-primary" (click)="retryTenantSettings()">Try again</button>
+    </div>
+  </div>
 } @else {
 <main class="shell row g-0 mx-auto min-vh-100">
   <!-- Hero / brand panel -->
