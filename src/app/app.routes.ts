@@ -93,6 +93,11 @@ export const routes: Routes = [
       import('./features/announcements/announcements-page').then((m) => m.AnnouncementsPage),
   },
   {
+    path: 'support',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/support/support-page').then((m) => m.SupportPage),
+  },
+  {
     // No admin-specific guard yet — the access rule hasn't been defined, so
     // this is only gated on being signed in at all (same as every other
     // route above) until that rule exists.

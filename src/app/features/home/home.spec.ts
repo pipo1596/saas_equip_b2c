@@ -1,10 +1,11 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { AuthService } from '../../core/auth/auth';
 import { FAKE_SESSION } from '../../core/auth/auth.testing';
+import { CartService } from '../../core/cart/cart';
 import { Home } from './home';
 
 describe('Home', () => {
@@ -464,5 +465,81 @@ describe('Home', () => {
     const actions: HTMLAnchorElement[] = fixture.nativeElement.querySelectorAll('.action');
     const myAccount = Array.from(actions).find((el) => el.textContent?.includes('My account'));
     expect(myAccount?.getAttribute('href')).toBe('/account');
+  });
+
+  describe('quick actions', () => {
+    function actionTitles(fixture: ComponentFixture<Home>): string[] {
+      const actions: HTMLAnchorElement[] = fixture.nativeElement.querySelectorAll('.action');
+      return Array.from(actions).map((el) => el.querySelector('.action__t')?.textContent?.trim() ?? '');
+    }
+
+    it('shows My account, Order history, Announcements, and Support & resources by default', () => {
+      const fixture = TestBed.createComponent(Home);
+      fixture.detectChanges();
+
+      expect(actionTitles(fixture)).toEqual(['My account', 'Order history', 'Announcements', 'Support & resources']);
+    });
+
+    it('links Order history, Announcements, and Support & resources to their real pages', () => {
+      const fixture = TestBed.createComponent(Home);
+      fixture.detectChanges();
+
+      const actions: HTMLAnchorElement[] = fixture.nativeElement.querySelectorAll('.action');
+      const byTitle = (title: string) =>
+        Array.from(actions).find((el) => el.querySelector('.action__t')?.textContent?.trim() === title);
+      expect(byTitle('Order history')?.getAttribute('href')).toBe('/orders');
+      expect(byTitle('Announcements')?.getAttribute('href')).toBe('/announcements');
+      expect(byTitle('Support & resources')?.getAttribute('href')).toBe('/support');
+    });
+
+    it('does not show eQuip videos, Sizing, Reorder essentials, or the old Department communication label', () => {
+      const fixture = TestBed.createComponent(Home);
+      fixture.detectChanges();
+
+      const titles = actionTitles(fixture);
+      expect(titles).not.toContain('eQuip videos');
+      expect(titles).not.toContain('Sizing');
+      expect(titles).not.toContain('Reorder essentials');
+      expect(titles).not.toContain('Department communication');
+    });
+
+    it('inserts an Approval dashboard tile, right after Order history, only when the employee can approve', () => {
+      const fixture = TestBed.createComponent(Home);
+      fixture.detectChanges();
+      TestBed.inject(CartService).cart.set({
+        cartId: null,
+        itemCount: 0,
+        subtotalPrice: 0,
+        subtotalPoints: null,
+        items: [],
+        roleRequiresApproval: 'N',
+        allotment: {
+          programId: 3,
+          allotmentBar: null,
+          ruleCount: 0,
+          allotExclTaxFreight: 'N',
+          allowCcOverage: 'N',
+          rules: [],
+          approvals: { canApprove: 'Y', pendingApprovals: 4, awaitingApproval: null },
+          openOrders: null,
+          lineTags: [],
+          productTag: null,
+        },
+      });
+      fixture.detectChanges();
+
+      expect(actionTitles(fixture)).toEqual([
+        'My account',
+        'Order history',
+        'Approval dashboard',
+        'Announcements',
+        'Support & resources',
+      ]);
+      const actions: HTMLAnchorElement[] = fixture.nativeElement.querySelectorAll('.action');
+      const approvalTile = Array.from(actions).find(
+        (el) => el.querySelector('.action__t')?.textContent?.trim() === 'Approval dashboard',
+      );
+      expect(approvalTile?.getAttribute('href')).toBe('/approvals');
+    });
   });
 });

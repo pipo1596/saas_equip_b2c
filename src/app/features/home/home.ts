@@ -29,6 +29,37 @@ import { TenantSettingsService } from '../../core/tenant/tenant-settings';
 import { Footer } from '../../shared/footer/footer';
 import { Header } from '../../shared/header/header';
 
+export type QuickActionIcon = 'account' | 'orders' | 'announcements' | 'approvals' | 'support';
+
+export interface QuickAction {
+  icon: QuickActionIcon;
+  title: string;
+  description: string;
+  routerLink: string;
+}
+
+// The "Your portal" tile grid — always these, in this order, regardless of
+// the viewer. "Approval dashboard" isn't here: it's inserted into
+// `quickActions` only for an employee who can actually approve (see
+// `approvals()` below), the same `canApprove` flag the header's own
+// Approvals link and the hero's approvals stat already gate on.
+const BASE_QUICK_ACTIONS: QuickAction[] = [
+  { icon: 'account', title: 'My account', description: 'View and edit your profile and sizes', routerLink: '/account' },
+  { icon: 'orders', title: 'Order history', description: 'Track shipments and reorder past items', routerLink: '/orders' },
+  {
+    icon: 'announcements',
+    title: 'Announcements',
+    description: 'Updates, policies, and key info',
+    routerLink: '/announcements',
+  },
+  {
+    icon: 'support',
+    title: 'Support & resources',
+    description: 'Help with this shopping platform',
+    routerLink: '/support',
+  },
+];
+
 @Component({
   selector: 'app-home',
   imports: [Header, Footer, RouterLink, NgOptimizedImage, DatePipe],
@@ -74,6 +105,23 @@ export class Home implements OnInit {
   readonly tileBalance = tileBalance;
   readonly meterPct = meterPct;
   readonly formatBalanceAmount = formatBalanceAmount;
+
+  // `BASE_QUICK_ACTIONS` plus "Approval dashboard", inserted right after
+  // Order history, only when this employee can approve — everyone else
+  // never sees it at all, rather than a dead/blocked link.
+  readonly quickActions = computed<QuickAction[]>(() => {
+    if (this.approvals()?.canApprove !== 'Y') {
+      return BASE_QUICK_ACTIONS;
+    }
+    const actions = [...BASE_QUICK_ACTIONS];
+    actions.splice(2, 0, {
+      icon: 'approvals',
+      title: 'Approval dashboard',
+      description: 'Review and approve pending orders',
+      routerLink: '/approvals',
+    });
+    return actions;
+  });
 
   // Refreshes the "Shop by category" list whenever the active location
   // defaults or changes, same as the header's own catalog menu load.
